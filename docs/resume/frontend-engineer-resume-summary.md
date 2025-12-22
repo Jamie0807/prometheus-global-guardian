@@ -7,7 +7,7 @@
 
 • **构建企业级React数据可视化平台**：主导开发全球灾害监控平台前端系统，使用**React 19.1 + TypeScript 5.9严格模式**构建现代化SPA应用，集成**Recharts 3.5.0**实现**4类交互式图表**（饼图、柱状图、折线图、面积图）处理实时灾害数据，通过**图表响应式优化、React性能优化（memo/useMemo/useCallback）**等手段优化渲染性能，支持**3层数据钻取**交互
 
-• **打造高性能3D地图可视化系统**：基于**Mapbox GL JS 3.15**开发交互式地理空间可视化，集成**React Hooks**实现地图状态管理，通过**GeoJSON格式**渲染多源数据（USGS、GDACS），实现**热力图、标记点、自定义弹窗**等多种展示形式，支持**实时事件过滤、缩放动画**等高级功能
+• **打造高性能3D地图可视化系统**：基于**Mapbox GL JS 3.15**开发交互式**3D地球视图**，集成**React Hooks**实现地图状态管理，通过**GeoJSON格式**渲染**4大数据源**（USGS地震、NASA环境事件、GDACS灾害警报、DisasterAware），实现**热力图、动态标记点聚类、自定义Popup弹窗**等多种展示形式，支持**实时事件过滤、3D旋转倾斜、缩放动画**等高级功能
 
 • **开发前后端分离架构与API集成**：设计并实现**RESTful API调用层**，使用**Fetch API + TypeScript**封装类型安全的API客户端，集成**Python FastAPI后端**的统计分析、预测模型、风险评估等接口，实现**超时控制和重试机制**（30秒超时，最多重试3次），错误处理覆盖率**100%**
 
@@ -19,12 +19,12 @@
 
 ---
 
-## 项目：全球灾害监控平台前端可视化系统
+## 项目：Prometheus Global Guardian - 实时全球环境灾害监控与可视化平台
 **Prometheus Space Technologies** | Sep 2025 – present  
 
-**项目描述**：为Prometheus Space Technologies全球灾害监控平台构建现代化前端可视化系统，整合实时灾害数据的展示、分析和交互功能。采用**React 19.1 + TypeScript 5.9 + Vite 7.1**技术栈，实现3D地图可视化、交互式数据图表、实时数据更新、智能通知中心等核心功能。项目覆盖数据可视化、状态管理、性能优化、工程化实践等前端全栈技能。
+**项目描述**：基于**React 19.1 + TypeScript 5.9 + Mapbox GL**构建的现代化全栈应用，整合**4大权威数据源**（USGS地震数据、NASA环境事件、GDACS全球灾害警报、DisasterAware实时灾害），为全球灾害监测提供**实时、直观、交互式**的可视化解决方案。实现**3D地球视图**、**多源数据融合**、**智能数据分析**、**交互式图表系统**、**风险评估预测**等核心功能。项目整合**Python FastAPI微服务**（23种统计算法 + 5个预测模型），实现前后端分离架构，覆盖数据可视化、状态管理、API集成、性能优化等前端全栈技能。
 
-**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | Vite 7.1 + ESM | Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API | CSS Modules + Responsive Design
+**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | Vite 7.1 + ESM | Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | CSS Modules + Responsive Design
 
 ### 主要职责与成果：
 
@@ -507,12 +507,19 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 - **数据格式标准化**：统一不同数据源的数据结构为Hazard接口
 - **类型安全**：完整TypeScript类型定义，编译时错误检查
 
-**数据源对比**：
-| 数据源 | 认证方式 | 数据类型 | 覆盖范围 |
-|--------|---------|---------|---------|
-| DisasterAware | OAuth 2.0 | 全球灾害 | 全球 |
-| USGS | API Key | 地震数据 | 全球 |
-| GDACS | 公开API | 自然灾害 | 全球 |
+**多数据源集成架构**：
+| 数据源 | 认证方式 | 数据类型 | 更新频率 | 覆盖范围 |
+|--------|---------|---------|---------|----------|
+| DisasterAware | OAuth 2.0 | 全球灾害事件 | 实时 | 全球 |
+| USGS | 公开API | 地震数据（震级、深度、位置） | 实时 | 全球 |
+| NASA EONET | 公开API | 环境事件（野火、风暴） | 每日 | 全球 |
+| GDACS | 公开API | 自然灾害警报 | 实时 | 全球 |
+
+**数据融合特点**：
+- ✅ **统一数据模型**：将4个数据源标准化为Hazard接口
+- ✅ **错误降级处理**：单个数据源失败不影响整体系统
+- ✅ **去重机制**：基于ID和地理位置去除重复事件
+- ✅ **实时轮询**：5分钟自动刷新，保持数据时效性
 
 ---
 
@@ -1009,9 +1016,11 @@ const [isRefreshing, setIsRefreshing] = useState(false);
 ## 项目亮点
 
 **技术创新**：
+- **多数据源聚合架构**：整合4大权威数据源（DisasterAware、USGS、NASA、GDACS），数据覆盖率**全球100%**
 - **React 19最新特性**：使用最新React特性和并发渲染提升性能
 - **TypeScript严格模式**：编译时类型安全保障，减少运行时错误
 - **组件化架构**：构建18个可复用组件，高度模块化设计
+- **OAuth 2.0认证系统**：完整的Bearer Token + 自动刷新机制，支持第三方API安全接入
 
 **性能突破**：
 - **首屏加载**：优化至**1.1秒**
@@ -1103,7 +1112,7 @@ const [isRefreshing, setIsRefreshing] = useState(false);
 
 ### 🔌 **API集成与认证**
 - **认证协议**：OAuth 2.0、Bearer Token、Token自动刷新
-- **第三方API**：DisasterAware API、USGS Earthquake API、GDACS
+- **第三方API**：DisasterAware API、USGS Earthquake API、NASA EONET API、GDACS
 - **HTTP客户端**：Fetch API、超时控制、自动重试、错误降级
 - **数据融合**：多数据源聚合、数据格式标准化、接口统一封装
 
