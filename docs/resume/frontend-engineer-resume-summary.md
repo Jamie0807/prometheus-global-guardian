@@ -7,7 +7,7 @@
 
 • **构建企业级React数据可视化平台**：主导开发全球灾害监控平台前端系统，使用**React 19.1 + TypeScript 5.9严格模式**构建现代化SPA应用，集成**Recharts 2.15**实现**4类交互式图表**（饼图、柱状图、折线图、面积图）处理实时灾害数据，通过**数据分页加载、图表响应式优化、React性能优化（memo/useMemo/useCallback）**等综合手段优化渲染性能，支持**3层数据钻取**交互，日均服务**500+次**数据探索请求
 
-• **打造高性能3D地图可视化系统**：基于**Mapbox GL JS 3.15**开发交互式地理空间可视化，集成**React Hooks**实现地图状态管理，通过**GeoJSON格式**渲染多源数据（USGS、GDACS），实现**热力图、标记点聚类、自定义弹窗**等多种展示形式，支持**实时事件过滤、缩放动画、飞行定位**等高级功能，地图交互响应时间**<50ms**
+• **打造高性能3D地图可视化系统**：基于**Mapbox GL JS 3.15**开发交互式地理空间可视化，集成**React Hooks**实现地图状态管理，通过**GeoJSON格式**渲染多源数据（USGS、GDACS），实现**热力图、标记点聚类、自定义弹窗**等多种展示形式，支持**实时事件过滤、缩放动画**等高级功能，地图交互响应时间**<50ms**
 
 • **开发前后端分离架构与API集成**：设计并实现**RESTful API调用层**，使用**Axios + TypeScript泛型**封装类型安全的API客户端，集成**Python FastAPI后端**的统计分析、预测模型、风险评估等**9个核心接口**，通过**Promise.allSettled**实现并发请求优化，数据获取时间从**3s优化至800ms**，错误处理覆盖率**100%**
 
@@ -41,7 +41,7 @@
 • **3D地图可视化开发（Mapbox GL JS 3.15）**：
   - 基于**Mapbox GL**实现全球灾害地理可视化，集成**USGS地震数据源**和**GDACS灾害数据源**
   - 实现**GeoJSON数据格式解析**：支持热力图、标记点聚类渲染，地图交互响应**<50ms**
-  - 开发**实时数据更新**、**飞行动画**、**自定义Popup**等高级交互功能
+  - 开发**实时数据更新**、**自定义Popup弹窗**等高级交互功能
 
 • **API集成与数据管理**：
   - 设计**类型安全API客户端**：使用**Fetch + TypeScript**封装Python后端接口
@@ -274,53 +274,36 @@ mapRef.current.addLayer({
 });
 ```
 
-**3. 实时数据更新与动画**
+**3. 地图数据更新**
 ```typescript
-// 增量更新地图数据（概念示例）
-const updateMapData = useCallback((newHazards: Hazard[]) => {
-  const source = mapRef.current?.getSource('hazards') as mapboxgl.GeoJSONSource;
-  if (source) {
-    // 实际项目中通过 MapView 组件的 onDataUpdate 回调更新
-    source.setData({
-      type: 'FeatureCollection',
-      features: newHazards.map(h => ({
-        type: 'Feature',
-        geometry: h.geometry,
-        properties: h.properties
-      }))
-    });
-  }
-}, []);
+// 实际项目中通过 MapView 组件的 props 和 state 管理数据更新
+const [disasters, setDisasters] = useState<Hazard[]>([]);
 
-// 飞行动画
-const flyToLocation = (lng: number, lat: number) => {
-  mapRef.current?.flyTo({
-    center: [lng, lat],
-    zoom: 8,
-    duration: 2000,
-    essential: true
-  });
+// 在 App.tsx 中通过 onDataUpdate 回调更新父组件状态
+const handleDisastersUpdate = (data: Hazard[]) => {
+  setDisasters(data);
+  if (data.length > previousCount) {
+    notify.info('数据更新', `检测到 ${data.length - previousCount} 条新记录`);
+  }
 };
 ```
 
-**4. 自定义弹窗与交互**
+**4. 自定义弹窗展示**
 ```typescript
-// Marker点击事件
-mapRef.current.on('click', 'unclustered-point', (e) => {
-  const coordinates = e.features![0].geometry.coordinates.slice();
-  const properties = e.features![0].properties;
+// 实际使用的 Popup 实现（来自 MapView.tsx）
+const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+  <div class="popup-title">${hazard.title}</div>
+  <div class="popup-info">
+    <strong>Type:</strong> ${hazard.type}<br/>
+    <strong>Severity:</strong> ${hazard.severity || 'N/A'}<br/>
+    <strong>Source:</strong> ${hazard.source}
+  </div>
+`);
 
-  new mapboxgl.Popup()
-    .setLngLat(coordinates as [number, number])
-    .setHTML(`
-      <div class="custom-popup">
-        <h3>${properties.type}</h3>
-        <p><strong>Severity:</strong> ${properties.severity}</p>
-        <p><strong>Time:</strong> ${formatDate(properties.timestamp)}</p>
-      </div>
-    `)
-    .addTo(mapRef.current!);
-});
+new mapboxgl.Marker()
+  .setLngLat(coordinates)
+  .setPopup(popup)
+  .addTo(map.current!);
 ```
 
 **地图性能优化**：
