@@ -64,6 +64,7 @@ Statistical Libraries: Python专业数据科学库 (statistical_algorithms.py, p
 
 #### 算法原理
 ```python
+# File: python-analytics-service/analytics/risk_assessment.py
 # Python实现 - 基于Pandas的高效网格聚合
 def _identify_high_risk_regions(self, df: pd.DataFrame):
     # 1. 坐标网格化 (保留整数经纬度)
@@ -119,6 +120,7 @@ def _identify_high_risk_regions(self, df: pd.DataFrame):
 
 **1. 频率因子 (0-100分)**
 ```python
+# File: python-analytics-service/analytics/risk_assessment.py
 # Python实现
 frequency_factor = (current_count / historical_max) * 100
 ```
@@ -127,6 +129,7 @@ frequency_factor = (current_count / historical_max) * 100
 
 **2. 严重性因子 (0-100分)**
 ```python
+# File: python-analytics-service/analytics/risk_assessment.py
 # Python实现 - 使用Pandas高效计算
 severity_factor = (df[df['severity'] == 'WARNING'].shape[0] / len(df)) * 100
 ```
@@ -136,6 +139,7 @@ severity_factor = (df[df['severity'] == 'WARNING'].shape[0] / len(df)) * 100
 
 **3. 地理密度因子 (0-100分)**
 ```python
+# File: python-analytics-service/analytics/risk_assessment.py
 # Python实现 - 基于网格密度统计
 geo_density_factor = (grid_count / theoretical_max) * 100
 ```
@@ -161,6 +165,7 @@ geo_density_factor = (grid_count / theoretical_max) * 100
 
 #### 算法公式
 ```python
+# File: python-analytics-service/analytics/statistical_algorithms.py
 # Python实现 - 使用Pandas时间序列分析
 growth_rate = ((recent_7days - previous_7days) / previous_7days) * 100
 
@@ -198,6 +203,7 @@ else:
 
 #### 公式
 ```python
+# File: python-analytics-service/analytics/statistical_algorithms.py
 # Python实现 - 使用NumPy高效计算
 import numpy as np
 
@@ -237,6 +243,7 @@ anomalies = data[np.abs(data - mu) > 3 * sigma]  # 3σ异常检测
 
 #### 算法公式
 ```python
+# File: python-analytics-service/analytics/statistical_algorithms.py
 # Python实现 - 使用SciPy统计库
 from scipy.stats import pearsonr
 
@@ -284,6 +291,7 @@ r, p_value = pearsonr(x_data, y_data)
 
 **1. 频率统计**
 ```python
+# File: python-analytics-service/analytics/statistical_algorithms.py
 # 使用 Pandas 高效分组统计
 import pandas as pd
 
@@ -337,27 +345,31 @@ advisory_count = len(df[df['severity'] == 'ADVISORY'])
 ### 4.1 Extract阶段：并行数据获取
 
 #### **多源数据整合架构**
-```python
-# Python异步并行提取三大数据源
-import asyncio
-import aiohttp
+```typescript
+// File: src/components/MapView.tsx
+// TypeScript并行提取三大数据源 (Actual Implementation)
+const fetchDisasters = async () => {
+  try {
+    // 使用 Promise.allSettled 并行请求
+    const [usgs, nasa, gdacs] = await Promise.allSettled([
+      fetchUSGSEarthquakes(),
+      fetchNASAEONET(),
+      fetchGDACS()
+    ]);
 
-async def fetch_all_sources() -> list:
-    """使用asyncio并行获取所有数据源"""
-    async with aiohttp.ClientSession() as session:
-        tasks = [
-            fetch_usgs_data(session),      # 地震数据
-            fetch_nasa_eonet_data(session), # 环境事件数据  
-            fetch_gdacs_data(session)       # 全球灾害预警
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # 过滤成功的结果
-        hazards = []
-        for result in results:
-            if not isinstance(result, Exception):
-                hazards.extend(result)
-        return hazards
+    const all: Hazard[] = [];
+    // 聚合成功的结果
+    [usgs, nasa, gdacs].forEach(res => {
+      if (res.status === "fulfilled" && res.value.length > 0)
+        all.push(...res.value);
+    });
+    
+    return all;
+  } catch (err) {
+    console.error("Error loading disasters:", err);
+    return [];
+  }
+};
 ```
 
 **性能优化指标**：
@@ -378,6 +390,7 @@ async def fetch_all_sources() -> list:
 #### **异构数据统一建模**
 
 ```python
+# File: python-analytics-service/main.py
 # 使用Pydantic进行数据验证和建模
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -400,6 +413,7 @@ class Hazard(BaseModel):
 
 **1. 类型映射标准化**
 ```python
+# File: python-analytics-service/analytics/unified_model.py
 # USGS震级 → 统一严重性映射
 def map_usgs_severity(magnitude: float) -> str:
     if magnitude >= 7.0:
@@ -420,6 +434,7 @@ def map_nasa_type(category: str) -> str:
 
 **2. 数据验证算法**
 ```python
+# File: python-analytics-service/analytics/quality_monitor.py
 # 综合数据质量检查 - Python ETL处理器
 from analytics.etl_processor import ETLProcessor
 
@@ -445,6 +460,7 @@ def validate_data_quality(df: pd.DataFrame) -> dict:
 
 **3. 异常检测与修复**
 ```python
+# File: python-analytics-service/analytics/statistical_algorithms.py
 # 3σ原则异常值检测 - NumPy高效实现
 import numpy as np
 
@@ -475,44 +491,48 @@ def detect_anomalies(values: np.ndarray) -> dict:
 
 #### **分层数据存储策略**
 
-```python
-# 智能采样算法 - Pandas高效分层采样
-import pandas as pd
-
-def intelligent_sampling(df: pd.DataFrame, max_samples: int = 1000) -> dict:
-    """智能采样：按类型保持分布比例"""
-    if len(df) <= max_samples:
-        return {
-            'should_sample': False,
-            'data': df,
-            'message': '无需采样'
-        }
-    
-    # 分层采样：按类型保持分布比例
-    type_distribution = df['type'].value_counts()
-    sampled_data = pd.DataFrame()
-    
-    for hazard_type, count in type_distribution.items():
-        sample_size = int(np.ceil((count / len(df)) * max_samples))
-        type_df = df[df['type'] == hazard_type]
-        sampled = type_df.sample(n=min(sample_size, len(type_df)))
-        sampled_data = pd.concat([sampled_data, sampled])
-    
-    memory_reduction = (len(df) - len(sampled_data)) / len(df) * 100
-    
-    return {
-        'should_sample': True,
-        'original_count': len(df),
-        'sampled_count': len(sampled_data),
-        'data': sampled_data,
-        'memory_reduction': f'{memory_reduction:.1f}%',  # 70%内存优化
-        'message': f'智能采样：{len(df)} → {len(sampled_data)}条'
+```typescript
+// File: src/components/ChartsPanel.tsx
+// 实际实现 - 前端数据切片与按需加载
+const loadPythonStats = async () => {
+  if (hazards.length === 0) return;
+  
+  setLoading(true);
+  setChartError('');
+  try {
+    // 智能采样：仅发送前100条数据进行统计分析，避免后端过载
+    const result = await getStatistics(hazards.slice(0, 100));
+    if (result.success) {
+      setPythonStats(result.data);
+    } else {
+      setChartError('统计数据加载失败');
     }
+  } catch (error) {
+    console.error('Failed to load Python statistics:', error);
+    setChartError((error as Error).message || '加载统计数据时出错');
+  } finally {
+    setLoading(false);
+  }
+};
+
+// 时间线数据优化：仅展示最近30天数据
+const timelineData = React.useMemo(() => {
+  const dateCount: Record<string, number> = {};
+  hazards.forEach(h => {
+    const date = h.properties?.timestamp ? new Date(h.properties.timestamp).toLocaleDateString('zh-CN') : '未知日期';
+    dateCount[date] = (dateCount[date] || 0) + 1;
+  });
+  return Object.entries(dateCount)
+    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+    .slice(-30) // 采样策略：最近30天
+    .map(([date, count]) => ({ date, count }));
+}, [hazards]);
 ```
 
 #### **持久化配置管理**
 
 ```python
+# File: python-analytics-service/main.py
 # 后端数据存储 - FastAPI + Pandas
 from fastapi import FastAPI, Response
 import pandas as pd
@@ -559,6 +579,7 @@ async def export_data(format: str, df: pd.DataFrame) -> Response:
 #### **统一回归算法实现**
 
 ```python
+# File: python-analytics-service/analytics/prediction_models.py
 # Python Scikit-learn专业机器学习库实现
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
@@ -595,6 +616,7 @@ class PredictionEngine:
 
 **1. 地震预测模型**
 ```python
+# File: python-analytics-service/analytics/prediction_models.py
 # 地震特异性特征工程 - Python实现
 from analytics.prediction_models import PredictionEngine
 import pandas as pd
@@ -643,6 +665,7 @@ def earthquake_prediction_model(df: pd.DataFrame) -> dict:
 
 **2. 火山活动预测模型**
 ```python
+# File: python-analytics-service/analytics/prediction_models.py
 # 火山-地震关联性建模 - Python SciPy相关性分析
 from scipy.stats import pearsonr
 import pandas as pd
@@ -683,6 +706,7 @@ def volcano_activity_model(df: pd.DataFrame) -> dict:
 
 **3. 风暴系统预测模型**
 ```python
+# File: python-analytics-service/analytics/prediction_models.py
 # 季节性分解与周期识别 - Statsmodels时间序列分析
 from statsmodels.tsa.seasonal import seasonal_decompose
 import pandas as pd
@@ -723,6 +747,7 @@ def storm_system_model(df: pd.DataFrame) -> dict:
 
 **4. 洪水灾害预测模型**
 ```python
+# File: python-analytics-service/analytics/prediction_models.py
 # 级联灾害关联建模 - SciPy + Scikit-learn
 from scipy.stats import pearsonr
 from sklearn.cluster import DBSCAN
@@ -763,6 +788,7 @@ def flood_disaster_model(df: pd.DataFrame) -> dict:
 
 **5. 野火预测模型**
 ```python
+# File: python-analytics-service/analytics/prediction_models.py
 # 地理空间加权回归模型 - Scikit-learn
 from sklearn.linear_model import LinearRegression
 import pandas as pd
@@ -803,42 +829,36 @@ def wildfire_prediction_model(df: pd.DataFrame) -> dict:
 
 #### **多模型融合与风险评估**
 
-```typescript
-// 综合风险评估算法
-const aggregateRiskAssessment = (predictions: PredictionResult[]): OverallRisk => {
-  // 加权风险聚合
-  const riskWeights = {
-    EARTHQUAKE: 0.25,  // 地震权重25%
-    VOLCANO: 0.15,     // 火山权重15%  
-    STORM: 0.25,       // 风暴权重25%
-    FLOOD: 0.20,       // 洪水权重20%
-    WILDFIRE: 0.15     // 野火权重15%
-  };
-  
-  // 计算加权综合风险分数
-  const overallScore = predictions.reduce((total, pred) => {
-    const weight = riskWeights[pred.type];
-    const riskScore = pred.predictions.reduce((sum, val) => sum + val, 0);
-    return total + (riskScore * weight);
-  }, 0);
-  
-  // 风险等级映射
-  const riskLevel = mapRiskLevel(overallScore);
-  
-  // 动态置信度计算
-  const avgRSquared = predictions.reduce((sum, pred) => sum + pred.rSquared, 0) / predictions.length;
-  const confidenceScore = Math.round(avgRSquared * 100); // 83%
-  
-  return {
-    overallScore: Math.round(overallScore),
-    riskLevel: riskLevel,        // 'HIGH', 'MODERATE', etc.
-    confidence: confidenceScore,  // 83%
-    totalPredictedEvents: predictions.reduce((sum, pred) => 
-      sum + pred.predictions.reduce((a, b) => a + b, 0), 0
-    ),
-    recommendations: generateActionRecommendations(riskLevel)
-  };
-};
+```python
+# File: python-analytics-service/analytics/prediction_models.py
+# 实际实现 - 多模型融合风险评估
+def _aggregate_risk_assessment(self, df: pd.DataFrame) -> Dict[str, Any]:
+    """多模型融合风险评估"""
+    # 加权风险聚合
+    risk_weights = {
+        'EARTHQUAKE': 0.25,
+        'VOLCANO': 0.15,
+        'STORM': 0.25,
+        'FLOOD': 0.20,
+        'WILDFIRE': 0.15
+    }
+    
+    type_counts = df['type'].value_counts().to_dict()
+    
+    # 计算加权风险分数
+    total_risk_score = 0
+    for hazard_type, weight in risk_weights.items():
+        count = type_counts.get(hazard_type, 0)
+        total_risk_score += count * weight
+    
+    # 标准化到0-100分
+    max_possible = len(df)
+    normalized_score = min(100, (total_risk_score / max_possible * 100) if max_possible > 0 else 0)
+    
+    return {
+        "overallRiskScore": float(normalized_score),
+        "riskLevel": self._get_risk_level(normalized_score)
+    }
 ```
 
 ### 5.2 算法性能与优化
@@ -856,55 +876,53 @@ const aggregateRiskAssessment = (predictions: PredictionResult[]): OverallRisk =
 #### **模型优化策略**
 
 **1. 缓存机制优化**
-```typescript
-// 智能缓存系统
-const ModelCache = {
-  regressionResults: new Map<string, RegressionResult>(),
-  correlationMatrices: new Map<string, CorrelationMatrix>(),
-  
-  getCachedRegression: (dataHash: string): RegressionResult | null => {
-    return ModelCache.regressionResults.get(dataHash) || null;
-  },
-  
-  setCachedRegression: (dataHash: string, result: RegressionResult): void => {
-    // LRU缓存，最多存储20个结果
-    if (ModelCache.regressionResults.size >= 20) {
-      const firstKey = ModelCache.regressionResults.keys().next().value;
-      ModelCache.regressionResults.delete(firstKey);
-    }
-    ModelCache.regressionResults.set(dataHash, result);
-  }
-};
+```python
+# File: python-analytics-service/analytics/statistical_algorithms.py
+# 实际实现 - Python内存缓存与TTL机制
+def _get_cache_key(self, df: pd.DataFrame) -> str:
+    """生成数据框的缓存键：基于数据内容哈希"""
+    # 组合数据长度、列名和类型分布作为指纹
+    data_str = f"{len(df)}_{df.columns.tolist()}_{df['type'].value_counts().to_dict()}"
+    return hashlib.md5(data_str.encode()).hexdigest()
 
-// 缓存效果：重复计算性能提升80%
+def _get_from_cache(self, key: str) -> Optional[Dict[str, Any]]:
+    """从缓存获取结果 (带TTL检查)"""
+    if key in self._cache:
+        timestamp = self._cache_timestamps.get(key)
+        # 检查是否在有效期内 (300秒)
+        if timestamp and (datetime.now() - timestamp).seconds < self._cache_ttl:
+            self.logger.info(f"Cache hit for key: {key[:8]}...")
+            return self._cache[key]
+        else:
+            # 缓存过期，清理
+            del self._cache[key]
+            del self._cache_timestamps[key]
+    return None
 ```
 
 **2. 增量更新机制**
-```typescript
-// 增量模型更新
-const incrementalModelUpdate = (
-  existingModel: RegressionResult, 
-  newDataPoint: DataPoint
-): RegressionResult => {
-  // 在线学习算法：避免完全重训练
-  const alpha = 0.1; // 学习率
-  
-  const updatedSlope = existingModel.slope + alpha * (
-    newDataPoint.error * newDataPoint.x
-  );
-  
-  const updatedIntercept = existingModel.intercept + alpha * newDataPoint.error;
-  
-  return {
-    slope: updatedSlope,
-    intercept: updatedIntercept,
-    rSquared: recalculateRSquared(updatedSlope, updatedIntercept),
-    prediction: generateNewPrediction(updatedSlope, updatedIntercept)
-  };
-};
-
-// 性能提升：95%计算时间节省，实时响应
+```python
+# File: python-analytics-service/analytics/prediction_models.py
+# 实际实现 - 滑动窗口优化 (替代增量更新)
+def _prepare_time_series_data(self, df: pd.DataFrame, hazard_type: str, 
+                               window_days: int = 30) -> Tuple[np.ndarray, np.ndarray]:
+    """准备时间序列数据：使用滑动窗口限制计算量"""
+    # ...
+    
+    # 优化策略：只取最近window_days天的数据进行训练
+    # 避免全量历史数据导致计算耗时随时间线性增长
+    if len(daily_counts) > window_days:
+        daily_counts = daily_counts.tail(window_days)
+    
+    # 特征工程：添加移动平均
+    if len(daily_counts) >= 7:
+        daily_counts['ma_3'] = daily_counts['count'].rolling(window=3, min_periods=1).mean()
+        daily_counts['ma_7'] = daily_counts['count'].rolling(window=7, min_periods=1).mean()
+        
+    return X, y
 ```
+
+// 性能提升：通过限制训练数据窗口(30天)确保O(1)的预测延迟
 
 **3. 并行计算优化**
 ```typescript
