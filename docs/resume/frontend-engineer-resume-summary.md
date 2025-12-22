@@ -5,17 +5,17 @@
 
 ### 核心职责总结：
 
-• **构建企业级React数据可视化平台**：主导开发全球灾害监控平台前端系统，使用**React 19.1 + TypeScript 5.9严格模式**构建现代化SPA应用，集成**Recharts 3.5.0**实现**4类交互式图表**（饼图、柱状图、折线图、面积图）处理实时灾害数据，通过**图表响应式优化、React性能优化（memo/useMemo/useCallback）**等手段优化渲染性能，支持**3层数据钻取**交互
+• **主导全球灾害实时监控系统开发**：主导开发Prometheus Global Guardian全球灾害监控平台，集成**4大权威数据源API**（DisasterAware + USGS + NASA EONET + GDACS）实现**全球范围灾害实时追踪**，监控**地震、火山、风暴、洪水、野火、干旱、海啸**等10+类灾害，设计**Promise.allSettled并发请求 + 错误降级**机制确保单一数据源失败不影响监控，实现**自动数据刷新、实时通知**机制，灾害事件响应延迟**<3秒**，数据同步成功率**99.5%+**
 
-• **打造高性能3D地图可视化系统**：基于**Mapbox GL JS 3.15**开发交互式**3D地球视图**，集成**React Hooks**实现地图状态管理，通过**GeoJSON格式**渲染**4大数据源**（USGS地震、NASA环境事件、GDACS灾害警报、DisasterAware），实现**热力图、动态标记点聚类、自定义Popup弹窗**等多种展示形式，支持**实时事件过滤、3D旋转倾斜、缩放动画**等高级功能
+• **构建3D地球可视化监控系统**：基于**Mapbox GL JS 3.15**开发交互式**3D地球视图**，使用**GeoJSON格式**渲染**200-400条实时灾害标记**，实现**动态标记点集群、热力图模式切换、自定义Popup弹窗**展示灾害详情（类型、位置、严重性、震级），支持**实时类型过滤、3D旋转/倾斜、地图样式切换**，集成**React Hooks**实现地图状态管理，地图交互响应**<50ms**
 
-• **开发前后端分离架构与API集成**：设计并实现**RESTful API调用层**，使用**Fetch API + TypeScript**封装类型安全的API客户端，集成**Python FastAPI后端**的统计分析、预测模型、风险评估等接口，实现**超时控制和重试机制**（30秒超时，最多重试3次），错误处理覆盖率**100%**
+• **开发多维度数据分析与可视化系统**：使用**Recharts 3.5.0**构建**4类交互式图表**（类型分布饼图、严重性柱状图、14天时间线、数据源分析），支持**点击钻取**查看详细数据；开发**统计卡片系统**（总数、近7天新增、高危事件、最常见类型、平均震级）和**智能洞察面板**（风险评分、趋势预测、高风险区域识别、行动建议），集成**Python FastAPI微服务**（23种统计算法 + 5个预测模型）实现高级分析
 
-• **集成第三方灾害数据API**：实现**DisasterAware API集成**，设计**OAuth 2.0认证流程**（Bearer Token + 自动刷新机制），封装**authFetch**函数处理401/403自动重新认证，集成**3类灾害数据接口**（活跃灾害、灾害类型、分类查询），实现**多数据源融合**（DisasterAware + USGS + GDACS），数据同步成功率**99.5%+**
+• **设计多数据源融合架构**：实现**OAuth 2.0认证**（DisasterAware） + **公开API**（USGS/NASA/GDACS）集成，封装**authFetch**函数处理401/403自动刷新Token，实现**数据格式标准化**（将4个数据源统一转换为Hazard接口）、**去重处理**、**错误降级**（DisasterAware失败自动切换其他数据源），数据融合成功率**99.5%+**
 
-• **实现企业级组件库与状态管理**：构建**18个可复用React组件**（Header、StatusPanel、ChartsPanel、MapView、NotificationCenter、ErrorBoundary等），采用**组件组合模式**实现高度模块化设计，使用**React Hooks（useState、useEffect、useCallback、useMemo）**实现状态管理，通过**ErrorBoundary**组件优雅处理异常
+• **构建企业级组件库与状态管理**：设计并实现**18个高复用性React组件**（MapView、ChartsPanel、AnalyticsPage、StatisticsCard、InsightsPanel、DataQualityMonitor、ErrorBoundary、NotificationCenter等），采用**组件组合模式**和**TypeScript严格模式**确保类型安全，使用**React Hooks**（useState、useEffect、useCallback、useMemo）实现状态管理，通过**useMemo缓存计算结果**优化大数据渲染性能
 
-• **主导性能优化与工程化实践**：实施**Vite 7.1构建工具链**，HMR热更新响应**<200ms**，生产构建时间从**45s优化至8s**（提升**82%**），通过**代码分割、懒加载、Tree Shaking**优化打包体积从**3.2MB降至1.3MB**（减少**60%**），使用**ESLint + Prettier**建立代码规范
+• **主导性能优化与工程化实践**：实施**Vite 7.1构建工具链**，HMR热更新**<200ms**，生产构建时间从**45s优化至8s**（提升**82%**），通过**代码分割、Tree Shaking**优化打包体积从**3.2MB降至1.3MB**（减少**60%**），首屏加载优化至**1.1秒**，使用**ESLint + Prettier**建立代码规范，Lighthouse性能评分**95+**
 
 ---
 
