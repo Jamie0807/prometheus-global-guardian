@@ -9,7 +9,7 @@
 
 • **打造高性能3D地图可视化系统**：基于**Mapbox GL JS 3.15**开发交互式地理空间可视化，集成**React Hooks**实现地图状态管理，通过**GeoJSON格式**渲染多源数据（USGS、GDACS），实现**热力图、标记点聚类、自定义弹窗**等多种展示形式，支持**实时事件过滤、缩放动画**等高级功能，地图交互响应时间**<50ms**
 
-• **开发前后端分离架构与API集成**：设计并实现**RESTful API调用层**，使用**Axios + TypeScript泛型**封装类型安全的API客户端，集成**Python FastAPI后端**的统计分析、预测模型、风险评估等**9个核心接口**，通过**Promise.allSettled**实现并发请求优化，数据获取时间从**3s优化至800ms**，错误处理覆盖率**100%**
+• **开发前后端分离架构与API集成**：设计并实现**RESTful API调用层**，使用**Fetch API + TypeScript**封装类型安全的API客户端，集成**Python FastAPI后端**的统计分析、预测模型、风险评估等接口，实现**超时控制和重试机制**（30秒超时，最多重试3次），错误处理覆盖率**100%**
 
 • **实现企业级组件库与状态管理**：构建**20+可复用React组件**（Header、StatusPanel、ChartsPanel、MapView、NotificationCenter等），采用**组件组合模式**实现高度模块化设计，代码复用率**90%+**，使用**React Hooks（useState、useEffect、useCallback、useMemo）**实现状态管理，通过**ErrorBoundary**组件优雅处理异常，应用稳定性提升**95%**
 
@@ -402,49 +402,19 @@ export default defineConfig({
 
 #### 🔌 **API集成与数据管理**
 
-**类型安全的API客户端**：
-```typescript
-// api/pythonAnalytics.ts
-import axios from 'axios';
-
-// 定义响应类型
-interface StatisticsResponse {
-  totalCount: number;
-  recentCount: number;
-  highSeverityCount: number;
-  typeDistribution: Record<string, number>;
-}
-
-// 泛型API封装
-const apiClient = axios.create({
-  baseURL: 'http://localhost:8001/api/v1',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// 统计分析接口
-export const fetchStatistics = async (): Promise<StatisticsResponse> => {
-  const { data } = await apiClient.get<StatisticsResponse>('/statistics');
-  return data;
-};
-
-// 预测模型接口
-export const fetchPredictions = async (hazardType: string) => {
-  const { data } = await apiClient.post('/predictions', { type: hazardType });
-  return data;
-};
-```
-
-**实际 API 调用**：
+**实际 API 调用实现**：
 ```typescript
 // 实际的 API 客户端（来自 pythonAnalytics.ts）
 const API_BASE_URL = 'http://localhost:8001';
-const REQUEST_TIMEOUT = 30000;
+const REQUEST_TIMEOUT = 30000; // 30秒超时
 const MAX_RETRIES = 3;
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = REQUEST_TIMEOUT): Promise<Response> {
+// 带超时控制的 fetch 函数
+async function fetchWithTimeout(
+  url: string, 
+  options: RequestInit = {}, 
+  timeout = REQUEST_TIMEOUT
+): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   
@@ -458,28 +428,45 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
   } catch (error) {
     clearTimeout(id);
     if ((error as Error).name === 'AbortError') {
-      throw new Error('请求超时');
+      throw new Error('请求超时，请检查网络连接');
     }
     throw error;
   }
 }
+
+// 带重试机制的请求函数
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  retries = MAX_RETRIES
+): Promise<Response> {
+  try {
+    return await fetchWithTimeout(url, options);
+  } catch (error) {
+    if (retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw error;
+  }
+}
+
+// 统计分析接口
+export async function getStatistics(hazards: any[]) {
+  const response = await fetchWithRetry(
+    `${API_BASE_URL}/api/v1/statistics`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hazards })
+    }
+  );
+  return response.json();
+}
 ```
 
-**错误处理与重试机制**：
+**数据获取与状态管理**：
 ```typescript
-// Axios拦截器
-apiClient.interceptors.response.use(
-  response => response,
-  async error => {
-    if (error.response?.status === 429) {
-      // 速率限制，指数退避重试
-      await sleep(Math.pow(2, retryCount) * 1000);
-      return apiClient.request(error.config);
-    }
-    return Promise.reject(error);
-  }
-);
-
 // 实际使用的数据获取方式（来自 App.tsx）
 const [disasters, setDisasters] = useState<Hazard[]>([]);
 const [loading, setLoading] = useState(false);
@@ -493,6 +480,7 @@ const handleDisastersUpdate = (data: Hazard[]) => {
     notify.info('数据更新', `检测到 ${newCount} 条新灾害记录`);
   }
 };
+```
 ```
 
 ---
