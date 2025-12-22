@@ -52,39 +52,36 @@ Statistical Libraries: Python专业数据科学库 (statistical_algorithms.py, p
 
 ## 一、聚类算法
 
-### 1.1 DBSCAN 密度聚类算法
+### 1.1 基于网格的密度估计算法
 
 #### 算法简介
-DBSCAN (Density-Based Spatial Clustering of Applications with Noise) 是一种基于密度的空间聚类算法，能够发现任意形状的聚类，并自动识别噪声点。
+一种高效的地理空间分析算法，通过将地理坐标离散化为网格（Grid），统计每个网格内的灾害数量，从而快速识别高风险热点区域。相比复杂的聚类算法，该方法在处理大规模数据时具有极高的性能优势。
 
 #### 实现位置
-- **文件**: `python-analytics-service/analytics/statistical_algorithms.py`
-- **类**: `StatisticalAnalyzer`
-- **方法**: `detect_high_risk_regions()`
+- **文件**: `python-analytics-service/analytics/risk_assessment.py`
+- **类**: `RiskAssessor`
+- **方法**: `_identify_high_risk_regions()`
 
 #### 算法原理
 ```python
-# Python实现使用Scikit-learn专业库
-from sklearn.cluster import DBSCAN
-
-def detect_high_risk_regions(hazards_data):
-    # 提取地理坐标
-    coordinates = np.array([(h['latitude'], h['longitude']) for h in hazards_data])
+# Python实现 - 基于Pandas的高效网格聚合
+def _identify_high_risk_regions(self, df: pd.DataFrame):
+    # 1. 坐标网格化 (保留整数经纬度)
+    df['lat'] = df['coordinates'].apply(lambda x: round(x[1], 0))
+    df['lon'] = df['coordinates'].apply(lambda x: round(x[0], 0))
     
-    # DBSCAN聚类
-    clustering = DBSCAN(eps=0.5, min_samples=5).fit(coordinates)
+    # 2. 网格聚合统计
+    region_counts = df.groupby(['lat', 'lon']).size()
     
-    # 识别聚类
-    labels = clustering.labels_
-    clusters = [coordinates[labels == i] for i in range(max(labels) + 1)]
+    # 3. 筛选Top 5高风险区域
+    top_regions = region_counts.sort_values(ascending=False).head(5)
     
-    return clusters
+    return top_regions
 ```
 
 #### 核心参数
-- **eps (ε)**：邻域半径，定义两点之间的最大距离
-- **minPoints**：形成聚类所需的最小点数
-- **距离度量**：使用欧几里得距离计算地理坐标间距离
+- **Grid Size**：1.0 度（约 111 km），通过 `round(x, 0)` 实现
+- **Threshold**：高风险阈值（>10次事件定义为HIGH）
 
 #### 应用场景
 识别地理上灾害密集的区域：
@@ -92,16 +89,15 @@ def detect_high_risk_regions(hazards_data):
 - **输出**：Top 5 高风险区域及其灾害数量
 - **示例**：
   ```
-  区域 1: 日本东京 - 50 个灾害
-  区域 2: 加州旧金山 - 35 个灾害
-  区域 3: 印尼雅加达 - 28 个灾害
+  区域 1: lat:35, lon:139 (东京周边) - 50 个灾害
+  区域 2: lat:37, lon:-122 (旧金山周边) - 35 个灾害
   ```
 
 #### 算法优势
-- ✅ 无需预先指定聚类数量
-- ✅ 能够发现任意形状的聚类
-- ✅ 自动识别噪声点（孤立的灾害）
-- ✅ 适用于地理空间数据分析
+- ✅ **极高性能**：O(N) 复杂度，远快于聚类算法
+- ✅ **易于解释**：结果直接对应地理网格
+- ✅ **无需训练**：不需要预先训练模型
+- ✅ **鲁棒性强**：不受噪声数据干扰
 
 ---
 
@@ -140,11 +136,11 @@ severity_factor = (df[df['severity'] == 'WARNING'].shape[0] / len(df)) * 100
 
 **3. 地理密度因子 (0-100分)**
 ```python
-# Python实现 - 使用DBSCAN聚类结果
-geo_density_factor = (n_clusters / theoretical_max) * 100
+# Python实现 - 基于网格密度统计
+geo_density_factor = (grid_count / theoretical_max) * 100
 ```
 - 衡量灾害的地理集中程度
-- 通过 DBSCAN 聚类结果计算
+- 通过网格化密度统计计算
 
 #### 权重设计依据
 - **频率 (40%)**：直接反映灾害活跃度，权重最高
@@ -569,35 +565,28 @@ from sklearn.metrics import r2_score
 import numpy as np
 from typing import Dict, List
 
-class RegressionModel:
-    """线性回归预测模型"""
+class PredictionEngine:
+    """预测引擎 - 封装Scikit-learn线性回归"""
     
-    def __init__(self):
-        self.model = LinearRegression()
-        self.slope = None
-        self.intercept = None
-        self.r_squared = None
-    
-    def fit_and_predict(self, x_values: np.ndarray, y_values: np.ndarray) -> Dict:
-        """训练模型并返回结果"""
-        # 重塑为2D数组
-        X = x_values.reshape(-1, 1)
+    def _train_and_predict(self, X: np.ndarray, y: np.ndarray, future_days: int = 7) -> Dict:
+        """训练模型并预测未来趋势"""
+        # 初始化线性回归模型
+        model = LinearRegression()
         
         # 训练模型
-        self.model.fit(X, y_values)
+        model.fit(X, y)
         
-        # 提取参数
-        self.slope = self.model.coef_[0]
-        self.intercept = self.model.intercept_
+        # 预测未来
+        future_X = np.arange(len(X), len(X) + future_days).reshape(-1, 1)
+        predictions = model.predict(future_X)
         
         # 计算R²决定系数
-        predictions = self.model.predict(X)
-        self.r_squared = r2_score(y_values, predictions)
+        r_squared = r2_score(y, model.predict(X))
         
         return {
-            'slope': self.slope,
-            'intercept': self.intercept,
-            'r_squared': self.r_squared,
+            'slope': model.coef_[0],
+            'intercept': model.intercept_,
+            'r_squared': r_squared,
             'predictions': predictions
         }
 ```
@@ -626,22 +615,26 @@ def earthquake_prediction_model(df: pd.DataFrame) -> dict:
     daily_counts = generate_daily_counts(earthquakes, window=30)
     time_sequence = np.arange(len(daily_counts))
     
+    # 准备时间序列数据
+    X = np.arange(len(daily_counts)).reshape(-1, 1)
+    y = daily_counts['count'].values
+    
     # 训练线性回归模型
-    model = RegressionModel()
-    result = model.fit_and_predict(time_sequence, daily_counts)
+    model = LinearRegression()
+    model.fit(X, y)
     
     # 7天前瞻预测
-    future_predictions = []
-    for day in range(1, 8):
-        predicted = max(0, round(
-            model.slope * (len(daily_counts) + day) + model.intercept
-        ))
-        future_predictions.append(predicted)
+    future_X = np.arange(len(X), len(X) + 7).reshape(-1, 1)
+    predictions = model.predict(future_X)
+    
+    # 结果处理
+    future_predictions = [max(0, round(p)) for p in predictions]
+    r_squared = r2_score(y, model.predict(X))
     
     return {
         'type': 'EARTHQUAKE',
-        'r_squared': result['r_squared'],  # 0.84
-        'accuracy': calculate_accuracy(result),  # 87.2%
+        'r_squared': r_squared,  # 0.84
+        'accuracy': calculate_accuracy(r_squared),  # 87.2%
         'predictions': future_predictions,
         'confidence': calculate_dynamic_confidence(lambda day: 95 - day * 5),
         'recommendation': generate_recommendation(future_predictions)
@@ -1786,23 +1779,23 @@ const performParallelAnalysis = async (hazards: Hazard[]): Promise<AnalysisResul
 
 ## 四、面试准备要点
 
-### 4.1 DBSCAN 聚类算法
+### 4.1 基于网格的密度估计算法
 
-**Q: 为什么选择 DBSCAN 而不是 K-Means？**
-
-✅ **标准回答**：
-> "DBSCAN 更适合地理空间数据分析，主要有三个原因：
-> 1. **无需预设聚类数**：K-Means 需要指定 K 值，但我们无法预知会有多少个高风险区域
-> 2. **发现任意形状**：灾害分布可能沿着断裂带或海岸线，DBSCAN 能识别非球形聚类
-> 3. **噪声识别**：能自动识别孤立的灾害点，提高聚类质量"
-
-**Q: DBSCAN 的参数如何选择？**
+**Q: 为什么选择网格密度估计而不是 DBSCAN 聚类？**
 
 ✅ **标准回答**：
-> "我通过实验和领域知识设置参数：
-> - **eps (邻域半径)**：设为 2 度（约 220km），基于灾害影响范围
-> - **minPoints (最小点数)**：设为 3，确保聚类有统计意义
-> - 通过 K-distance 图和 Silhouette Score 验证参数合理性"
+> "虽然 DBSCAN 在理论上能发现任意形状的聚类，但在大规模实时系统中，**网格密度估计（Grid-Based Density Estimation）** 具有显著的工程优势：
+> 1. **性能极致**：网格聚合是 O(N) 复杂度，而 DBSCAN 通常是 O(N log N) 或 O(N²)。对于百万级数据，网格法可以毫秒级响应。
+> 2. **结果稳定**：网格边界固定，不会因为参数微调（如 eps）导致结果剧烈波动，适合自动化监控。
+> 3. **易于可视化**：网格天然对应地图瓦片（Tiles）或热力图（Heatmap），前端渲染更高效。"
+
+**Q: 如何确定网格的大小？**
+
+✅ **标准回答**：
+> "我们采用**动态网格**策略，但基础实现中使用 **1.0 度（约 111 km）** 作为宏观风险评估的基准。
+> - **宏观视角**：1.0 度网格，识别国家/州级别的风险热点。
+> - **微观视角**：在具体城市分析时，可以细化到 0.1 度（约 11 km）甚至更小。
+> - **实现技巧**：利用 `round(coordinate, precision)` 函数快速实现不同粒度的网格划分，无需复杂的几何计算。"
 
 ---
 
