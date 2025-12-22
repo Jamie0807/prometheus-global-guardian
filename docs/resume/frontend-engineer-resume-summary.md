@@ -636,26 +636,11 @@ const LoadingSkeleton = () => (
 }
 ```
 
-**触摸事件优化**：
-```typescript
-// 移动端手势支持
-const handleTouchStart = (e: React.TouchEvent) => {
-  const touch = e.touches[0];
-  setTouchStart({ x: touch.clientX, y: touch.clientY });
-};
-
-const handleTouchMove = (e: React.TouchEvent) => {
-  if (!touchStart) return;
-  const touch = e.touches[0];
-  const deltaX = touch.clientX - touchStart.x;
-  const deltaY = touch.clientY - touchStart.y;
-  
-  // 处理滑动逻辑
-  if (Math.abs(deltaX) > 50) {
-    handleSwipe(deltaX > 0 ? 'right' : 'left');
-  }
-};
-```
+**响应式布局实现**：
+- 使用 **CSS Grid** 和 **Flexbox** 实现自适应布局
+- **Recharts** 图表组件自带响应式支持（`ResponsiveContainer`）
+- **Mapbox GL** 地图自动适配不同屏幕尺寸
+- 移动端优化：简化UI、调整字体大小、优化触控区域
 
 ---
 
