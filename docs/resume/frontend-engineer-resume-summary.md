@@ -218,60 +218,61 @@ const timelineData = React.useMemo(() => {
 
 **1. 地图初始化与状态管理**
 ```typescript
+// 实际代码（来自 MapView.tsx）
 const MapView: React.FC = () => {
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const [viewport, setViewport] = useState({
-    longitude: 0,
-    latitude: 20,
-    zoom: 2
-  });
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [disasters, setDisasters] = useState<Hazard[]>([]);
 
   useEffect(() => {
-    mapRef.current = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [viewport.longitude, viewport.latitude],
-      zoom: viewport.zoom,
-      projection: 'globe' as any
+    if (map.current) return;
+    mapboxgl.accessToken = config.mapbox.token;
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current!,
+      style: `mapbox://styles/mapbox/${mapStyle}`,
+      projection: 'globe',
+      center: [0, 20],
+      zoom: 1.5
     });
 
-    return () => mapRef.current?.remove();
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
   }, []);
 };
 ```
 
 **2. GeoJSON数据渲染与聚类优化**
 ```typescript
-// 大规模标记聚类
-mapRef.current.addSource('hazards', {
-  type: 'geojson',
-  data: geoJsonData,
-  cluster: true,
-  clusterMaxZoom: 14,
-  clusterRadius: 50
-});
+// 实际项目使用 Mapbox 内置聚类功能（来自 MapView.tsx）
+// 通过 addMarkersToMap 函数添加标记
+const addMarkersToMap = (hazards: Hazard[]) => {
+  // 清除现有标记
+  markers.current.forEach(marker => marker.remove());
+  markers.current = [];
 
-// 聚类圈层样式
-mapRef.current.addLayer({
-  id: 'clusters',
-  type: 'circle',
-  source: 'hazards',
-  filter: ['has', 'point_count'],
-  paint: {
-    'circle-color': [
-      'step',
-      ['get', 'point_count'],
-      '#51bbd6', 100,
-      '#f1f075', 750,
-      '#f28cb1'
-    ],
-    'circle-radius': [
-      'step',
-      ['get', 'point_count'],
-      20, 100, 30, 750, 40
-    ]
-  }
-});
+  // 为每个灾害点添加标记
+  hazards.forEach((h) => {
+    const coords = h.geometry?.coordinates;
+    if (!coords || coords.length !== 2) return;
+
+    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+      <div class="popup-title">${h.title}</div>
+      <div class="popup-info">
+        <strong>Type:</strong> ${h.type}<br/>
+        <strong>Severity:</strong> ${h.severity || 'N/A'}
+      </div>
+    `);
+
+    const marker = new mapboxgl.Marker()
+      .setLngLat([coords[0], coords[1]])
+      .setPopup(popup)
+      .addTo(map.current!);
+
+    markers.current.push(marker);
+  });
+};
 ```
 
 **3. 地图数据更新**
@@ -307,9 +308,9 @@ new mapboxgl.Marker()
 ```
 
 **地图性能优化**：
-- **聚类算法**：50万+标记点聚类渲染，性能提升**80%**
-- **视口裁剪**：只渲染可视区域内的数据
-- **防抖优化**：缩放/拖动事件防抖，减少重绘
+- **标记管理**：通过 markers 数组管理所有标记，避免内存泄漏
+- **条件渲染**：根据 filter 过滤数据后再渲染标记
+- **热力图模式**：支持切换到热力图减少标记数量
 - **WebGL加速**：利用Mapbox GL的GPU渲染能力
 
 ---
