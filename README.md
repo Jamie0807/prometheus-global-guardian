@@ -77,7 +77,7 @@
 ### **数据分析技术栈**
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| **Recharts** | 2.15.0 | 数据可视化图表库（饼图、柱状图、折线图） |
+| **Recharts** | 3.5.0 | 数据可视化图表库（饼图、柱状图、折线图） |
 | **date-fns** | 4.1.0 | 日期时间处理库，用于时间序列分析 |
 | **lodash** | 4.17.21 | 高性能工具函数库，用于数据处理与统计 |
 
@@ -91,12 +91,12 @@
 ### **🐍 Python 数据分析微服务**（🆕 新增）
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| **FastAPI** | 0.104.1 | 现代化 Python Web 框架 |
-| **Pandas** | 2.1.4 | 高性能数据处理与分析 |
-| **NumPy** | 1.24.3 | 科学计算核心库 |
-| **Scikit-learn** | 1.3.2 | 机器学习算法库 |
-| **SciPy** | 1.11.4 | 科学计算与统计分析 |
-| **Statsmodels** | 0.14.1 | 高级统计建模 |
+| **FastAPI** | 0.115.5 | 现代化 Python Web 框架 |
+| **Pandas** | 2.2.3 | 高性能数据处理与分析 |
+| **NumPy** | 2.2.1 | 科学计算核心库 |
+| **Scikit-learn** | 1.6.1 | 机器学习算法库 |
+| **SciPy** | 1.15.1 | 科学计算与统计分析 |
+| **Statsmodels** | 0.14.4 | 高级统计建模 |
 
 > 💡 **技术升级**: 将原有 TypeScript 自实现的 23 种统计算法和 5 个预测模型迁移到 Python，利用成熟的数据科学生态系统，代码量减少 55%，性能提升 3 倍，准确率提升至 99.8%。详见 [Python服务文档](./python-analytics-service/README.md)
 
@@ -129,14 +129,17 @@ prometheus-global-guardian/
 │   │   ├── Header.tsx                # 顶部导航栏
 │   │   ├── StatusPanel.tsx           # 状态面板（含总数统计）
 │   │   ├── LegendPanel.tsx           # 图例面板
-│   │   ├── MapView.tsx               # 地图视图（含热力图）
+│   │   ├── MapView.tsx               # 地图视图（含聚类）
 │   │   ├── MapError.tsx              # 地图错误提示组件
 │   │   ├── SaveReportModal.tsx       # 报告导出对话框
 │   │   ├── SettingsModal.tsx         # 设置面板
 │   │   ├── AnalyticsPage.tsx         # 数据分析页面
 │   │   ├── StatisticsCard.tsx        # 统计卡片组件
 │   │   ├── ChartsPanel.tsx           # 图表面板组件
-│   │   └── InsightsPanel.tsx         # 智能洞察面板
+│   │   ├── InsightsPanel.tsx         # 智能洞察面板
+│   │   ├── DataQualityMonitor.tsx    # 数据质量监控组件
+│   │   ├── ErrorBoundary.tsx         # 错误边界组件
+│   │   └── NotificationCenter.tsx    # 通知中心组件
 │   ├── api/                 # API 接口
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
@@ -262,7 +265,7 @@ npm start
 
 #### **主界面组件**
 - **Header** - 顶部导航栏与标题（含 Analytics、Save Report、Settings 按钮）
-- **MapView** - 主地图视图组件（支持标记模式和热力图模式切换）
+- **MapView** - 主地图视图组件（支持标记聚类和热力图模式）
 - **StatusPanel** - 实时统计面板（显示总灾害数量、类型筛选）
 - **LegendPanel** - 图例与灾害类型说明
 - **SettingsModal** - 设置与配置面板
