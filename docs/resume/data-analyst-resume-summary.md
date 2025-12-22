@@ -21,7 +21,7 @@
 **Prometheus Space Technologies** | Sep 2025 – present  
 **项目描述**：为Prometheus Space Technologies全球灾害监控平台构建企业级数据分析平台与可视化系统，整合USGS（地震数据）、NASA EONET（环境事件）、GDACS（全球灾害预警）等权威数据源，采用**Python微服务架构**（FastAPI + NumPy + Pandas + Scikit-learn）处理核心数据分析，前端React 19.1 + TypeScript 5.9+ Vite 7.1现代化技术栈，实现实时数据聚合、统计分析、预测建模和3D可视化。构建完整的数据科学工作流，从数据采集、清洗、分析到可视化呈现，为灾害监控和风险评估提供数据驱动的解决方案。
 
-**核心技术栈**：**Python 3.11** (FastAPI + Pandas + NumPy + SciPy + Scikit-learn + Statsmodels) | React 19.1 + TypeScript 5.9 | Mapbox GL 3.15 | Recharts 2.15 | 线性回归 + DBSCAN聚类 | 统计分析 + 相关性建模
+**核心技术栈**：**Python 3.11** (FastAPI + Pandas + NumPy + SciPy + Scikit-learn + Statsmodels) | React 19.1 + TypeScript 5.9 | **Vite 7.1**（manualChunks代码分割 + React.lazy懒加载）| Mapbox GL 3.15 | Recharts 2.15 | 线性回归 + DBSCAN聚类 | 统计分析 + 相关性建模
 
 ### 主要职责与成果：
 
@@ -60,6 +60,7 @@
   - **Python微服务调用**：统计分析、预测模型、风险评估3大API接口
   - **自动刷新系统**：可配置轮询间隔，实时数据同步机制
   - **错误处理机制**：优雅的异常捕获和用户友好提示
+  - **前端性能优化**：Vite manualChunks分割vendor代码（react、mapbox-gl、recharts独立打包），React.lazy()懒加载AnalyticsPage等3个大型组件，**构建时间减少29%**，**首屏加载减少89%**
 
 • **Python数据分析微服务架构**：
   - 构建4大核心Python分析模块（`statistical_algorithms.py`、`prediction_models.py`、`risk_assessment.py`、`etl_processor.py`）
@@ -78,6 +79,7 @@
 - **性能突破**：**50万+数据点**渲染**<100ms**，内存优化**70%**，支持实时分析
 - **统计深度**：**23种统计算法**，**4维数据透视**，**95%置信水平**显著性检验
 - **工程质量**：**6大核心模块**，**90%+代码复用**，**零编译错误**，TypeScript严格模式
+- **前端优化**：Vite manualChunks代码分割 + React.lazy懒加载，**构建时间减少29%**（17.76s→12.60s），**首屏加载减少89%**（669KB→71KB gzip）
 
 **项目链接**：[github.com/Jamie-qian/prometheus-global-guardian](https://github.com/Jamie-qian/prometheus-global-guardian)
 
@@ -267,6 +269,7 @@
 
 ### 💻 **全栈开发技术**
 - **前端框架**: React 19.1 + TypeScript 5.9 + Vite 7.1（现代化单页应用开发）
+- **构建优化**: Vite manualChunks代码分割（4个vendor包独立打包）+ React.lazy懒加载（3个大型组件按需加载），**构建时间减少29%**（17.76s→12.60s），**首屏bundle减少89%**（669KB→71KB gzip）
 - **后端架构**: Python FastAPI + Node.js Express（微服务架构）
 - **3D可视化**: Mapbox GL 3.15（交互式地理空间数据可视化）
 - **数据可视化**: Recharts 2.15（4类交互式图表 + 自定义Dashboard）

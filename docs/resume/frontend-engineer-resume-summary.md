@@ -15,7 +15,7 @@
 
 • **构建企业级组件库与状态管理**：设计并实现**18个高复用性React组件**（MapView、ChartsPanel、AnalyticsPage、StatisticsCard、InsightsPanel、DataQualityMonitor、ErrorBoundary、NotificationCenter等），采用**组件组合模式**和**TypeScript严格模式**确保类型安全，使用**React Hooks**（useState、useEffect、useCallback、useMemo）实现状态管理，通过**useMemo缓存计算结果**优化大数据渲染性能
 
-• **主导性能优化与工程化实践**：实施**Vite 7.1构建工具链**，HMR热更新**<200ms**，优化生产构建流程，通过**代码分割、Tree Shaking、Gzip压缩**优化资源加载，打包后主文件**2.33MB（Gzip后669KB）**，使用**ESLint + Prettier**建立代码规范，通过Chrome DevTools持续监控性能表现
+• **主导性能优化与工程化实践**：实施**Vite 7.1构建工具链**，HMR热更新**<200ms**，配置**manualChunks代码分割策略**将vendor库（react、mapbox-gl、recharts、utils）独立打包，使用**React.lazy() + Suspense**对AnalyticsPage等3个大型组件实施懒加载，**构建时间减少29%**（17.76s→12.60s），**首屏bundle减少89%**（669KB→71KB gzip），通过**Tree Shaking、Gzip压缩**优化资源加载，使用**ESLint + Prettier**建立代码规范，通过Chrome DevTools持续监控性能表现
 
 ---
 
@@ -24,7 +24,7 @@
 
 **项目描述**：基于**React 19.1 + TypeScript 5.9 + Mapbox GL**构建的现代化全栈应用，整合**4大权威数据源**（USGS地震数据、NASA环境事件、GDACS全球灾害警报、DisasterAware实时灾害），为全球灾害监测提供**实时、直观、交互式**的可视化解决方案。实现**3D地球视图**、**多源数据融合**、**智能数据分析**、**交互式图表系统**、**风险评估预测**等核心功能。项目整合**Python FastAPI微服务**（23种统计算法 + 5个预测模型），实现前后端分离架构，覆盖数据可视化、状态管理、API集成、性能优化等前端全栈技能。
 
-**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | Vite 7.1 + ESM | Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | CSS Modules + Responsive Design
+**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | **Vite 7.1**（manualChunks代码分割 + React.lazy懒加载 + Tree Shaking）| Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | CSS Modules + Responsive Design
 
 ### 主要职责与成果：
 
@@ -52,8 +52,8 @@
 
 • **性能优化与工程实践**：
   - 实施**前端性能优化**：React.memo减少重渲染、useMemo缓存计算结果、响应式图表设计
-  - 配置**Vite构建优化**：代码分割、Tree Shaking、Gzip压缩，打包后主文件**2.33MB（Gzip后669KB）**
-  - 通过Chrome DevTools持续监控性能
+  - 配置**Vite构建优化**：manualChunks将vendor库（react、mapbox-gl、recharts、utils）独立打包，React.lazy()对AnalyticsPage/SaveReportModal/SettingsModal实施懒加载，**构建时间减少29%**（17.76s→12.60s），**首屏bundle减少89%**（669KB→71KB gzip），代码分割为7个优化chunk，提升浏览器缓存利用率
+  - 通过Chrome DevTools持续监控性能，Network面板验证懒加载生效
 
 • **状态管理与业务逻辑**：
   - 使用**React Hooks**（useState、useEffect、useCallback、useMemo）管理组件状态和副作用
@@ -1020,9 +1020,10 @@ const [isRefreshing, setIsRefreshing] = useState(false);
 - **OAuth 2.0认证系统**：完整的Bearer Token + 自动刷新机制，支持第三方API安全接入
 
 **性能突破**：
-- **首屏加载**：优化至**1.1秒**
-- **包体积优化**：通过Tree Shaking + Code Splitting减少**60%**
-- **构建时间**：从45s优化至8s，提升**82%**
+- **构建优化**：Vite manualChunks代码分割 + React.lazy懒加载，**构建时间减少29%**（17.76s→12.60s），**首屏bundle减少89%**（669KB→71KB gzip）
+- **代码分割**：将单一bundle（2.33MB）拆分为7个优化chunk，vendor库独立缓存
+- **懒加载策略**：AnalyticsPage等3个大型组件按需加载，首屏加载速度提升显著
+- **浏览器缓存**：vendor库（react、mapbox-gl、recharts）独立打包，缓存命中率提升
 
 **工程质量**：
 - **代码规范**：ESLint + Prettier确保代码质量
@@ -1054,14 +1055,17 @@ const [isRefreshing, setIsRefreshing] = useState(false);
 - **错误处理**：ErrorBoundary、try-catch、超时控制
 
 ### 工程化与构建
-- **Vite**：配置优化、插件开发、构建分析
+- **Vite 7.1**：manualChunks配置优化、HMR热更新、生产构建优化
+- **代码分割策略**：vendor库分离（react-vendor、mapbox-vendor、charts-vendor、utils-vendor）
+- **懒加载实现**：React.lazy() + Suspense，按需加载大型组件
 - **ESLint + Prettier**：代码规范、自动格式化
 - **TypeScript严格模式**：编译时类型检查、错误预防
 
 ### 性能优化
-- **渲染优化**：React.memo、虚拟列表、懒加载
-- **包体积优化**：Tree Shaking、Code Splitting、压缩
-- **网络优化**：资源缓存、CDN、HTTP/2
+- **构建优化**：manualChunks代码分割，构建时间减少29%
+- **渲染优化**：React.memo、useMemo缓存、懒加载
+- **包体积优化**：Tree Shaking、Code Splitting、Gzip压缩
+- **网络优化**：vendor库独立缓存、按需加载、浏览器缓存策略
 
 ### 测试与调试
 - **Chrome DevTools**：性能分析、内存泄漏检测
@@ -1073,9 +1077,9 @@ const [isRefreshing, setIsRefreshing] = useState(false);
 ## 项目成果
 
 **性能优化**：
-- **首屏加载时间**：优化至1.1秒
-- **包体积**：减少60%（3.2MB → 1.3MB）
-- **构建时间**：提升82%（45s → 8s）
+- **构建时间优化**：Vite manualChunks + React.lazy，构建时间减少29%（17.76s → 12.60s）
+- **首屏加载优化**：代码分割为7个chunk，首屏bundle减少89%（669KB → 71KB gzip）
+- **缓存策略优化**：vendor库独立打包，浏览器缓存命中率显著提升
 
 **技术实践**：
 - **模块化设计**：18个可复用组件支持快速功能开发
@@ -1121,7 +1125,6 @@ const [isRefreshing, setIsRefreshing] = useState(false);
 ---
 
 **项目链接**：[github.com/Jamie-qian/prometheus-global-guardian](https://github.com/Jamie-qian/prometheus-global-guardian)  
-**在线演示**：[Demo Link]  
 **作者**：Jamie0807
 
 ---

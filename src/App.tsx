@@ -1,15 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { authorize } from "./api/auth";
 import { notify } from "./utils/notifications";
 import Header from "./components/Header";
 import StatusPanel from "./components/StatusPanel";
 import LegendPanel from "./components/LegendPanel";
 import MapView from "./components/MapView";
-import SaveReportModal from "./components/SaveReportModal";
-import SettingsModal from "./components/SettingsModal";
-import AnalyticsPage from "./components/AnalyticsPage";
 import ErrorBoundary from "./components/ErrorBoundary";
 import type { Hazard, SaveReportPayload } from "./types";
+
+// 使用 React.lazy() 懒加载大型组件
+const AnalyticsPage = lazy(() => import("./components/AnalyticsPage"));
+const SaveReportModal = lazy(() => import("./components/SaveReportModal"));
+const SettingsModal = lazy(() => import("./components/SettingsModal"));
+
+// 加载指示器组件
+const LoadingFallback = () => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    height: '100vh',
+    fontSize: '18px',
+    color: '#666'
+  }}>
+    加载中...
+  </div>
+);
 
 const App: React.FC = () => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -76,11 +92,13 @@ const App: React.FC = () => {
       <main>
         {isAnalyticsOpen ? (
           <ErrorBoundary>
-            <AnalyticsPage 
-              hazards={disasters} 
-              onClose={() => setIsAnalyticsOpen(false)}
-              onRefresh={handleDisastersUpdate}
-            />
+            <Suspense fallback={<LoadingFallback />}>
+              <AnalyticsPage 
+                hazards={disasters} 
+                onClose={() => setIsAnalyticsOpen(false)}
+                onRefresh={handleDisastersUpdate}
+              />
+            </Suspense>
           </ErrorBoundary>
         ) : (
           <>
@@ -99,19 +117,23 @@ const App: React.FC = () => {
           </>
         )}
 
-        <SaveReportModal
-          isOpen={isSaveModalOpen}
-          onClose={() => setIsSaveModalOpen(false)}
-          onDownload={handleDownloadReport}
-          disasters={disasters}
-          filter={filter}
-        />
+        <Suspense fallback={null}>
+          <SaveReportModal
+            isOpen={isSaveModalOpen}
+            onClose={() => setIsSaveModalOpen(false)}
+            onDownload={handleDownloadReport}
+            disasters={disasters}
+            filter={filter}
+          />
+        </Suspense>
 
-        <SettingsModal
-          isOpen={isSettingsModalOpen}
-          onClose={() => setIsSettingsModalOpen(false)}
-          onStyleChange={handleStyleChange}
-        />
+        <Suspense fallback={null}>
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setIsSettingsModalOpen(false)}
+            onStyleChange={handleStyleChange}
+          />
+        </Suspense>
       </main>
     </>
   );

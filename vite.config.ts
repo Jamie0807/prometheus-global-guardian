@@ -13,5 +13,24 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // 手动配置代码分块策略
+        manualChunks: {
+          // React核心库单独打包
+          'react-vendor': ['react', 'react-dom'],
+          // 地图库单独打包（体积大）
+          'mapbox-vendor': ['mapbox-gl'],
+          // 图表库单独打包（体积大）
+          'charts-vendor': ['recharts'],
+          // 日期和工具库
+          'utils-vendor': ['date-fns', 'lodash']
+        }
+      }
+    },
+    // 提高chunk大小警告阈值（因为已经做了分块）
+    chunkSizeWarningLimit: 1000
   }
 });
