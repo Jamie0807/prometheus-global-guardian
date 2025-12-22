@@ -777,25 +777,31 @@ const transformUSGS: TransformFunction<USGSFeature, Hazard> = (feature) => ({
 
 ---
 
-### 10. **智能数据采样算法**
-**定义**: 在保持数据统计特性的前提下，减少数据量的算法。
+### 10. **数据采样策略**
+**定义**: 在处理大量数据时，通过采样减少数据量同时保持统计特性的方法。
 
-**简历中的实现**: >1000条记录自动采样至500个代表性数据点
-- **采样策略**: 分层抽样 + 时间均匀分布
-- **保持特性**: 均值、方差、分布形状
-- **性能提升**: 图表渲染时间从1秒降至100ms
+**项目中的实际应用**: 
+- **数据量**: 实际数据量为200-400条灾害记录（USGS地震数据 + NASA事件 + GDACS灾害）
+- **无需采样**: 由于数据量较小，项目中直接渲染全部数据
+- **性能优化手段**: 使用 `useMemo` 缓存计算结果，避免重复计算
 
-**技术细节**:
-```javascript
-function intelligentSampling(data, targetSize) {
-  // 按严重性分层
-  const strata = groupBy(data, 'severity')
-  // 按比例采样
-  return flatMap(strata, stratum => 
-    randomSample(stratum, targetSize * stratum.length / data.length)
-  )
-}
+**实际代码实现**:
+```typescript
+// 时间线数据缓存（ChartsPanel.tsx）
+const timelineData = React.useMemo(() => {
+  const dateCount: Record<string, number> = {};
+  hazards.forEach(h => {
+    const date = h.properties?.timestamp ? 
+      new Date(h.properties.timestamp).toLocaleDateString('zh-CN') : '未知日期';
+    dateCount[date] = (dateCount[date] || 0) + 1;
+  });
+  return Object.entries(dateCount)
+    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+    .slice(-30); // 最近30天
+}, [hazards]);
 ```
+
+**性能指标**: 图表渲染时间 <100ms（得益于Recharts优化和数据缓存）
 
 ---
 
@@ -817,19 +823,36 @@ function intelligentSampling(data, targetSize) {
 
 ---
 
-### 12. **虚拟滚动技术 (Virtual Scrolling)**
-**定义**: 只渲染可视区域内的DOM元素的优化技术。
+### 12. **React性能优化技术**
+**定义**: 通过各种技术手段优化React应用渲染性能的方法。
 
-**简历中的效果**: 减少70% DOM节点
-- **问题**: 50万数据直接渲染会卡死浏览器
-- **解决**: 只渲染屏幕可见的50-100条数据
-- **用户体验**: 看起来像加载了全部数据，但实际很流畅
+**项目中的实际应用**:
+- **React.memo**: 避免不必要的组件重渲染
+- **useMemo**: 缓存计算结果（时间线数据、严重性分布）
+- **useCallback**: 稳定函数引用，避免子组件重渲染
+- **按需渲染**: 只渲染当前激活的图表类型
 
-**技术实现**:
-```javascript
-// 只渲染可见区域的数据
-const visibleData = data.slice(scrollTop / itemHeight, scrollTop / itemHeight + viewportHeight)
+**实际代码**:
+```typescript
+// 缓存时间线数据计算（ChartsPanel.tsx）
+const timelineData = React.useMemo(() => {
+  const dateCount: Record<string, number> = {};
+  hazards.forEach(h => {
+    const date = h.properties?.timestamp ? 
+      new Date(h.properties.timestamp).toLocaleDateString('zh-CN') : '未知日期';
+    dateCount[date] = (dateCount[date] || 0) + 1;
+  });
+  return Object.entries(dateCount)
+    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+    .slice(-30);
+}, [hazards]);
+
+// 条件渲染减少DOM节点
+{activeChart === 'pie' && <PieChart data={chartData} />}
+{activeChart === 'bar' && <BarChart data={chartData} />}
 ```
+
+**性能效果**: 图表渲染时间 <100ms，页面交互流畅
 
 ---
 
@@ -865,18 +888,19 @@ const visibleData = data.slice(scrollTop / itemHeight, scrollTop / itemHeight + 
 - 7天预测期内，平均6天预测准确
 - 支持业务决策，降低风险
 
-### 15. **数据处理能力50万+**
+### 15. **实际数据规模**
 **技术细节**:
-- **存储**: 支持50万历史记录的查询和分析
-- **计算**: 单次可处理10万+数据点的统计计算
-- **实时**: 每秒处理1000+新增数据
+- **实时数据**: 200-400条灾害记录（USGS地震 + NASA事件 + GDACS灾害）
+- **数据源**: 3个权威API（USGS、NASA EONET、GDACS）
+- **更新频率**: 5分钟自动刷新（可配置）
+- **历史数据**: 支持30天时间窗口的趋势分析
 
 ### 16. **渲染性能<100ms**
 **优化技术**:
-- Canvas渲染代替DOM操作
-- 数据虚拟化
-- 异步分块处理
-- WebGL硬件加速
+- **React.useMemo**: 缓存计算结果避免重复计算
+- **按需渲染**: 只渲染当前激活的图表类型
+- **Recharts优化**: 使用高性能图表库
+- **条件渲染**: 减少不必要的DOM节点
 
 ---
 

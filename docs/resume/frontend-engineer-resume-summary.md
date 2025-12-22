@@ -101,21 +101,25 @@ src/
 **1. 类型分布饼图（PieChart with Drill-down）**
 ```typescript
 // 核心实现：点击钻取功能
-const handlePieClick = (data: ChartData) => {
-  const filtered = hazards.filter(h => h.type === data.name);
-  setDrilldownData(filtered);
-  setShowModal(true);
+const handleChartClick = (data: any, drilldownType: 'type' | 'severity') => {
+  const value = data.name;
+  const filtered = hazards.filter(h => {
+    const type = h.type || h.properties?.type || '未分类';
+    return type === value;
+  });
+  
+  setDrilldownData({
+    title: `灾害类型：${value} (${filtered.length}条)`,
+    filteredHazards: filtered,
+    drilldownType,
+    drilldownValue: value
+  });
+  setIsDrilldownOpen(true);
 };
-
-// 性能优化：大数据采样
-const sampledData = useMemo(() => 
-  data.length > 1000 ? intelligentSampling(data, 1000) : data,
-  [data]
-);
 ```
 **技术亮点**：
+- **3层数据钻取**：支持按类型、严重性、日期多维度钻取
 - 使用**React Portal**渲染模态框，避免z-index冲突
-- **自定义Label组件**动态显示百分比和数值
 - **响应式设计**，移动端自动调整图表尺寸
 
 **2. 类型统计柱状图（BarChart with Gradient）**
@@ -175,9 +179,9 @@ const processTimeSeriesData = (hazards: Hazard[]) => {
 ```
 
 **图表性能优化**：
-- **智能采样算法**：10万+数据点自动降采样至1000点，保持趋势特征
-- **虚拟滚动**：大数据列表使用`react-window`，渲染性能提升**10倍**
-- **防抖节流**：图表交互事件使用`lodash.debounce`，减少重渲染
+- **useMemo缓存**：时间线数据和严重性分布数据使用useMemo缓存，避免重复计算
+- **按需渲染**：只渲染当前激活的图表类型，减少DOM节点
+- **防抖节流**：图表交互事件使用防抖处理，减少重渲染
 
 ---
 
