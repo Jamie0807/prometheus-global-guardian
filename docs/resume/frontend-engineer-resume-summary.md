@@ -60,8 +60,8 @@
 
 • **响应式设计与用户体验**：
   - 实现**响应式布局**：桌面端/平板/移动端完美适配，使用CSS Grid + Flexbox
-  - 开发**Skeleton加载态**、**Suspense懒加载**，提升用户等待体验
-  - 实现**无障碍设计**：WCAG 2.1 AA级标准，支持键盘导航和屏幕阅读器
+  - 优化**加载体验**：数据获取时显示加载状态，5分钟自动刷新
+  - 实现**无障碍设计**：语义化HTML标签，键盘导航支持
 
 ---
 
@@ -320,19 +320,7 @@ const handleRefresh = useCallback(() => {
 }, [fetchData]);
 ```
 
-**2. 代码分割与懒加载**
-```typescript
-// 路由级代码分割
-const AnalyticsPage = lazy(() => import('./components/AnalyticsPage'));
-const SettingsModal = lazy(() => import('./components/SettingsModal'));
-
-// Suspense边界
-<Suspense fallback={<LoadingSpinner />}>
-  <AnalyticsPage />
-</Suspense>
-```
-
-**3. 资源优化**
+**2. 资源优化**
 ```typescript
 // 图片懒加载
 <img 
@@ -585,23 +573,13 @@ class ErrorBoundary extends React.Component<
 
 **Loading状态管理**：
 ```typescript
-// Skeleton加载态
-const LoadingSkeleton = () => (
-  <div className="skeleton">
-    <div className="skeleton-header" />
-    <div className="skeleton-chart" />
-    <div className="skeleton-list">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="skeleton-item" />
-      ))}
-    </div>
-  </div>
-);
+// 数据加载状态（MapView.tsx、ChartsPanel.tsx）
+const [loading, setLoading] = useState(false);
+const [isRefreshing, setIsRefreshing] = useState(false);
 
-// Suspense + Lazy Loading
-<Suspense fallback={<LoadingSkeleton />}>
-  <LazyComponent />
-</Suspense>
+// 加载指示器
+{loading && <div className="loading-spinner">Loading...</div>}
+{isRefreshing && <div className="refresh-indicator">Refreshing data...</div>}
 ```
 
 ---
