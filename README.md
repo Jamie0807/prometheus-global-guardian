@@ -117,43 +117,57 @@
 
 ```
 prometheus-global-guardian/
+├── docs/                    # 项目文档
+│   ├── guides/              # 开发指南
+│   ├── interview/           # 面试题库
+│   ├── reports/             # 实施报告
+│   └── resume/              # 简历相关
 ├── public/
-│   └── assets/              # 静态资源（logo 等）
-│       ├── prometheus-logo.jpeg
-│       └── prometheus-logo.png
+│   └── assets/              # 静态资源
+├── python-analytics-service/# Python 数据分析微服务
+│   ├── analytics/           # 核心分析模块
+│   │   ├── etl_processor.py
+│   │   ├── pivot_table_analyzer.py
+│   │   ├── prediction_models.py
+│   │   ├── quality_monitor.py
+│   │   ├── risk_assessment.py
+│   │   ├── statistical_algorithms.py
+│   │   └── unified_model.py
+│   ├── main.py              # FastAPI 入口
+│   ├── requirements.txt     # Python 依赖
+│   └── Dockerfile
 ├── src/
 │   ├── index.tsx            # 应用入口
 │   ├── index.css            # 全局样式
 │   ├── App.tsx              # 主应用组件
 │   ├── components/          # 功能组件
-│   │   ├── Header.tsx                # 顶部导航栏
-│   │   ├── StatusPanel.tsx           # 状态面板（含总数统计）
-│   │   ├── LegendPanel.tsx           # 图例面板
-│   │   ├── MapView.tsx               # 地图视图（含聚类）
-│   │   ├── MapError.tsx              # 地图错误提示组件
-│   │   ├── SaveReportModal.tsx       # 报告导出对话框
-│   │   ├── SettingsModal.tsx         # 设置面板
 │   │   ├── AnalyticsPage.tsx         # 数据分析页面
-│   │   ├── StatisticsCard.tsx        # 统计卡片组件
+│   │   ├── ChartCustomizationModal.tsx # 图表定制模态框
+│   │   ├── ChartDrilldownModal.tsx   # 图表下钻模态框
 │   │   ├── ChartsPanel.tsx           # 图表面板组件
+│   │   ├── CustomChartTooltip.tsx    # 自定义图表提示
+│   │   ├── DataQualityMonitor.tsx    # 数据质量监控
+│   │   ├── DataVisualization.tsx     # 数据可视化容器
+│   │   ├── ErrorBoundary.tsx         # 错误边界
+│   │   ├── Header.tsx                # 顶部导航栏
 │   │   ├── InsightsPanel.tsx         # 智能洞察面板
-│   │   ├── DataQualityMonitor.tsx    # 数据质量监控组件
-│   │   ├── ErrorBoundary.tsx         # 错误边界组件
-│   │   └── NotificationCenter.tsx    # 通知中心组件
+│   │   ├── LegendPanel.tsx           # 图例面板
+│   │   ├── MapError.tsx              # 地图错误提示
+│   │   ├── MapView.tsx               # 地图视图
+│   │   ├── NotificationCenter.tsx    # 通知中心
+│   │   ├── SaveReportModal.tsx       # 报告导出
+│   │   ├── SettingsModal.tsx         # 设置面板
+│   │   ├── StatisticsCard.tsx        # 统计卡片
+│   │   └── StatusPanel.tsx           # 状态面板
 │   ├── api/                 # API 接口
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
-│   │   └── pythonAnalytics.ts        # Python分析服务API客户端
+│   │   └── pythonAnalytics.ts
 │   ├── utils/               # 工具函数
-│   │   ├── dataExport.ts             # 数据导出工具
-│   │   └── notifications.ts          # 通知工具
 │   ├── config/              # 配置文件
-│   │   ├── displayedTypes.ts
-│   │   ├── hazardColors.ts
-│   │   └── index.ts
 │   └── types/               # 类型定义
-│       └── index.ts
 ├── server.js                # Express 服务器
+├── start-python-service.sh  # Python 服务启动脚本
 ├── package.json
 ├── tsconfig.json
 ├── tsconfig.app.json
