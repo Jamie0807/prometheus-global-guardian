@@ -11,7 +11,7 @@
 
 • **开发多维度数据分析与可视化系统**：使用**Recharts 3.5.0**构建**4类交互式图表**（类型分布饼图、严重性柱状图、14天时间线、数据源分析），支持**点击钻取**查看详细数据；开发**统计卡片系统**（总数、近7天新增、高危事件、最常见类型、平均震级）和**智能洞察面板**（风险评分、趋势预测、高风险区域识别、行动建议），集成**Python FastAPI微服务**（23种统计算法 + 5个预测模型）实现高级分析
 
-• **设计多数据源融合架构**：实现**OAuth 2.0认证**（DisasterAware） + **公开API**（USGS/NASA/GDACS）集成，封装**authFetch**函数处理401/403自动刷新Token，实现**数据格式标准化**（将4个数据源统一转换为Hazard接口）、**去重处理**、**错误降级**（DisasterAware失败自动切换其他数据源），数据融合成功率**99.5%+**
+• **设计 BFF (Backend for Frontend) 层或适配器模式，统一异构数据源，实现故障自动降级与数据清洗管道**：实现**OAuth 2.0认证**（DisasterAware） + **公开API**（USGS/NASA/GDACS）集成，封装**authFetch**函数处理401/403自动刷新Token，实现**数据格式标准化**（将4个数据源统一转换为Hazard接口）、**去重处理**、**错误降级**（DisasterAware失败自动切换其他数据源），数据融合成功率**99.5%+**
 
 • **构建企业级组件库与状态管理**：设计并实现**18个高复用性React组件**（MapView、ChartsPanel、AnalyticsPage、StatisticsCard、InsightsPanel、DataQualityMonitor、ErrorBoundary、NotificationCenter等），采用**组件组合模式**和**TypeScript严格模式**确保类型安全，使用**React Hooks**（useState、useEffect、useCallback、useMemo）实现状态管理，通过**useMemo缓存计算结果**优化大数据渲染性能
 
