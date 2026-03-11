@@ -2,12 +2,13 @@
 
 > **实时全球环境灾害监控与可视化平台** | Real-time Global Environmental Hazards Monitoring Platform
 
-基于 **React 19 + TypeScript 5.9 + Mapbox GL** 构建的现代化全栈应用，整合多个权威数据源（USGS、NASA、GDACS），为全球灾害监测提供实时、直观、交互式的可视化解决方案。
+基于 **React 19 + TypeScript 5.9 + Mapbox GL** 构建的现代化全栈应用，整合多个权威数据源（USGS、NASA、GDACS），为全球灾害监测提供实时、直观、交互式的可视化解决方案。内置基于 **LLM 大语言模型**的 AI 灾害分析助手，支持流式对话与智能风险研判。
 
 [![React](https://img.shields.io/badge/React-19.1.1-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-7.1.7-646CFF?logo=vite)](https://vitejs.dev/)
 [![Mapbox](https://img.shields.io/badge/Mapbox_GL-3.15.0-000000?logo=mapbox)](https://www.mapbox.com/)
+[![OpenAI](https://img.shields.io/badge/LLM-OpenAI_Compatible-412991?logo=openai)](https://platform.openai.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---
@@ -20,6 +21,7 @@
 - [项目结构](#项目结构)
 - [数据源](#数据源)
 - [功能展示](#功能展示)
+- [AI 灾害分析助手](#ai-灾害分析助手)
 - [数据分析功能详解](#数据分析功能详解)
 - [开发说明](#开发说明)
 
@@ -62,6 +64,15 @@
 - 点击遮罩层关闭交互
 - 响应式设计，适配多种设备
 
+### **AI 灾害分析助手**（新增）
+- 基于 **LLM 大语言模型**，实时解读平台灾害监控数据
+- **流式对话输出**（SSE + ReadableStream），逐字打印提升交互体验
+- 灾害实时上下文自动注入 System Prompt，AI 响应更具针对性
+- 6 类预设快捷分析工作流（全球态势、地震、洪水、野火、火山、趋势预测）
+- 支持多轮对话历史管理
+- **Demo 降级模式**：无 API Key 时自动切换本地演示，功能展示完整
+- 兼容 OpenAI / DeepSeek / 通义千问 / 智谱 GLM 等任意 OpenAI-format 接口
+
 ---
 
 ## **技术架构**
@@ -99,6 +110,15 @@
 | **Statsmodels** | 0.14.4 | 高级统计建模 |
 
 > **技术升级**: 将原有 TypeScript 自实现的 23 种统计算法和 5 个预测模型迁移到 Python，利用成熟的数据科学生态系统，代码量减少 55%，性能提升 3 倍，准确率提升至 99.8%。详见 [Python服务文档](./python-analytics-service/README.md)
+
+### **AI 智能分析技术栈**（新增）
+| 技术 | 用途 |
+|------|------|
+| **OpenAI Chat Completions API** | LLM 对话接口（兼容 DeepSeek / 通义千问等） |
+| **ReadableStream + SSE** | 流式响应读取，实现逐 token 打字效果 |
+| **动态 System Prompt** | 将灾害实时数据注入上下文，提升 AI 专业性 |
+| **Vite 环境变量** | 管理 API Key / 模型 / 接口地址配置 |
+| **Demo 降级模式** | 无 Key 时本地模拟流式输出，保证演示完整性 |
 
 ### **开发工具链**
 - **ESLint** 9.36.0 - 代码规范与质量检查
@@ -141,6 +161,7 @@ prometheus-global-guardian/
 │   ├── index.css            # 全局样式
 │   ├── App.tsx              # 主应用组件
 │   ├── components/          # 功能组件
+│   │   ├── AIChatAssistant.tsx       # AI 灾害分析助手（LLM 流式对话）
 │   │   ├── AnalyticsPage.tsx         # 数据分析页面
 │   │   ├── ChartCustomizationModal.tsx # 图表定制模态框
 │   │   ├── ChartDrilldownModal.tsx   # 图表下钻模态框
@@ -160,6 +181,7 @@ prometheus-global-guardian/
 │   │   ├── StatisticsCard.tsx        # 统计卡片
 │   │   └── StatusPanel.tsx           # 状态面板
 │   ├── api/                 # API 接口
+│   │   ├── aiAssistant.ts            # AI 助手 LLM 流式 API
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
 │   │   └── pythonAnalytics.ts
@@ -249,7 +271,74 @@ npm start
 | `npm run lint` | 运行 ESLint 代码检查 |
 | `npm start` | 使用 serve 启动生产服务器 |
 
----
+### **启动 Python 数据分析微服务**
+
+Python 服务运行在独立端口 `8001`，需单独启动。
+
+**方式一：使用启动脚本（推荐）**
+
+```bash
+cd python-analytics-service
+chmod +x start.sh
+./start.sh
+```
+
+**方式二：手动启动**
+
+```bash
+cd python-analytics-service
+
+# 创建并激活虚拟环境
+python3 -m venv venv
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动服务（选其一）
+python3 main.py                                              # 直接运行
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload        # 热重载模式
+```
+
+**也可在项目根目录使用根目录启动脚本：**
+
+```bash
+chmod +x start-python-service.sh
+./start-python-service.sh
+```
+
+服务启动后可访问：
+
+| 地址 | 说明 |
+|------|------|
+| http://localhost:8001/health | 健康检查 |
+| http://localhost:8001/docs | Swagger API 文档 |
+| http://localhost:8001/redoc | ReDoc API 文档 |
+
+### **配置 AI 灾害分析助手（可选）**
+
+在 `.env` 中添加 LLM 配置即可启用完整 AI 功能，**不配置则自动进入 Demo 演示模式**：
+
+```dotenv
+# 填入 API Key（选择以下任一服务）
+VITE_OPENAI_API_KEY=sk-你的key
+
+# 可选：模型名称（默认 gpt-3.5-turbo）
+# VITE_OPENAI_MODEL=deepseek-chat
+
+# 可选：自定义接口地址（兼容国内服务）
+# VITE_OPENAI_API_URL=https://api.deepseek.com/v1/chat/completions
+```
+
+**推荐 LLM 服务（均兼容 OpenAI 格式）：**
+
+| 服务 | Key 获取 | API URL | 特点 |
+|------|---------|---------|------|
+| **DeepSeek** | [platform.deepseek.com](https://platform.deepseek.com) | `https://api.deepseek.com/v1/chat/completions` | 国内直连、性价比高 |
+| **OpenAI** | [platform.openai.com](https://platform.openai.com/api-keys) | 不填（默认） | 原生接口 |
+| **通义千问** | [bailian.aliyun.com](https://bailian.aliyun.com) | 阿里云控制台获取 | 有免费额度 |
+| **智谱 GLM** | [open.bigmodel.cn](https://open.bigmodel.cn) | `https://open.bigmodel.cn/api/paas/v4/chat/completions` | 免费额度多 |
 
 ## **数据源**
 
@@ -278,12 +367,19 @@ npm start
 ### **界面组件**
 
 #### **主界面组件**
-- **Header** - 顶部导航栏与标题（含 Analytics、Save Report、Settings 按钮）
+- **Header** - 顶部导航栏与标题（含 **AI 助手**、Analytics、Save Report、Settings 按钮）
 - **MapView** - 主地图视图组件（支持标记聚类和热力图模式）
 - **StatusPanel** - 实时统计面板（显示总灾害数量、类型筛选）
 - **LegendPanel** - 图例与灾害类型说明
 - **SettingsModal** - 设置与配置面板
 - **SaveReportModal** - 报告导出对话框
+
+#### **AI 智能分析组件**（新增）
+- **AIChatAssistant** - AI 灾害分析助手侧边面板
+  - 🤖 基于 LLM 的多轮流式对话
+  - 📡 灾害实时数据上下文自动注入
+  - ⚡ 6 类预设快捷分析工作流
+  - 🎭 Demo 降级模式（无需 API Key）
 
 #### **数据分析组件**
 - **AnalyticsPage** - 独立的数据分析仪表板页面
@@ -298,6 +394,49 @@ npm start
   - 高风险区域识别
   - 趋势预测
   - 智能行动建议
+
+---
+
+## **AI 灾害分析助手**
+
+点击顶部导航栏「🤖 AI 助手」按钮即可打开。
+
+### **功能概览**
+
+| 功能 | 说明 |
+|------|------|
+| 💬 **流式对话** | 基于 LLM，逐字打印输出，支持多轮对话 |
+| 📡 **实时上下文** | 自动将平台当前灾害数据注入 System Prompt |
+| ⚡ **快捷分析** | 6 类预设工作流一键触发专业分析报告 |
+| 🌍 **专项分析** | 地震、洪水、野火、火山、全球态势、趋势预测 |
+| 🎭 **Demo 模式** | 无 API Key 时自动降级为本地演示，功能完整 |
+| 📱 **响应式** | 移动端自动全屏展示 |
+
+### **技术实现**
+
+```
+平台灾害数据 (Hazard[])
+       ↓ useMemo 构建上下文
+   System Prompt（动态注入）
+       ↓
+  LLM API（stream: true）
+       ↓ ReadableStream + SSE
+   逐 token onChunk 回调
+       ↓ setState 追加字符
+   React 重渲染 → 打字效果
+```
+
+### **支持的 LLM 服务**
+
+只需在 `.env` 中配置，代码无需修改：
+
+```dotenv
+VITE_OPENAI_API_KEY=sk-你的key
+VITE_OPENAI_MODEL=deepseek-chat
+VITE_OPENAI_API_URL=https://api.deepseek.com/v1/chat/completions
+```
+
+兼容：**OpenAI** / **DeepSeek** / **通义千问** / **智谱 GLM** / **Azure OpenAI** / **本地 Ollama** 等任意 OpenAI-format 接口。
 
 ---
 

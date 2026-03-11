@@ -12,6 +12,7 @@ import type { Hazard, SaveReportPayload } from "./types";
 const AnalyticsPage = lazy(() => import("./components/AnalyticsPage"));
 const SaveReportModal = lazy(() => import("./components/SaveReportModal"));
 const SettingsModal = lazy(() => import("./components/SettingsModal"));
+const AIChatAssistant = lazy(() => import("./components/AIChatAssistant"));
 
 // 加载指示器组件
 const LoadingFallback = () => (
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isAIOpen, setIsAIOpen] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState("dark-v11");
   const [disasters, setDisasters] = useState<Hazard[]>([]);
   const [filter, setFilter] = useState("ALL");
@@ -88,6 +90,7 @@ const App: React.FC = () => {
         onOpenSaveModal={() => setIsSaveModalOpen(true)}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsOpen(true)}
+        onOpenAI={() => setIsAIOpen(true)}
       />
       <main>
         {isAnalyticsOpen ? (
@@ -132,6 +135,14 @@ const App: React.FC = () => {
             isOpen={isSettingsModalOpen}
             onClose={() => setIsSettingsModalOpen(false)}
             onStyleChange={handleStyleChange}
+          />
+        </Suspense>
+
+        <Suspense fallback={null}>
+          <AIChatAssistant
+            isOpen={isAIOpen}
+            onClose={() => setIsAIOpen(false)}
+            hazards={disasters}
           />
         </Suspense>
       </main>
