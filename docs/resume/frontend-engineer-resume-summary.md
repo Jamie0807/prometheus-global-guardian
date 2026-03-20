@@ -5,21 +5,15 @@
 
 ### 核心职责总结：
 
-• **实时全球环境灾害监控与可视化平台**：主导开发Prometheus Global Guardian全球灾害监控与可视化平台，集成**4大权威数据源API**（DisasterAware + USGS + NASA EONET + GDACS）实现**全球范围灾害实时追踪**，监控**地震、火山、风暴、洪水、野火、干旱、海啸**等10+类灾害，设计**Promise.allSettled并发请求 + 错误降级**机制确保单一数据源失败不影响监控，实现**自动数据刷新、实时通知**机制，灾害事件响应延迟**<3秒**，数据同步成功率**99.5%+**
+• **主导全栈灾害监控平台设计与交付**：独立负责 Prometheus Global Guardian 从架构选型到上线全流程，基于 **React 19.1 + TypeScript 5.9 + Vite 7.1** 搭建现代化前端工程体系，集成 **4 大权威数据源**（DisasterAware / USGS / NASA EONET / GDACS），覆盖地震、火山、洪水等 **10+ 类灾害**实时追踪，事件响应延迟 **<3 秒**，数据同步成功率 **99.5%+**
 
-• **构建3D地球可视化监控系统**：基于 **Mapbox GL JS 3.15** 设计高性能时空数据可视化引擎，利用 **WebGL 实例化渲染技术**处理 **10w+ 级灾害点位**，帧率稳定在 **55fps+**；使用 **GeoJSON 格式**渲染实时灾害标记，实现**动态标记点集群、热力图模式切换、自定义 Popup 弹窗**展示灾害详情（类型、位置、严重性、震级），支持**实时类型过滤、3D 旋转/倾斜、地图样式切换**，集成 **React Hooks** 实现地图状态管理，地图交互响应 **<50ms**
+• **高性能时空可视化引擎**：基于 **Mapbox GL JS 3.15** 设计 WebGL 渲染层，利用**实例化渲染**处理 **10w+ 级灾害点位**，帧率稳定 **55fps+**；引入 **deck.gl + LOD 三级调度**（全球聚合 → 区域 Marker → 城市 3D 体块），显存占用降低 **40%**，地图交互响应 **<50ms**
 
-• **重构 3D 地图渲染层，引入 3D Tiles 与 LOD 策略**：集成 **deck.gl Tile3DLayer + CesiumIonLoader** 替换原有建筑渲染管线，支持外部标准 3D Tiles 数据源；实现基于视距的 **LOD 三级调度**（全球视图聚合气泡 → 区域视图独立 Marker → 城市视图 3D 建筑体块），优化 **glTF 模型加载管线**，实现从全球视图到城市级视角的**无缝缩放**，显存占用降低 **40%**
+• **BFF 适配器层 + 数据清洗管道**：设计 **BFF (Backend for Frontend)** 层统一 4 个异构数据源格式为标准 `Hazard` 接口；封装 **authFetch** 实现 OAuth 2.0 Token 自动刷新与 **Promise.allSettled** 容错降级，构建去重 / 标准化 / 异常过滤清洗管道，数据融合成功率 **99.5%+**
 
-• **开发多维度数据分析与可视化系统**：使用**Recharts 3.5.0**构建**4类交互式图表**（类型分布饼图、严重性柱状图、14天时间线、数据源分析），支持**点击钻取**查看详细数据；开发**统计卡片系统**（总数、近7天新增、高危事件、最常见类型、平均震级）和**智能洞察面板**（风险评分、趋势预测、高风险区域识别、行动建议），集成**Python FastAPI微服务**（23种统计算法 + 5个预测模型）实现高级分析
+• **前端工程化与性能优化**：配置 **manualChunks 代码分割 + React.lazy() 懒加载**，**首屏 bundle 减少 89%**（669 KB → 71 KB gzip），**构建时间减少 29%**（17.76 s → 12.60 s）；设计并沉淀 **18 个高复用组件**，TypeScript 严格模式确保类型安全
 
-• **设计 BFF (Backend for Frontend) 层或适配器模式，统一异构数据源，实现故障自动降级与数据清洗管道**：实现**OAuth 2.0认证**（DisasterAware） + **公开API**（USGS/NASA/GDACS）集成，封装**authFetch**函数处理401/403自动刷新Token，实现**数据格式标准化**（将4个数据源统一转换为Hazard接口）、**去重处理**、**错误降级**（DisasterAware失败自动切换其他数据源），数据融合成功率**99.5%+**
-
-• **构建企业级组件库与状态管理**：设计并实现**18个高复用性React组件**（MapView、ChartsPanel、AnalyticsPage、StatisticsCard、InsightsPanel、DataQualityMonitor、ErrorBoundary、NotificationCenter等），采用**组件组合模式**和**TypeScript严格模式**确保类型安全，使用**React Hooks**（useState、useEffect、useCallback、useMemo）实现状态管理，通过**useMemo缓存计算结果**优化大数据渲染性能
-
-• **主导性能优化与工程化实践**：实施**Vite 7.1构建工具链**，HMR热更新**<200ms**，配置**manualChunks代码分割策略**将vendor库（react、mapbox-gl、recharts、utils）独立打包，使用**React.lazy() + Suspense**对AnalyticsPage等3个大型组件实施懒加载，**构建时间减少29%**（17.76s→12.60s），**首屏bundle减少89%**（669KB→71KB gzip），通过**Tree Shaking、Gzip压缩**优化资源加载，使用**ESLint + Prettier**建立代码规范，通过Chrome DevTools持续监控性能表现
-
-• **构建基于 LLM 的 AI 灾害分析智能模块**：设计并实现 **AI 灾害分析助手**功能，基于 **OpenAI Chat Completions API** 实现**流式响应（SSE + ReadableStream）**，将灾害实时监控上下文（灾害总数、类型分布、近期事件）动态注入 System Prompt，支持**多轮对话历史管理**；开发 6 类预设**灾害分析工作流**（全球态势、地震、洪水、野火、火山、趋势预测），设计**逐字打字动画**（streaming chunk 渲染）提升交互体验；实现**降级 Demo 模式**（无 API Key 时自动切换本地响应模拟），系统 **API 调用成功率 99%+**，响应首字延迟 **<1s**
+• **LLM 驱动的 AI 灾害分析助手**：集成 **OpenAI Chat Completions API**，实现 **SSE 流式响应**与灾害上下文动态注入 System Prompt；开发 **6 类预设分析工作流**，支持多轮对话与降级 Demo 模式，API 调用成功率 **99%+**，首字响应延迟 **<1s**
 
 ---
 
