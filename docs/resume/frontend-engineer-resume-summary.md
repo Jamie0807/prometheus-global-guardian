@@ -651,6 +651,14 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 
 ##### 解决方案一：AbortController 取消过期请求
 
+> **💡 概念解释：AbortController 是什么？**
+>
+> `AbortController` 是浏览器原生提供的 Web API，用于**取消异步操作**（主要是 `fetch` 请求）。它由两个核心部分组成：
+> - `controller.signal`：一个 `AbortSignal` 对象，传给需要被取消的 `fetch`
+> - `controller.abort()`：调用后立即触发取消，`signal.aborted` 变为 `true`，`fetch` 抛出 `AbortError`
+>
+> 关键特性：同一个 `controller` 可以同时传给多个 `fetch`，调一次 `abort()` 全部取消；`AbortError` 需要在 catch 里单独处理，不要当成真正的错误上报。
+
 每次发起新请求前，先 abort 上一次未完成的请求，确保只有最新请求的结果会被处理：
 
 ```typescript
