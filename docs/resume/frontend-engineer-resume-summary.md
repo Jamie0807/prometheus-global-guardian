@@ -1543,7 +1543,6 @@ const handleDisastersUpdate = (data: Hazard[]) => {
   }
 };
 ```
-```
 
 ---
 
