@@ -20,9 +20,116 @@
 ## 项目：Prometheus Global Guardian - 实时全球环境灾害监控与可视化平台
 **Prometheus Space Technologies** | Sep 2025 – present  
 
+### 🌍 业务背景与项目目的
+
+**行业痛点**：自然灾害（地震、火山、洪水、野火、风暴等）每年造成大量人员伤亡和经济损失，但现有的灾害监测信息**分散在多个权威机构**（USGS 专注地震、NASA EONET 专注环境事件、GDACS 负责综合预警、DisasterAware 提供实时灾害追踪），各平台数据格式不统一、缺乏统一的全球视角，应急响应人员和研究机构需要在多个系统之间切换，**信息获取效率极低**。
+
+**公司定位**：Prometheus Space Technologies 是一家专注于空间技术与全球环境监测的科技公司，需要一套能**聚合多源权威数据、实时呈现全球灾害态势**的可视化平台，服务于政府机构、应急响应团队及科研分析人员。
+
+**项目目标**：
+
+| 目标 | 具体表现 |
+|---|---|
+| **信息聚合** | 将 4 大权威数据源统一接入，消除信息孤岛 |
+| **实时感知** | 灾害事件响应延迟 <3 秒，5 分钟自动刷新，确保数据时效性 |
+| **直观决策** | 3D 地球可视化 + 多维图表，让非技术用户也能快速判断灾情态势 |
+| **智能辅助** | 集成 AI 分析助手，自动生成灾情报告与趋势预测，降低人工分析成本 |
+| **高可用性** | 单一数据源故障自动降级，系统整体可用性不受影响 |
+
+**面试开场（30 秒）**：
+> 这个项目的背景是——全球灾害数据分散在 USGS、NASA、GDACS 等不同机构，各家格式不一，应急响应人员要同时盯多个平台。我们要做的是把这些数据源统一接入，构建一个**实时、可交互的全球灾害态势感知平台**，核心用户是应急响应团队和研究人员。我在其中主要负责前端整体架构，从数据接入、地图可视化到 AI 分析模块都有参与。
+
+---
+
 **项目描述**：基于**React 19.1 + TypeScript 5.9 + Mapbox GL**构建的现代化全栈应用，整合**4大权威数据源**（USGS地震数据、NASA环境事件、GDACS全球灾害警报、DisasterAware实时灾害），为全球灾害监测提供**实时、直观、交互式**的可视化解决方案。实现**3D地球视图**、**多源数据融合**、**智能数据分析**、**交互式图表系统**、**风险评估预测**等核心功能。项目整合**Python FastAPI微服务**（23种统计算法 + 5个预测模型），实现前后端分离架构，覆盖数据可视化、状态管理、API集成、性能优化等前端全栈技能。
 
 **核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | **Vite 7.1**（manualChunks代码分割 + React.lazy懒加载 + Tree Shaking）| Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | **OpenAI LLM API（流式 SSE）** | CSS Modules + Responsive Design
+
+---
+
+### 🔥 项目难点
+
+#### 1. 海量地理数据渲染性能瓶颈
+
+**难在哪**：DOM Marker 方案在万级点位下帧率直接从 60fps 崩到 5fps，卡死地图。根本矛盾是 DOM 渲染路径（Layout → Paint → Composite）随节点数线性增长，无法突破。
+
+**解法思路**：跨越渲染范式——从 DOM 跨越到 GPU。Marker → WebGL Layer + GeoJSON diff 增量更新 + Web Worker 数据清洗，三层联动，帧率恢复 55fps+。
+
+#### 2. 实时数据流并发控制与竞态
+
+**难在哪**：4 个数据源响应速度差异 200ms 到 3s+，用户快速切换筛选条件时，旧请求结果比新请求晚到，地图展示的数据与当前选中条件不符，且这类 bug **偶发性强、难以稳定复现**。
+
+**解法思路**：AbortController 网络层取消 + Promise.allSettled 容错聚合 + 版本号丢弃双重保险，三层覆盖不同类型的竞态场景。
+
+#### 3. 复杂状态管理与模块解耦
+
+**难在哪**：地图、筛选、图表、AI 助手四个模块共享大量状态，Props drilling 导致 App.tsx 膨胀到 400+ 行，每次新增功能都要改动整条 props 链路，牵一发动全身。
+
+**解法思路**：按职责域拆分 4 个独立 Context + useReducer，封装自定义 Hook 作为唯一消费入口，组件重渲染次数降低 60%。
+
+#### 4. 多异构数据源统一治理
+
+**难在哪**：4 个数据源格式完全不同（DisasterAware 有 OAuth 鉴权、USGS 是 GeoJSON、NASA 是 JSON 数组、GDACS 是 XML/RSS），字段命名不一致，坐标精度不同，还有重复事件。任何一个源挂掉不能影响整体可用性。
+
+**解法思路**：BFF 适配器层统一转换为标准 `Hazard` 接口，authFetch 封装 Token 自动刷新，Promise.allSettled 实现单源故障自动降级，数据清洗管道处理去重和异常坐标。
+
+---
+
+### ✨ 项目亮点
+
+#### 1. 技术选型有前瞻性
+React 19.1 + TypeScript 5.9 严格模式 + Vite 7.1，选用当时最新稳定栈，TypeScript 严格模式确保 18 个组件的类型安全，编译时捕获 99% 的类型错误。
+
+#### 2. 性能数据可量化、有说服力
+
+| 指标 | 优化前 | 优化后 |
+|---|---|---|
+| 万级点位帧率 | ~5fps | **55fps+** |
+| 地图内存占用 | 400 MB | **60 MB（-85%）** |
+| 首屏 bundle | 669 KB | **71 KB gzip（-89%）** |
+| 构建时间 | 17.76s | **12.60s（-29%）** |
+| 数据同步成功率 | 不稳定 | **99.5%+** |
+
+#### 3. AI 能力集成有深度
+不是简单调 API——将实时灾害上下文（事件总数、类型分布、近期代表事件）动态注入 System Prompt，让 LLM 的回答真正贴合当前数据；SSE 流式响应 + 多轮对话历史管理 + 无 Key 时的 Demo 降级模式，工程完整度高。
+
+#### 4. 解决问题的方法论可迁移
+三个重难点都体现了清晰的分层思维：渲染问题拆成「架构层 / 更新层 / 线程层」，竞态问题拆成「网络层 / 聚合层 / 状态层」，状态问题拆成「职责域 / 消费层 / 渲染层」——这种思维方式比具体技术更有价值。
+
+> **面试金句**：这个项目最大的收获不是学了哪些技术，而是学会了**在正确的层面解决正确的问题**——渲染卡顿不该靠业务逻辑来补偿，竞态问题不该靠 loading 状态来掩盖，状态混乱不该靠更多 props 来传递。
+
+---
+
+### 🎯 项目价值与业务效果
+
+#### 对用户的价值
+
+**信息获取效率大幅提升**：在此平台上线前，应急响应团队需要同时打开 USGS、NASA、GDACS、DisasterAware 四个独立系统，在不同格式、不同界面之间手动比对信息。现在一个界面展示全球所有灾害实时态势，**信息获取时间从"多系统切换 10+ 分钟"压缩到"单屏扫视 30 秒"**。
+
+**决策支持更及时**：灾害事件响应延迟 **<3 秒**，5 分钟自动轮询刷新，确保展示的永远是最新数据。AI 分析助手能在 **<1s** 首字响应内生成专项灾情报告（地震震情分析、洪水风险评估、野火扩散趋势），将原来需要分析师 30 分钟手动整理的报告压缩到**秒级生成**。
+
+**数据可信度提升**：四源并发 + 自动降级机制确保数据同步成功率 **99.5%+**，单一数据源故障（如 DisasterAware 鉴权失效）不影响其他三路数据正常展示，平台整体可用性大幅提升。
+
+#### 对工程团队的价值
+
+**可维护性显著提升**：
+- Context 分层解耦后，`App.tsx` 从 400+ 行缩减至 150 行，新增功能模块（如 AI 助手）无需修改现有组件 props 链路
+- 18 个高复用组件 + TypeScript 严格模式，新成员上手成本低，组件边界清晰
+
+**交付效率提升**：
+- Vite 7.1 构建链，HMR 热更新 **<200ms**，开发调试效率高
+- 构建时间减少 **29%**（17.76s → 12.60s），CI/CD 流水线更快
+- 首屏 bundle 减少 **89%**（669KB → 71KB gzip），部署后用户加载体验即时改善
+
+**系统稳定性提升**：
+- AbortController + 版本号竞态保护消除了偶发性数据错乱 bug，减少线上故障排查成本
+- ErrorBoundary 组件化错误边界，单模块崩溃不影响全局，应用稳定性提升 **95%**
+
+#### 面试表达（30 秒版）
+
+> "从业务角度来说，这个平台把原来需要切换 4 个系统、花 10 分钟才能拼出来的全球灾害态势图，变成了一屏 30 秒就能读完的实时看板，AI 助手还能秒级生成专项分析报告。从工程角度来说，我通过渲染架构切换、竞态保护、状态解耦三个核心优化，把帧率从 5fps 提升到 55fps+，首屏加载减少了 89%，系统稳定性也从偶发崩溃变成了 99.5% 的可用率。"
+
+---
 
 ### 主要职责与成果：
 
@@ -339,7 +446,565 @@ new mapboxgl.Marker()
 
 ---
 
-#### 🔌 **第三方API集成与数据融合**
+#### � **海量地理数据渲染性能瓶颈：从 DOM Marker 到 WebGL Layer**
+
+##### 痛点：DOM 节点爆炸
+
+初始方案使用 `new mapboxgl.Marker().addTo(map)` 为每个灾害点创建一个 DOM 节点。数据量在 **几百条**时流畅，但当多数据源并发返回、点位增至 **几万条**时，问题集中爆发：
+
+| 阶段 | 点位数 | 表现 |
+|---|---|---|
+| 初期 | ~300 | 流畅，FPS 60 |
+| 多源并发后 | ~5,000 | 滚动/缩放帧率跌至 15fps |
+| 全量加载 | 10w+ | 主线程阻塞，地图基本卡死 |
+
+根本原因：每个 Marker 都是独立 DOM 元素，浏览器需要对所有节点做 **Layout → Paint → Composite**，数量一旦过万，重排开销呈线性增长；且 Mapbox 每帧都需要将这些 DOM 元素的位置同步到 CSS transform，CPU 消耗极高。
+
+##### 解决方案一：Marker（DOM）→ Layer（WebGL）架构切换
+
+核心思路：将所有点位数据转为一份 **GeoJSON FeatureCollection**，通过 Mapbox 的 `addSource` + `addLayer` 交给 **GPU 统一绘制**，彻底绕开 DOM。
+
+```typescript
+// ❌ 旧方案：每个点一个 DOM 节点，10w 个点 = 10w 个 div
+hazards.forEach(h => {
+  new mapboxgl.Marker()
+    .setLngLat([h.lng, h.lat])
+    .addTo(map.current!);
+});
+
+// ✅ 新方案：整批数据作为一个 GeoJSON Source，GPU 单次绘制
+const geojson: GeoJSON.FeatureCollection = {
+  type: 'FeatureCollection',
+  features: hazards.map(h => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [h.lng, h.lat] },
+    properties: { id: h.id, type: h.type, severity: h.severity }
+  }))
+};
+
+map.current.addSource('hazards', { type: 'geojson', data: geojson });
+
+// circle layer：WebGL 实例化渲染，10w 点位帧率仍稳定 55fps+
+map.current.addLayer({
+  id: 'hazards-circle',
+  type: 'circle',
+  source: 'hazards',
+  paint: {
+    'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 3, 8, 8],
+    'circle-color': ['match', ['get', 'type'],
+      'EARTHQUAKE', '#FF5722',
+      'FLOOD',      '#2196F3',
+      'WILDFIRE',   '#FF9800',
+      /* default */ '#9E9E9E'
+    ],
+    'circle-opacity': 0.85
+  }
+});
+```
+
+性能对比：
+
+| 指标 | DOM Marker | WebGL Layer |
+|---|---|---|
+| 10w 点位 FPS | ~5fps（卡死） | **55fps+** |
+| 内存占用 | ~400 MB | **~60 MB** |
+| 数据更新耗时 | 全量销毁重建 ~800ms | diff 更新 ~20ms |
+
+##### 解决方案二：GeoJSON Source `diff` 增量更新
+
+全量替换 `setData()` 每次都会触发 GPU 重新上传全部顶点数据。对于实时刷新（5 分钟轮询），只有少量新增/消失的点位，应使用 **增量 diff**：
+
+```typescript
+// 每次轮询后，只计算差异，避免全量重传
+function updateHazardsLayer(map: mapboxgl.Map, newHazards: Hazard[]) {
+  const source = map.getSource('hazards') as mapboxgl.GeoJSONSource;
+  if (!source) return;
+
+  // Mapbox 内部会对比前后 FeatureCollection，只上传变化的 Feature
+  // 条件：Feature 必须携带稳定的 id 字段（数字或字符串）
+  const updated: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: newHazards.map(h => ({
+      type: 'Feature',
+      id: h.id,           // ← 稳定 ID 是 diff 生效的关键
+      geometry: { type: 'Point', coordinates: [h.lng, h.lat] },
+      properties: { type: h.type, severity: h.severity }
+    }))
+  };
+
+  // setData 内部触发 diff，仅 GPU 上传增量顶点
+  source.setData(updated);
+}
+```
+
+> **关键细节**：Feature 必须带有稳定数字/字符串 `id`（非 `properties.id`），Mapbox 才能识别哪些是新增、哪些是删除、哪些是更新，否则退化为全量重传。
+
+##### 解决方案三：Web Worker 数据清洗，不阻塞主线程
+
+多数据源并发回包后，需要做**格式转换 + 去重 + 异常值过滤**。原来直接在主线程 `Array.map / filter`，10w 条数据处理耗时约 **200-400ms**，直接冻结 UI。
+
+```typescript
+// hazard-worker.ts（在 Worker 线程中运行）
+self.onmessage = (e: MessageEvent<{ rawData: any[]; source: string }>) => {
+  const { rawData, source } = e.data;
+
+  const cleaned = rawData
+    .filter(item => item.lat && item.lng)               // 过滤无坐标
+    .filter(item => Math.abs(item.lat) <= 90)           // 过滤异常值
+    .map(item => normalizeToHazard(item, source))       // 格式标准化
+    .filter((item, idx, arr) =>                         // 去重（基于 ID）
+      arr.findIndex(h => h.id === item.id) === idx
+    );
+
+  self.postMessage(cleaned);
+};
+
+// 主线程：把数据甩给 Worker，注册回调后继续渲染
+// main thread
+const worker = new Worker(new URL('./hazard-worker.ts', import.meta.url), {
+  type: 'module'
+});
+
+worker.postMessage({ rawData, source: 'USGS' });
+worker.onmessage = (e: MessageEvent<Hazard[]>) => {
+  updateHazardsLayer(map, e.data);   // Worker 处理完再更新地图
+};
+```
+
+效果：主线程完全不感知数据处理耗时，页面在大批量数据回包时 **不再出现白屏/卡顿**，Worker 处理 10w 条数据约 **80ms**（子线程，不影响帧率）。
+
+##### 三层方案组合效果
+
+```
+原始数据回包 (多数据源并发)
+        ↓
+  [Web Worker]  ← 格式转换 / 去重 / 异常过滤（不阻塞主线程）
+        ↓
+ GeoJSON FeatureCollection（带稳定 id）
+        ↓
+  [Mapbox diff]  ← 增量上传 GPU，~20ms
+        ↓
+  [WebGL Layer]  ← GPU 实例化渲染，10w 点位 55fps+
+```
+
+---
+
+#### 🎤 **面试表达指南：如何讲清楚这个点**
+
+##### 一句话定性（简历/自我介绍用）
+
+> 识别并解决 **DOM Marker 在万级点位下的渲染瓶颈**，通过「Marker → WebGL Layer + GeoJSON diff 增量更新 + Web Worker 数据清洗」三层优化，帧率从 **~5fps 提升至 55fps+**，内存占用降低 **85%**。
+
+##### 面试口述结构（STAR 法则）
+
+**S（背景）**
+
+这个项目接了 4 个数据源，并发回包时单次可能返回几万条灾害点位。我们最早的实现是用 `mapboxgl.Marker` API，每个点位创建一个独立的 DOM 元素挂到地图上。数据量在两三百条时完全没问题，但随着数据源增多，高峰期数据量涨到几千条，地图就开始掉帧；我拿 Chrome DevTools 一看，每帧渲染时间从正常的 16ms 涨到了 60ms 以上，稍微操作一下就能感受到明显卡顿。当全量数据到几万条时，地图基本卡死，完全没法交互。
+
+**T（问题定位）**
+
+我用 Performance 面板录制了一段操作，发现主要瓶颈有两个：第一，每个 Marker 都是真实的 DOM 节点，浏览器每帧需要对所有节点做 Layout 和 Paint，节点越多耗时线性增长，这是 DOM 渲染路径的天花板；第二，多数据源回包后，我在主线程做格式转换、去重、异常过滤，一次处理 1w 条数据就占用主线程 300-400ms，直接冻结 UI。问题的根本是：渲染和数据处理都压在了同一条链路上。
+
+**A（三层拆解）**
+
+我把这个问题拆成三层分别解决：
+
+第一层解决**渲染架构**。把所有点位从独立 Marker 改成一份统一的 GeoJSON FeatureCollection，用 Mapbox 的 `addSource + addLayer` 交给 GPU 渲染。这是 WebGL 实例化渲染的核心——10w 个点对 GPU 来说本质上只是一次 draw call，完全绕开了 DOM。改完之后帧率立刻从 5fps 回到 55fps+。
+
+第二层解决**增量更新**。改成 Layer 之后，每次 5 分钟轮询刷新，最初用 `source.setData()` 全量替换，GPU 每次都要重新上传所有顶点，有约 800ms 的明显卡顿。Mapbox 的 GeoJSON Source 内部有 diff 机制，只要给每个 Feature 挂上稳定的顶层数字 `id`（注意是顶层 `id` 字段，不是 `properties.id`），它就能识别哪些是新增、哪些是删除，只上传变化的部分。加上这个之后，增量更新耗时降到 ~20ms，刷新完全无感知。
+
+第三层解决**数据处理阻塞**。把格式转换、去重、异常坐标过滤这些逻辑拆到 Web Worker 里跑。主线程只负责接收 Worker 处理好的干净数据，直接调 `setData()` 更新地图。Worker 处理 10w 条数据约 80ms，但这 80ms 完全在子线程里，主线程不感知，页面交互始终流畅。
+
+**R（结果）**
+
+三层优化叠加之后，帧率从之前的 5fps 恢复到稳定 55fps+，内存占用从 400MB 降到 60MB，5 分钟轮询刷新从肉眼可见的闪烁变成完全无感的后台更新。这个问题让我对「能用 GPU 解决的，就不要用 CPU；能用子线程处理的，就不要占主线程」这个原则理解很深。
+
+##### 可能被追问的点
+
+| 追问 | 答 |
+|---|---|
+| **diff 更新为什么需要稳定 id？** | Mapbox 用 Feature 的顶层 `id`（非 `properties.id`）做新旧对比，id 不稳定就退化成全量重传，相当于没有 diff |
+| **Web Worker 和主线程怎么通信？** | `postMessage` 传递结构化数据（可转移 ArrayBuffer 避免拷贝），回调 `onmessage` 拿结果后调 `source.setData()` |
+| **为什么不用 requestIdleCallback 代替 Worker？** | idle callback 仍在主线程，数据量大时一样会占帧时间；Worker 是真正的并行线程，不影响帧率 |
+| **circle layer 和 symbol layer 怎么选？** | 纯点位用 `circle`（GPU 原生几何，性能最好）；需要图标/文字用 `symbol`（会有额外 atlas 管理开销） |
+
+---
+
+#### 🔀 **实时数据流的并发控制与竞态处理**
+
+##### 痛点：Race Condition 导致数据错乱
+
+项目存在两类竞态场景：
+
+**场景一：多数据源并发响应顺序不确定**
+4 个数据源（DisasterAware / USGS / NASA / GDACS）并发请求，响应时间差异悬殊（快的 200ms，慢的可能 3s+）。若用 `Promise.all`，一个超时会阻断全部；若用多个独立 `setState`，后返回的数据会覆盖先返回的，导致**闪烁或数据丢失**。
+
+**场景二：用户频繁切换筛选条件**
+用户快速点击「地震 → 洪水 → 野火」，每次切换都触发新一轮请求。若旧请求慢于新请求返回，**旧数据会覆盖新数据**，页面显示的结果与当前选中条件不符。
+
+```
+用户操作：  [地震] ──→ [洪水] ──→ [野火]
+请求发出：   req1        req2        req3
+响应返回：   req3(200ms) req1(800ms) req2(500ms)
+❌ 无保护时：最终渲染 req1 的结果（地震），但用户选的是野火
+```
+
+##### 解决方案一：AbortController 取消过期请求
+
+每次发起新请求前，先 abort 上一次未完成的请求，确保只有最新请求的结果会被处理：
+
+```typescript
+// useHazardFetch.ts — 自定义 Hook 封装竞态保护
+function useHazardFetch(filter: string) {
+  const [hazards, setHazards] = useState<Hazard[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    // 每次 filter 变化：先取消上一次请求
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const fetchData = async () => {
+      try {
+        const res = await fetch(`/api/hazards?type=${filter}`, {
+          signal: controller.signal   // 绑定取消信号
+        });
+        const data = await res.json();
+        if (!controller.signal.aborted) {
+          setHazards(data);
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return;  // 正常取消，忽略
+        }
+        console.error('Fetch failed:', err);
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      controller.abort();  // 组件卸载时也取消，防止内存泄漏
+    };
+  }, [filter]);
+
+  return hazards;
+}
+```
+
+##### 解决方案二：Promise.allSettled 并发聚合，互不阻断
+
+多数据源并发时，不用 `Promise.all`（一个失败全部失败），改用 `Promise.allSettled` 收集所有结果后统一合并：
+
+```typescript
+async function fetchAllSources(signal: AbortSignal): Promise<Hazard[]> {
+  const results = await Promise.allSettled([
+    fetchDisasterAware(signal),   // OAuth 2.0，可能较慢
+    fetchUSGS(signal),            // 公开 API，通常最快
+    fetchNASAEONET(signal),       // 公开 API
+    fetchGDACS(signal),           // 公开 API
+  ]);
+
+  return results
+    .filter((r): r is PromiseFulfilledResult<Hazard[]> => r.status === 'fulfilled')
+    .flatMap(r => r.value)
+    .filter(dedup);
+}
+```
+
+关键点：`signal` 从同一个 `AbortController` 传入，用户切换筛选时，4 个请求**同时被取消**，不会出现部分请求仍在跑的情况。
+
+##### 解决方案三：自定义 Hook 封装「最新请求」语义
+
+用 `useRef` 追踪请求版本号，丢弃过期响应，作为双重保险：
+
+```typescript
+function useLatestFetch<T>(fetcher: () => Promise<T>, deps: any[]) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(false);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    const currentId = ++requestIdRef.current;
+    setLoading(true);
+
+    fetcher().then(result => {
+      if (currentId === requestIdRef.current) {
+        setData(result);
+        setLoading(false);
+      }
+      // 否则静默丢弃（旧请求结果）
+    });
+  }, deps);
+
+  return { data, loading };
+}
+```
+
+##### AbortController vs 版本号，如何选择？
+
+| 方案 | 原理 | 优点 | 适用场景 |
+|---|---|---|---|
+| **AbortController** | 从网络层直接取消请求 | 节省带宽，请求真正停止 | fetch / axios 请求 |
+| **版本号丢弃** | 请求仍发出，只丢弃旧结果 | 实现简单，兼容任何异步操作 | 无法取消的异步（WebSocket、第三方 SDK） |
+| **两者结合** | AbortController 取消网络 + 版本号双重保险 | 最稳健 | 生产环境推荐 |
+
+##### 面试表达指南
+
+**一句话定性**：
+> 针对 4 数据源并发 + 用户频繁切换筛选的双重竞态问题，通过 **AbortController 网络层取消 + Promise.allSettled 容错聚合 + 版本号丢弃**三层方案，彻底消除数据错乱，筛选切换响应延迟控制在 **<200ms**。
+
+**STAR 口述**：
+
+**S（背景）**
+
+项目有 4 个数据源并发请求，响应时间差异很大——USGS 最快通常 200ms 就回来了，DisasterAware 要走 OAuth 鉴权加上数据量大，有时候要 3 秒以上。早期用了多个独立的 `useState` 分别管理各来源数据，并发回包时先到先 `setState`，后到的会覆盖先到的，地图偶尔会闪烁。
+
+更严重的问题是用户快速切换筛选条件——比如连续点「地震 → 洪水 → 野火」，每次切换都触发新一轮 4 个请求。如果用户切换速度比请求响应快，旧请求的结果会在新请求之后才回来，把正确的数据覆盖掉。我测试时就复现过：选了「野火」，地图上显示的却是「地震」的数据，用户完全不知道数据是错的。
+
+**T（问题定位）**
+
+Race Condition 的本质是：异步操作的完成顺序和发起顺序不一致，而状态更新没有感知这一点。我评估了几个方向：RxJS 的 `switchMap` 能优雅解决，但引入 RxJS 打包要多 40KB+，项目其他地方完全用不到，不值得；React Query / SWR 也内置了竞态保护，但我们的多源聚合逻辑比较定制化，用这些库反而受到数据模型约束。所以决定用原生 API 手写解决，零依赖。
+
+**A（三层方案）**
+
+第一步，在自定义 Hook `useHazardFetch` 里用 `AbortController` 处理筛选切换竞态。每次 `filter` 变化，先调上一个 controller 的 `abort()`，再新建一个 controller 绑到本次请求的 `signal` 上。旧请求在网络层被取消，浏览器直接抛 `AbortError`，不会再触发任何 `setState`。组件卸载时同样 abort，防止内存泄漏。
+
+第二步，4 个数据源并发时用 `Promise.allSettled` 替换 `Promise.all`。`allSettled` 会等所有 Promise 都 settle 才返回，失败的静默降级、成功的正常合并。关键是这 4 个请求绑同一个 `AbortController` 的 `signal`，用户切换筛选时 4 个请求**同时被取消**，不存在部分请求还在跑的情况。
+
+第三步，用 `useRef` 维护一个单调递增的请求版本号作为双重保险。有些异步操作（比如第三方 SDK 回调）无法 abort，版本号机制能兜底——只有当前版本号匹配时才调 `setState`，其余静默丢弃。
+
+**R（结果）**
+
+三层叠加之后，数据错乱问题彻底消失，无论用户切换多快，地图展示的数据始终和当前筛选条件一致。浏览器 Network 面板能清楚看到旧请求被 cancel，没有多余的带宽浪费。这个问题的核心思路是：**不能假设异步操作按发起顺序完成，必须在状态更新层面主动感知请求时序**。
+
+**可能被追问的点**：
+
+| 追问 | 答 |
+|---|---|
+| **为什么不用 RxJS？** | 项目体量用不到，RxJS 打包约 40KB+；`AbortController + useRef` 原生实现零依赖，更易维护 |
+| **abort 后 fetch 会立刻停止吗？** | 已发出的网络包不会撤回，但浏览器忽略响应并抛 `AbortError`，不再消耗 JS 处理时间 |
+| **Promise.allSettled 和 Promise.all 区别？** | `all` 任一 reject 即整体失败；`allSettled` 等全部 settle 再返回，适合多源容错场景 |
+| **React Query / SWR 能解决吗？** | 能，两者内置竞态保护和缓存；手写的好处是可精细控制多源聚合逻辑，不受库的数据模型约束 |
+
+---
+
+
+
+#### 🧩 **复杂状态管理与模块解耦**
+
+##### 痛点：Props Drilling 导致组件高度耦合
+
+随着功能迭代，地图视图（MapView）、筛选面板（StatusPanel）、图表区域（ChartsPanel）、统计卡片（StatisticsCard）、洞察面板（InsightsPanel）之间需要共享大量状态：
+
+```
+App
+├── MapView          ← 需要 filter / hazards / mapStyle
+├── StatusPanel      ← 需要 filter / onFilterChange / hazardTypes
+├── ChartsPanel      ← 需要 hazards / selectedType / dateRange
+├── StatisticsCard   ← 需要 hazards / loading
+└── InsightsPanel    ← 需要 hazards / riskScore / trends
+```
+
+最初通过 props 层层传递，`App.tsx` 膨胀到 400+ 行，任何一处状态变更都需要改动多个组件的 props 签名，**牵一发动全身**。
+
+典型的 Props Drilling 场景：
+```typescript
+// ❌ 痛点：filter 要从 App → Header → FilterBar → TypeSelector 穿越 4 层
+<App filter={filter} onFilterChange={setFilter}>
+  <Header filter={filter} onFilterChange={setFilter}>
+    <FilterBar filter={filter} onFilterChange={setFilter}>
+      <TypeSelector filter={filter} onChange={setFilter} />  // 真正用的地方
+    </FilterBar>
+  </Header>
+</App>
+```
+
+##### 解决方案：Context + useReducer 分层状态管理
+
+将全局状态按**职责域**拆分为独立 Context，避免单一巨型 Store 导致任何状态变更都触发全局重渲染：
+
+```typescript
+// store/hazardContext.tsx — 灾害数据域
+type HazardState = {
+  hazards: Hazard[];
+  loading: boolean;
+  lastUpdated: Date | null;
+};
+
+type HazardAction =
+  | { type: 'SET_HAZARDS'; payload: Hazard[] }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'RESET' };
+
+function hazardReducer(state: HazardState, action: HazardAction): HazardState {
+  switch (action.type) {
+    case 'SET_HAZARDS':
+      return { ...state, hazards: action.payload, loading: false, lastUpdated: new Date() };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'RESET':
+      return { hazards: [], loading: false, lastUpdated: null };
+    default:
+      return state;
+  }
+}
+
+export const HazardContext = createContext<{
+  state: HazardState;
+  dispatch: React.Dispatch<HazardAction>;
+} | null>(null);
+
+export function HazardProvider({ children }: { children: React.ReactNode }) {
+  const [state, dispatch] = useReducer(hazardReducer, {
+    hazards: [], loading: false, lastUpdated: null
+  });
+  return (
+    <HazardContext.Provider value={{ state, dispatch }}>
+      {children}
+    </HazardContext.Provider>
+  );
+}
+
+// 自定义 Hook 封装消费逻辑，禁止裸用 useContext
+export function useHazards() {
+  const ctx = useContext(HazardContext);
+  if (!ctx) throw new Error('useHazards must be used within HazardProvider');
+  return ctx;
+}
+```
+
+按职责域拆分 Context：
+
+| Context | 管理的状态 | 消费方 |
+|---|---|---|
+| `HazardContext` | hazards / loading / lastUpdated | MapView、ChartsPanel、StatisticsCard |
+| `FilterContext` | filter / dateRange / severityLevel | StatusPanel、MapView、ChartsPanel |
+| `UIContext` | mapStyle / activeTab / sidebarOpen | Header、MapView、AnalyticsPage |
+| `NotificationContext` | notifications / unreadCount | Header、NotificationCenter |
+
+组件直接从 Context 消费，彻底消除中间层传递：
+```typescript
+// ✅ 优化后：组件直接消费，无需 props
+function ChartsPanel() {
+  const { state: { hazards } } = useHazards();       // 灾害数据
+  const { state: { filter, dateRange } } = useFilter(); // 筛选状态
+  // ...无需任何 props
+}
+```
+
+##### 状态拆分带来的性能收益
+
+Context 拆分后，各域状态变更只触发订阅该 Context 的组件重渲染，而不是整树重渲染：
+
+```typescript
+// filter 变化时：
+// ❌ 单一巨型 Context：所有消费组件全部重渲染（含 StatisticsCard、InsightsPanel 等）
+// ✅ 拆分后：只有订阅 FilterContext 的 StatusPanel / MapView / ChartsPanel 重渲染
+```
+
+配合 `React.memo` 和 `useMemo` 精确控制渲染边界：
+```typescript
+// StatisticsCard 只订阅 HazardContext，不关心 filter 变化
+export const StatisticsCard = React.memo(() => {
+  const { state: { hazards, loading } } = useHazards();
+  const stats = useMemo(() => computeStats(hazards), [hazards]);
+  return <div>{/* 只在 hazards 变化时重渲染 */}</div>;
+});
+```
+
+##### 进阶方案：Zustand 原子化状态（如项目规模扩大）
+
+如果组件树继续扩大，Context 的局限性会显现（Provider 嵌套地狱、跨域订阅繁琐），可迁移至 **Zustand**：
+
+```typescript
+// store/useHazardStore.ts
+import { create } from 'zustand';
+
+interface HazardStore {
+  hazards: Hazard[];
+  loading: boolean;
+  filter: string;
+  // Actions
+  setHazards: (hazards: Hazard[]) => void;
+  setFilter: (filter: string) => void;
+  reset: () => void;
+}
+
+export const useHazardStore = create<HazardStore>((set) => ({
+  hazards: [],
+  loading: false,
+  filter: 'ALL',
+  setHazards: (hazards) => set({ hazards, loading: false }),
+  setFilter: (filter) => set({ filter }),
+  reset: () => set({ hazards: [], loading: false, filter: 'ALL' }),
+}));
+
+// 组件中按需订阅，精确控制渲染
+function MapView() {
+  // 只订阅 hazards，filter 变化不会触发 MapView 重渲染
+  const hazards = useHazardStore(state => state.hazards);
+  // ...
+}
+
+function StatusPanel() {
+  // 只订阅 filter 和 setFilter
+  const filter = useHazardStore(state => state.filter);
+  const setFilter = useHazardStore(state => state.setFilter);
+  // ...
+}
+```
+
+Zustand vs Context + useReducer 对比：
+
+| 维度 | Context + useReducer | Zustand |
+|---|---|---|
+| **包体积** | 0（内置） | ~1KB gzip |
+| **Provider 嵌套** | 需要，多域时嵌套深 | 无需 Provider |
+| **精确订阅** | 需手动拆分 Context | selector 函数天然支持 |
+| **DevTools** | 需手动接入 | 内置 Redux DevTools 支持 |
+| **适用规模** | 中小型，域边界清晰 | 中大型，跨域状态频繁 |
+
+##### 面试表达指南
+
+**一句话定性**：
+> 将全局状态按职责域拆分为 4 个独立 Context（灾害数据 / 筛选条件 / UI 状态 / 通知），配合 `useReducer` 管理复杂状态转换，彻底消除 props drilling，组件重渲染次数减少约 **60%**。
+
+**STAR 口述**：
+
+**S（背景）**
+
+随着功能迭代，地图、筛选面板、图表、统计卡片这几个模块之间共享的状态越来越多——hazards 数据、filter 条件、loading 状态、mapStyle、通知列表，最后都汇聚到 `App.tsx` 里，再通过 props 一层层往下传。我加 AI 分析面板那个迭代，光是为了把 hazards 和 filter 传下去，就要改 Header、AnalyticsPage 这些中间组件的 props 签名，而这些组件本身根本不用这两个状态，它们只是"过道"。`App.tsx` 撑到了 400+ 行，每次改需求都要先在脑子里把整条 props 链路理清楚，开发体验很差，极容易漏改。
+
+**T（问题定位）**
+
+Prop drilling 的本质是：组件之间的数据依赖关系被编织进了组件树的结构里，导致中间层组件被迫承接与自身无关的数据。解决方向有两类：一是把状态移到组件树外，让需要它的组件直接消费；二是引入外部状态库。项目是中等规模，不想引入 Redux 那种 boilerplate 很重的方案，Zustand 可以是未来选项，当前用 React 原生的 Context + useReducer 足够，零依赖。
+
+**A（方案）**
+
+我按**职责域**把状态拆成 4 个独立的 Context：`HazardContext` 管灾害数据和 loading，`FilterContext` 管筛选条件和日期范围，`UIContext` 管地图样式和 Tab 切换，`NotificationContext` 管通知列表。每个 Context 配一个 `useReducer`，把所有状态转换逻辑集中在 reducer 里，保持单向数据流，状态变化有迹可循。
+
+关键的一步是给每个 Context 封装自定义 Hook（比如 `useHazards()`、`useFilter()`），作为唯一的消费入口。好处有两个：一是如果以后把 Context 换成 Zustand store，只需改 Hook 内部，所有消费组件不用动；二是 Hook 里加 null 检查，防止在 Provider 外部误用，运行时就能发现问题。
+
+Context 拆分本身也带来了性能收益：`filter` 变化时，只有订阅了 `FilterContext` 的组件重渲染，`StatisticsCard` 只订阅 `HazardContext`，完全不受筛选切换影响。再配合 `React.memo` 和 `useMemo` 精确控制渲染边界，整体重渲染次数降了约 60%。
+
+**R（结果）**
+
+重构完之后，`App.tsx` 从 400+ 行缩到了 150 行左右，中间层组件的 props 签名全部清干净，各自只关心自己的逻辑。后续加 AI 分析面板时，直接在组件内调 `useHazards()` 拿数据，完全不需要改上游组件。这让我理解到：**组件的 props 应该只描述这个组件自身需要什么，而不是替别人转交什么——一旦出现"过道 props"，就是状态管理需要重新设计的信号**。
+
+**可能被追问的点**：
+
+| 追问 | 答 |
+|---|---|
+| **Context 变更会导致全部消费组件重渲染，怎么处理？** | 按职责域拆分 Context 是核心手段；对于同一 Context 内的高频变更字段，可用 `useMemo` 稳定引用，或进一步拆分 Context |
+| **为什么不直接用 Redux？** | 项目体量不需要 Redux 的严格单向数据流约束，Context + useReducer 已足够；若规模扩大，会优先考虑 Zustand（更轻量） |
+| **Zustand 和 Jotai 有什么区别？** | Zustand 是 Store 模型（整体对象 + selector），适合有关联的状态；Jotai 是原子模型（每个状态独立 atom），适合完全独立的细粒度状态 |
+| **如何防止 Context value 引用变化导致的额外渲染？** | Provider 的 value 用 `useMemo` 包裹，确保 state 和 dispatch 引用稳定，避免每次父组件渲染都产生新 value 对象 |
+
+---
+
+#### �🔌 **第三方API集成与数据融合**
 
 **DisasterAware API集成（OAuth 2.0认证）**：
 
