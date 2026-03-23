@@ -426,6 +426,35 @@ map.current.addLayer({
 | 内存占用 | ~400 MB | **~60 MB** |
 | 近景弹窗交互 | ✅ 原生支持 | ✅ 保留 Marker |
 
+> **💡 概念解释：deck.gl 是什么？**
+>
+> Uber 开源的**大规模地理数据 WebGL 可视化框架**，专为海量地理数据高性能绘制设计。
+>
+> | | **Mapbox GL** | **deck.gl** |
+> |---|---|---|
+> | **定位** | 底图渲染引擎（地图本身） | 数据可视化叠加层 |
+> | **擅长** | 地图样式、瓦片加载、基础交互 | 海量数据点、轨迹、热力图、3D 图层 |
+> | **关系** | 作为底图 | 叠加在 Mapbox 上面 |
+>
+> 两者配合：Mapbox 渲染底图，deck.gl 叠加数据可视化图层。**本项目用 `Tile3DLayer` + `CesiumIonLoader` 加载标准 3D Tiles 格式建筑模型，通过 `MapboxOverlay` 挂载到 Mapbox 地图上：**
+>
+> ```typescript
+> // 桥接器：把 deck.gl 作为 Mapbox control 挂载
+> deckOverlay.current = new MapboxOverlay({ layers: [] });
+> map.current.addControl(deckOverlay.current);
+>
+> // Tile3DLayer：加载 Cesium ion / Google / 自建 3D Tiles
+> const tile3DLayer = new Tile3DLayer({
+>   id: 'deck-3d-tiles',
+>   data: config.tiles3d.url,       // tileset.json URL
+>   loaders: [CesiumIonLoader],     // Cesium ion 格式解析
+>   opacity: 0.9,
+> });
+> deckOverlay.current.setProps({ layers: [tile3DLayer] });
+> ```
+>
+> 仅在配置了 `VITE_3D_TILES_URL` 时启用，否则自动回退到 Mapbox 原生 `fill-extrusion` 模式。
+
 ##### 解决方案二：GeoJSON Source `diff` 增量更新
 
 > **💡 概念解释：GeoJSON Source diff 机制是什么？**
