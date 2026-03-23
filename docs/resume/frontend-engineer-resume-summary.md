@@ -460,55 +460,77 @@ new mapboxgl.Marker()
 
 根本原因：每个 Marker 都是独立 DOM 元素，浏览器需要对所有节点做 **Layout → Paint → Composite**，数量一旦过万，重排开销呈线性增长；且 Mapbox 每帧都需要将这些 DOM 元素的位置同步到 CSS transform，CPU 消耗极高。
 
-##### 解决方案一：Marker（DOM）→ Layer（WebGL）架构切换
+##### 解决方案一：LOD 三级调度——远景 WebGL、近景 Marker、随时热力图
 
-核心思路：将所有点位数据转为一份 **GeoJSON FeatureCollection**，通过 Mapbox 的 `addSource` + `addLayer` 交给 **GPU 统一绘制**，彻底绕开 DOM。
+核心思路：不是简单地把 Marker 全部替换成 WebGL Layer，而是引入**基于 zoom 的 LOD 调度机制**，让不同缩放级别使用最合适的渲染方案：
+
+```
+zoom < 8   →  LOD GeoJSON cluster 图层（WebGL）处理全量点位
+zoom ≥ 8   →  mapboxgl.Marker（DOM）承担近景单点 + 弹窗交互
+任意时刻   →  热力图模式（WebGL），Marker 全部隐藏
+```
+
+> **为什么近景还保留 Marker？** zoom 放大到城市级别时，视口内只有几十个点，DOM 渲染完全没有性能问题，且 Marker 可以挂 Popup 展示详细信息——用 WebGL symbol layer 实现弹窗反而更复杂。性能瓶颈只出现在远景/全球视图，那里才是需要 WebGL 接管的场景。
+
+`applyLOD()` 负责调度各层可见性：
 
 ```typescript
-// ❌ 旧方案：每个点一个 DOM 节点，10w 个点 = 10w 个 div
-hazards.forEach(h => {
-  new mapboxgl.Marker()
-    .setLngLat([h.lng, h.lat])
-    .addTo(map.current!);
-});
+// MapView.tsx — applyLOD：根据 zoom 切换渲染层
+const applyLOD = (zoom: number) => {
+  const useCluster = zoom < LOD_THRESHOLDS.CLUSTER_MAX; // CLUSTER_MAX = 8
 
-// ✅ 新方案：整批数据作为一个 GeoJSON Source，GPU 单次绘制
-const geojson: GeoJSON.FeatureCollection = {
-  type: 'FeatureCollection',
-  features: hazards.map(h => ({
-    type: 'Feature',
-    geometry: { type: 'Point', coordinates: [h.lng, h.lat] },
-    properties: { id: h.id, type: h.type, severity: h.severity }
-  }))
+  // LOD cluster 层（WebGL）：远景开，近景关
+  ['lod-clusters', 'lod-cluster-count', 'lod-unclustered'].forEach(id => {
+    map.current!.setLayoutProperty(id, 'visibility', useCluster ? 'visible' : 'none');
+  });
+
+  // Marker（DOM）：远景隐藏，近景显示
+  markers.current.forEach(marker => {
+    marker.getElement().style.display = useCluster ? 'none' : 'block';
+  });
+
+  // 3D 建筑：仅 zoom ≥ 14 时展示
+  if (buildingLayerId) {
+    map.current.setLayoutProperty(
+      buildingLayerId, 'visibility',
+      zoom >= LOD_THRESHOLDS.BUILDINGS_MIN ? 'visible' : 'none'
+    );
+  }
 };
 
-map.current.addSource('hazards', { type: 'geojson', data: geojson });
+// zoom 事件中实时调用
+map.current.on('zoom', () => applyLOD(map.current.getZoom()));
+```
 
-// circle layer：WebGL 实例化渲染，10w 点位帧率仍稳定 55fps+
+远景 LOD cluster 图层（WebGL GeoJSON Source，带 cluster 聚合）：
+
+```typescript
+// 全量点位数据写入 GeoJSON Source，Mapbox 负责聚合和 GPU 渲染
+map.current.addSource('hazards-lod', {
+  type: 'geojson',
+  data: { type: 'FeatureCollection', features: [] },
+  cluster: true,
+  clusterMaxZoom: LOD_THRESHOLDS.CLUSTER_MAX,  // zoom 8 以上展开
+  clusterRadius: 50
+});
+// 聚合气泡（蓝→黄→红，随数量变化）
 map.current.addLayer({
-  id: 'hazards-circle',
-  type: 'circle',
-  source: 'hazards',
+  id: 'lod-clusters', type: 'circle', source: 'hazards-lod',
+  filter: ['has', 'point_count'],
   paint: {
-    'circle-radius': ['interpolate', ['linear'], ['zoom'], 2, 3, 8, 8],
-    'circle-color': ['match', ['get', 'type'],
-      'EARTHQUAKE', '#FF5722',
-      'FLOOD',      '#2196F3',
-      'WILDFIRE',   '#FF9800',
-      /* default */ '#9E9E9E'
-    ],
-    'circle-opacity': 0.85
+    'circle-color': ['step', ['get', 'point_count'], '#3b82f6', 20, '#f59e0b', 50, '#ef4444'],
+    'circle-radius': ['step', ['get', 'point_count'], 18, 20, 28, 50, 38],
   }
 });
 ```
 
 性能对比：
 
-| 指标 | DOM Marker | WebGL Layer |
+| 指标 | 纯 DOM Marker（旧） | LOD 混合调度（现） |
 |---|---|---|
-| 10w 点位 FPS | ~5fps（卡死） | **55fps+** |
+| 10w 点位远景 FPS | ~5fps（卡死） | **55fps+** |
 | 内存占用 | ~400 MB | **~60 MB** |
-| 数据更新耗时 | 全量销毁重建 ~800ms | diff 更新 ~20ms |
+| 近景弹窗交互 | ✅ 原生支持 | ✅ 保留 Marker |
 
 ##### 解决方案二：GeoJSON Source `diff` 增量更新
 
@@ -584,7 +606,9 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
         ↓
   [Mapbox diff]  ← 增量上传 GPU，~20ms
         ↓
-  [WebGL Layer]  ← GPU 实例化渲染，10w 点位 55fps+
+  [applyLOD]  ← 根据 zoom 调度可见层
+   ├─ zoom < 8  → [WebGL LOD cluster 图层]  ← GPU 渲染全量点位，55fps+
+   └─ zoom ≥ 8  → [mapboxgl.Marker DOM 层]  ← 近景单点 + Popup 交互
 ```
 
 ---
@@ -593,7 +617,7 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 
 ##### 一句话定性（简历/自我介绍用）
 
-> 识别并解决 **DOM Marker 在万级点位下的渲染瓶颈**，通过「Marker → WebGL Layer + GeoJSON diff 增量更新 + Web Worker 数据清洗」三层优化，帧率从 **~5fps 提升至 55fps+**，内存占用降低 **85%**。
+> 识别并解决 **DOM Marker 在万级点位下的渲染瓶颈**，引入「LOD 三级调度 + GeoJSON diff 增量更新 + Web Worker 数据清洗」三层优化——远景用 WebGL GeoJSON cluster 接管全量渲染，近景保留 Marker 承担弹窗交互，帧率从 **~5fps 提升至 55fps+**，内存占用降低 **85%**。
 
 ##### 面试口述结构（STAR 法则）
 
@@ -609,7 +633,7 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 
 我把这个问题拆成三层分别解决：
 
-第一层解决**渲染架构**。把所有点位从独立 Marker 改成一份统一的 GeoJSON FeatureCollection，用 Mapbox 的 `addSource + addLayer` 交给 GPU 渲染。这是 WebGL 实例化渲染的核心——10w 个点对 GPU 来说本质上只是一次 draw call，完全绕开了 DOM。改完之后帧率立刻从 5fps 回到 55fps+。
+第一层解决**渲染架构**。引入基于 zoom 的 LOD 调度机制：远景（zoom < 8）用 Mapbox GeoJSON Source + cluster 图层交给 GPU 统一渲染，10w 个点对 GPU 来说本质上只是一次 draw call，完全绕开了 DOM；近景（zoom ≥ 8）保留 Marker，因为这个缩放级别视口内只有几十个点，DOM 没有性能压力，而且 Marker 还能挂 Popup 做详细信息展示，用 WebGL symbol layer 实现反而更复杂。`applyLOD()` 函数在每次 zoom 事件后被调用，动态切换各层的 visibility。加上这个之后，远景帧率立刻从 5fps 回到 55fps+。
 
 第二层解决**增量更新**。改成 Layer 之后，每次 5 分钟轮询刷新，最初用 `source.setData()` 全量替换，GPU 每次都要重新上传所有顶点，有约 800ms 的明显卡顿。Mapbox 的 GeoJSON Source 内部有 diff 机制，只要给每个 Feature 挂上稳定的顶层数字 `id`（注意是顶层 `id` 字段，不是 `properties.id`），它就能识别哪些是新增、哪些是删除，只上传变化的部分。加上这个之后，增量更新耗时降到 ~20ms，刷新完全无感知。
 
