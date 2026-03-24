@@ -1925,7 +1925,20 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 #### Q25：什么是 WebGL？
 
-> WebGL = 浏览器里调用 GPU 的 JavaScript API（基于 OpenGL ES）。普通 DOM 渲染走 CPU + 浏览器渲染引擎，WebGL 绕过 DOM，直接用 GPU 并行处理大量顶点和像素。对地图来说，GPU 同时处理 10w 个点只是一次 draw call，而 DOM 处理 10w 个节点需要 Layout → Paint 的线性遍历。
+> **WebGL**（Web Graphics Library）是浏览器内置的**调用 GPU 的 JavaScript API**，基于 OpenGL ES 2.0 标准，让网页可以直接使用显卡做硬件加速渲染，无需插件。
+>
+> **和普通 DOM 渲染的核心区别**：
+>
+> | | DOM 渲染 | WebGL |
+> |---|---|---|
+> | **执行单元** | CPU（单线程） | GPU（数千核并行） |
+> | **渲染路径** | Layout → Paint → Composite | 直接写显存，调 draw call |
+> | **性能瓶颈** | 节点数线性增长 | 与节点数几乎无关 |
+> | **适合场景** | 普通 UI、文本、表单 | 大量几何图形、地图、3D 场景 |
+>
+> **GPU 为什么快**：GPU 有数千个核心，专门为**大规模并行计算**设计。渲染 10w 个点，CPU 要逐一处理，GPU 可以同时处理所有点——对 GPU 来说，10w 个点和 1 个点的 draw call 开销几乎一样。
+>
+> **在本项目中的体现**：Mapbox GL JS 底层就是 WebGL。切换到 GeoJSON Layer 方案后，10w 个灾害点位交给 GPU 的一次 draw call 处理，帧率从 5fps 恢复到 55fps+。DOM Marker 方案的瓶颈不在 JS 逻辑，而在浏览器渲染引擎的 Layout/Paint 阶段——这是 WebGL 层面才能解决的问题，JS 层面的优化触碰不到。
 
 #### Q26：什么是 BFF？为什么要用它？
 
