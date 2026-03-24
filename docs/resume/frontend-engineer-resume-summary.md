@@ -955,6 +955,30 @@ App
 
 ##### 解决方案：Context + useReducer 分层状态管理
 
+> **💡 概念解释：Context 是什么？**
+>
+> Context = React 提供的**跨层级数据共享机制**，让任意深度的组件直接读取数据，无需逐层传 props。三个核心部分：
+>
+> ```typescript
+> // 1. createContext：创建"数据频道"
+> const FilterContext = createContext<FilterState | null>(null);
+>
+> // 2. Provider：在组件树顶部"广播"数据
+> <FilterContext.Provider value={{ filter, setFilter }}>
+>   <Header />     {/* 内部所有组件都能收到 */}
+>   <MapView />
+> </FilterContext.Provider>
+>
+> // 3. useContext：在任意深度"收听"数据，不需要任何 props
+> function TypeSelector() {
+>   const { filter, setFilter } = useContext(FilterContext)!;
+> }
+> ```
+>
+> **重要注意**：Context 值变化时，所有消费该 Context 的组件都会重渲染——所以要按职责域**拆分细粒度 Context**，而不是一个巨型 Context，否则任何状态变化都导致整树重渲染。
+>
+> **本项目 4 个 Context 的分工**：`HazardContext`（灾害数据）/ `FilterContext`（筛选条件）/ `UIContext`（地图样式/Tab）/ `NotificationContext`（通知列表），每个都封装了自定义 Hook 作为唯一消费入口（`useHazards()` / `useFilter()` 等）。
+
 将全局状态按**职责域**拆分为独立 Context，避免单一巨型 Store 导致任何状态变更都触发全局重渲染：
 
 ```typescript
