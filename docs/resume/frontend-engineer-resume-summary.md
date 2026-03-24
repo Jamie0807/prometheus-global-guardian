@@ -1053,9 +1053,24 @@ Context 拆分本身也带来了性能收益：`filter` 变化时，只有订阅
 AIChatAssistant.tsx（UI 层）
         ↓  调用
 aiAssistant.ts（API 层）
-        ↓  请求
+        ↓  fetch /api/chat
+server.js（BFF 层）
+        ↓  带 API Key 请求
 OpenAI Chat Completions API（stream: true）
 ```
+
+> **💡 概念解释：什么是 BFF？**
+>
+> **BFF**（Backend For Frontend，服务于前端的后端）= 专门为前端量身定制的中间层服务。
+>
+> 本项目需要 BFF 的核心原因：**OpenAI API Key 不能暴露给浏览器**——用户可以在 Chrome Network 面板看到所有请求头，直连 OpenAI 会导致 Key 泄露。
+>
+> ```
+> ❌ 无 BFF：前端 → 直接带 API Key 请求 OpenAI  →  Key 暴露在浏览器
+> ✅ 有 BFF：前端 → 请求 server.js → server.js 带 Key 请求 OpenAI → Key 只在服务端
+> ```
+>
+> `server.js` 作为 BFF 还承担了 SSE 流转发（`response.body.pipe(res)`）和请求代理两个职责，前端只需请求本地 `/api/chat`，完全不感知 OpenAI 的存在。
 
 两个核心文件职责分离：`aiAssistant.ts` 负责所有 LLM 通信逻辑（System Prompt 构建、SSE 流解析、Demo 降级），`AIChatAssistant.tsx` 负责 UI 状态管理和逐字打印动画，互不耦合。
 
