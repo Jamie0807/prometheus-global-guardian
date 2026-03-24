@@ -1072,6 +1072,36 @@ export const StatisticsCard = React.memo(() => {
 
 ##### 进阶方案：Zustand / Jotai 原子化状态（规模扩大时）
 
+> **💡 概念解释：Zustand 和 Jotai 是什么？**
+>
+> **Zustand** = 极简全局状态库，核心思路"一个 store，按需订阅"，无 Provider、无 boilerplate：
+> ```typescript
+> const useHazardStore = create((set) => ({
+>   hazards: [], filter: 'ALL',
+>   setFilter: (filter) => set({ filter }),
+> }));
+> // selector 精确控制渲染：filter 变化不触发 MapView 重渲染
+> const hazards = useHazardStore(state => state.hazards);
+> ```
+>
+> **Jotai** = 原子化状态，把状态拆成最小单元 `atom`，组件只订阅用到的 atom，更新粒度最细：
+> ```typescript
+> const hazardsAtom = atom<Hazard[]>([]);
+> const filterAtom = atom<string>('ALL');
+> // 派生 atom：自动追踪依赖，类似 useMemo
+> const filteredAtom = atom((get) =>
+>   get(hazardsAtom).filter(h => h.type === get(filterAtom))
+> );
+> ```
+>
+> **本项目选择路径**：
+> ```
+> 当前规模 → useState + 扁平 props（零依赖，够用）
+> 层级加深 → Context + useReducer（原生，按域拆分）
+> 跨域频繁 → Zustand（最常见选择，生态成熟）
+> 极细粒度 → Jotai（地图点位高频更新等特殊场景）
+> ```
+
 如果组件树继续扩大，Context 的局限性会显现（Provider 嵌套地狱、跨域订阅繁琐），可迁移至 **Zustand** 或 **Jotai**：
 
 ```typescript
@@ -1457,6 +1487,25 @@ onDone();
 ##### 面试表达（一句话）
 
 > 用原生 `fetch ReadableStream` 手写 SSE 解析，将平台实时灾害数据动态注入 System Prompt，配合 Demo 关键词匹配降级，实现零依赖、工程完整的 LLM 流式对话模块，首字响应 **<1s**，API 调用成功率 **99%+**。
+
+##### 🎤 面试题：介绍项目中 LLM 驱动的 AI 智能分析模块是怎么实现的
+
+> 整体分三层：
+>
+> **第一层 BFF 代理层**（`server.js`）：OpenAI API Key 不能暴露在浏览器里，前端请求本地 `/api/chat`，由 `server.js` 带 Key 去请求 OpenAI，同时把 SSE 流直接 `pipe` 给前端。
+>
+> **第二层 API 通信层**（`aiAssistant.ts`）：核心是两个函数。`buildSystemPrompt()` 在每次请求前把当前地图上的实时灾害数据——事件总数、类型分布、近期代表事件——动态注入进 System Prompt，让 AI 能回答"现在哪个地区最危险"这类实时问题。`streamChatMessage()` 用原生 `fetch` + `ReadableStream` 手写 SSE 解析，用 `buf` 缓冲区处理跨 chunk 的不完整行，每解析出一个 token 就通过 `onChunk` 回调传给 UI 层。没有 API Key 时自动进入 Demo 降级模式，关键词匹配 5 套预设模板逐字模拟输出。
+>
+> **第三层 组件层**（`AIChatAssistant.tsx`）：发消息时先插入 `content: '', isStreaming: true` 的占位消息，`onChunk` 每次把 delta 追加到 `content` 触发重渲染，`MessageBubble` 对 `content` 做 Markdown 增量渲染，React diff 只更新变化的 DOM 节点，视觉上就是打字机效果。`onDone` 时 `isStreaming` 置 false，光标消失。
+>
+> **追问备忘**：
+>
+> | 追问 | 要点 |
+> |---|---|
+> | **为什么不用 EventSource？** | 不支持 POST 和自定义 Header，无法传 `Authorization` token |
+> | **这是 RAG 吗？** | 不是标准 RAG（无向量检索），是动态上下文注入——实时数据直接拼进 Prompt |
+> | **Demo 模式怎么实现？** | 关键词匹配 5 模板，`6ms/4字符` 节奏 `setTimeout` 逐字输出，体验与真实流式一致 |
+> | **如何防止流式消息乱序？** | `streamingIdRef` 记录当前消息 ID，组件卸载后收到的 chunk 通过 id 比对丢弃 |
 
 ---
 
