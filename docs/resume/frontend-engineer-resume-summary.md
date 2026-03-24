@@ -354,6 +354,26 @@ const timelineData = React.useMemo(() => {
 
 根本原因：每个 Marker 都是独立 DOM 元素，浏览器需要对所有节点做 **Layout → Paint → Composite**，数量一旦过万，重排开销呈线性增长；且 Mapbox 每帧都需要将这些 DOM 元素的位置同步到 CSS transform，CPU 消耗极高。
 
+> **💡 概念解释：WebGL 是什么？**
+>
+> **WebGL**（Web Graphics Library）是浏览器内置的图形渲染 API，让 JavaScript 可以**直接调用 GPU 绘图**，无需插件。
+>
+> | | **DOM / Canvas 2D** | **WebGL** |
+> |---|---|---|
+> | **执行位置** | CPU（主线程） | GPU（并行） |
+> | **绘制方式** | 逐个元素绘制 | 批量顶点着色器并行处理 |
+> | **10w 个点** | 卡死（~5fps） | 流畅（55fps+） |
+> | **典型用途** | 普通 UI、图表 | 地图、3D、粒子效果 |
+>
+> GPU 有成千上万个核心，可同时并行处理每一个像素/顶点；CPU 只有几个核，只能串行——这是性能差距的根本原因。
+>
+> **本项目中所有 WebGL 的使用：**
+> 1. **Mapbox GL JS 底图** — 地图瓦片、道路、建筑全部 WebGL 渲染
+> 2. **LOD cluster 图层** — `hazards-lod` GeoJSON Source + circle layer，10w 点位批量绘制
+> 3. **热力图图层** — `hazards-heatmap` layer，实时计算密度热力值
+> 4. **deck.gl Tile3DLayer** — WebGL 渲染 3D Tiles 建筑模型
+> 5. **fill-extrusion** — Mapbox 原生 3D 建筑拉伸，着色器计算高度
+
 ##### 解决方案一：LOD 三级调度——远景 WebGL、近景 Marker、随时热力图
 
 核心思路：不是简单地把 Marker 全部替换成 WebGL Layer，而是引入**基于 zoom 的 LOD 调度机制**，让不同缩放级别使用最合适的渲染方案：
