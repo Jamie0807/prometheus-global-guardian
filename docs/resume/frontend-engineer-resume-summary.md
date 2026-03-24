@@ -1265,6 +1265,25 @@ UI 侧的打字机光标 `▌` 通过 `msg.isStreaming && <span className="ai-cu
 
 ---
 
+##### 🎤 面试题：前端如何流式接收 LLM 响应并实现打字机效果？
+
+> 完整链路分三层：
+>
+> **第一层 — API 层 SSE 解析**（`aiAssistant.ts`）：`fetch` 发请求时带 `stream: true`，拿到 `resp.body.getReader()` 后进入循环，用 `TextDecoder` 把二进制 chunk 转字符串，再按 `\n` 切割成 SSE lines。关键点是用 `buf` 缓冲区保留跨 chunk 的不完整行（`buf = lines.pop()`），防止 JSON 解析截断。每解析出一个 `delta.content` token，就调 `onChunk(delta)` 回调传给上层。
+>
+> **第二层 — 组件层流式状态**（`AIChatAssistant.tsx`）：发消息时先插入一条 `content: '', isStreaming: true` 的占位消息。`onChunk` 回调里用 `setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + chunk } : m))` 追加 token——注意是**追加不是替换**。`onDone` 时把 `isStreaming` 改为 `false`，光标消失。
+>
+> **第三层 — Markdown 增量渲染**（`MessageBubble`）：`content` 字符串每次增长都触发 `renderMarkdown` 重新 parse 整个字符串，识别 `**bold**`、`### 标题`、`- 列表`、`| 表格` 等格式，输出对应 JSX。React diff 只更新变化的 DOM 节点，视觉上是逐字出现。
+>
+> **完整数据流**：
+> ```
+> OpenAI SSE → ReadableStream.read() → TextDecoder → buf缓冲+split('\n')
+>   → JSON.parse → delta → onChunk() → setMessages追加 → renderMarkdown重渲染 → DOM更新 → 光标▌跟随
+> ```
+> **为什么选原生 fetch 而不用 EventSource？** `EventSource` 不支持 POST 请求和自定义 Header（无法传 Authorization Bearer token），而手写 `ReadableStream` 零依赖，完全可控。
+
+---
+
 ##### 核心四：Demo 降级模式
 
 无 `VITE_OPENAI_API_KEY` 时自动进入 `runDemoMode`：根据用户输入关键词匹配 5 套预设模板（地震/洪水/野火/火山/综合态势），然后以 **6ms/4字符** 的节奏逐字输出，用户体验与真实 LLM 完全一致：
