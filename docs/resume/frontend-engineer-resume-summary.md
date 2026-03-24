@@ -713,6 +713,25 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 >
 > 关键特性：同一个 `controller` 可以同时传给多个 `fetch`，调一次 `abort()` 全部取消；`AbortError` 需要在 catch 里单独处理，不要当成真正的错误上报。
 
+> **💡 概念解释：什么是 Hook？**
+>
+> Hook = React 提供的一类特殊函数，让**函数组件也能使用状态、生命周期等能力**（React 16.8 引入）。
+>
+> | Hook | 作用 | 本项目典型用法 |
+> |---|---|---|
+> | `useState` | 存储状态，变化触发重渲染 | `const [hazards, setHazards] = useState([])` |
+> | `useEffect` | 副作用（请求、订阅、DOM操作） | 地图初始化、数据拉取、事件监听 |
+> | `useRef` | 存储不触发渲染的可变值 | `abortControllerRef`、`map.current`、`markers.current` |
+> | `useMemo` | 缓存计算结果，依赖不变不重算 | `disasterContext` 从 `hazards` 派生 |
+> | `useCallback` | 缓存函数引用，避免子组件无效重渲染 | `sendMessage`、`scrollToBottom` |
+>
+> **自定义 Hook**：把多个内置 Hook 组合成可复用逻辑，以 `use` 开头命名。本项目的 `useHazardFetch` 就是自定义 Hook——把 `useState + useEffect + useRef` 三者组合，把竞态保护逻辑封装成一行可复用的调用：
+> ```typescript
+> const hazards = useHazardFetch(filter);  // 一行调用，内部处理所有竞态逻辑
+> ```
+>
+> **两条使用规则**：① 只能在函数组件或自定义 Hook 的**顶层**调用（不能在 if/for 里）；② 只能在 **React 函数**里调用（不能在普通 JS 函数里）。
+
 每次发起新请求前，先 abort 上一次未完成的请求，确保只有最新请求的结果会被处理：
 
 ```typescript
