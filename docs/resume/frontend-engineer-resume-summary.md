@@ -643,6 +643,20 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 
 ##### 解决方案一：AbortController 取消过期请求
 
+> **💡 概念解释：fetch 是什么？**
+>
+> `fetch` 是浏览器内置的 HTTP 请求 API，是 `XMLHttpRequest（XHR）` 的现代替代品。
+>
+> | | **XHR（旧）** | **fetch（新）** |
+> |---|---|---|
+> | **语法** | 回调嵌套，繁琐 | Promise / async-await，简洁 |
+> | **流式读取** | ❌ 不支持 | ✅ `ReadableStream`（SSE 依赖它） |
+> | **取消请求** | 复杂 | `AbortController.abort()` 一行搞定 |
+>
+> 本项目两处关键用法：
+> - **AI 流式响应**：`fetch` + `response.body.getReader()` 逐块读 SSE 数据
+> - **灾害数据并发拉取**：多个 `fetch` 共享同一个 `AbortController.signal`，一次 `abort()` 全部取消
+
 > **💡 概念解释：AbortController 是什么？**
 >
 > `AbortController` 是浏览器原生提供的 Web API，用于**取消异步操作**（主要是 `fetch` 请求）。它由两个核心部分组成：
