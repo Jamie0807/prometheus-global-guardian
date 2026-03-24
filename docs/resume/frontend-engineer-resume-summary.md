@@ -913,6 +913,21 @@ Race Condition 的本质是：异步操作的完成顺序和发起顺序不一�
 
 ##### 痛点：Props Drilling 导致组件高度耦合
 
+> **💡 概念解释：什么是 Props Drilling？**
+>
+> Props Drilling（属性钻透）= 为了把数据传给深层组件，不得不让中间每一层都转手传递 props，即使这些中间组件**根本不需要这个数据**。
+>
+> ```
+> App（持有 filter）
+>   └── Header（不需要 filter，但必须接收并往下传 ← 过道）
+>         └── FilterBar（不需要 filter，但必须接收并往下传 ← 过道）
+>               └── TypeSelector（真正需要 filter 的地方）
+> ```
+>
+> 带来的问题：中间组件被迫知道它不关心的数据；加一个新 prop，中间所有层都要改签名；App.tsx 积累大量状态，组件臃肿。
+>
+> **解决方案**：用 Context，让 `TypeSelector` 直接消费 `useFilter()`，中间层 props 签名完全干净。
+
 随着功能迭代，地图视图（MapView）、筛选面板（StatusPanel）、图表区域（ChartsPanel）、统计卡片（StatisticsCard）、洞察面板（InsightsPanel）之间需要共享大量状态：
 
 ```
