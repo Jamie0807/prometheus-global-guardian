@@ -1263,6 +1263,30 @@ const sendMessage = useCallback(async (text: string) => {
 
 UI 侧的打字机光标 `▌` 通过 `msg.isStreaming && <span className="ai-cursor">▌</span>` 实现，无需额外定时器。
 
+> **💡 概念解释：Markdown 增量渲染是什么？**
+>
+> 就是 AI 回复**一边输出一边被渲染成格式化内容**的过程。拆开理解：
+> - **"增量"**：每收到一个 token，`content` 字符串就变长
+> - **"Markdown 渲染"**：把 `**粗体**`、`### 标题`、`- 列表` 纯文本转成真正的 HTML 标签
+>
+> 实际发生的过程：
+> ```
+> 收到 "当"     → content="当"           → <p>当</p>
+> 收到 "前"     → content="当前"          → <p>当前</p>
+> 收到 "**地"   → content="当前**地"      → <p>当前**地</p>   ← 格式还不完整
+> 收到 "震**"   → content="当前**地震**"  → <p>当前<strong>地震</strong></p>  ← 粗体出现
+> ```
+>
+> 本项目 `renderMarkdown` 的工作方式：每次 `content` 增长触发重渲染 → **全量重 parse 整个字符串** → React diff 只更新变化的 DOM 节点。
+>
+> | | 说明 |
+> |---|---|
+> | **数据是增量的** | `content` 每次 +delta，不断增长 |
+> | **渲染是全量的** | `renderMarkdown` 每次重新 parse 整个字符串 |
+> | **DOM 更新是增量的** | React diff 只改变化的节点 |
+>
+> 三者结合，视觉上表现为**文字逐字出现并自动带格式**。
+
 ---
 
 ##### 🎤 面试题：前端如何流式接收 LLM 响应并实现打字机效果？
