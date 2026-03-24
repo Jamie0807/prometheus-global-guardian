@@ -354,33 +354,6 @@ const timelineData = React.useMemo(() => {
 
 根本原因：每个 Marker 都是独立 DOM 元素，浏览器需要对所有节点做 **Layout → Paint → Composite**，数量一旦过万，重排开销呈线性增长；且 Mapbox 每帧都需要将这些 DOM 元素的位置同步到 CSS transform，CPU 消耗极高。
 
-> **💡 概念解释：WebGL 是什么？**
->
-> **WebGL**（Web Graphics Library）是浏览器内置的图形渲染 API，让 JavaScript 可以**直接调用 GPU 绘图**，无需插件。
->
-> | | **DOM / Canvas 2D** | **WebGL** |
-> |---|---|---|
-> | **执行位置** | CPU（主线程） | GPU（并行） |
-> | **绘制方式** | 逐个元素绘制 | 批量顶点着色器并行处理 |
-> | **10w 个点** | 卡死（~5fps） | 流畅（55fps+） |
-> | **典型用途** | 普通 UI、图表 | 地图、3D、粒子效果 |
->
-> **CPU vs GPU 是什么？**
->
-> - **CPU**（中央处理器）：核心数少（4~16核），每核极强，擅长复杂逻辑、分支判断、串行任务 → React 组件、状态管理、数据处理
-> - **GPU**（图形处理器）：核心数极多（几千~几万），每核简单，擅长大量重复的简单计算 → 图形渲染、矩阵运算
->
-> 用工厂比喻：CPU 是 **10 个博士**，GPU 是 **10000 个流水线工人**。渲染 10w 个点位时，每个点的操作完全相同（计算坐标→填色），GPU 让 10000 个核**同时**各处理一个顶点，CPU 只能一个一个来——这就是 WebGL 快的根本原因。
->
-> **本项目分工**：React 组件逻辑 / 网络请求 / 数据处理 → CPU；地图渲染 / 聚合气泡 / 热力图 / 3D建筑 → GPU（WebGL）。
->
-> **本项目中所有 WebGL 的使用：**
-> 1. **Mapbox GL JS 底图** — 地图瓦片、道路、建筑全部 WebGL 渲染
-> 2. **LOD cluster 图层** — `hazards-lod` GeoJSON Source + circle layer，10w 点位批量绘制
-> 3. **热力图图层** — `hazards-heatmap` layer，实时计算密度热力值
-> 4. **deck.gl Tile3DLayer** — WebGL 渲染 3D Tiles 建筑模型
-> 5. **fill-extrusion** — Mapbox 原生 3D 建筑拉伸，着色器计算高度
-
 ##### 解决方案一：LOD 三级调度——远景 WebGL、近景 Marker、随时热力图
 
 核心思路：不是简单地把 Marker 全部替换成 WebGL Layer，而是引入**基于 zoom 的 LOD 调度机制**，让不同缩放级别使用最合适的渲染方案：
@@ -1927,18 +1900,32 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 > **WebGL**（Web Graphics Library）是浏览器内置的**调用 GPU 的 JavaScript API**，基于 OpenGL ES 2.0 标准，让网页可以直接使用显卡做硬件加速渲染，无需插件。
 >
-> **和普通 DOM 渲染的核心区别**：
+> **和普通 DOM / Canvas 2D 渲染的核心区别**：
 >
-> | | DOM 渲染 | WebGL |
+> | | DOM / Canvas 2D | WebGL |
 > |---|---|---|
-> | **执行单元** | CPU（单线程） | GPU（数千核并行） |
+> | **执行位置** | CPU（主线程） | GPU（并行） |
+> | **绘制方式** | 逐个元素绘制 | 批量顶点着色器并行处理 |
 > | **渲染路径** | Layout → Paint → Composite | 直接写显存，调 draw call |
-> | **性能瓶颈** | 节点数线性增长 | 与节点数几乎无关 |
-> | **适合场景** | 普通 UI、文本、表单 | 大量几何图形、地图、3D 场景 |
+> | **10w 个点** | 卡死（~5fps） | 流畅（55fps+） |
+> | **适合场景** | 普通 UI、图表、表单 | 地图、3D、粒子效果 |
 >
-> **GPU 为什么快**：GPU 有数千个核心，专门为**大规模并行计算**设计。渲染 10w 个点，CPU 要逐一处理，GPU 可以同时处理所有点——对 GPU 来说，10w 个点和 1 个点的 draw call 开销几乎一样。
+> **CPU vs GPU——工厂比喻**：
+> - **CPU**：核心数少（4~16核），每核极强，擅长复杂逻辑、分支判断、串行任务 → React 组件、网络请求、数据处理
+> - **GPU**：核心数极多（几千~几万），每核简单，擅长大量重复的简单计算 → 图形渲染、矩阵运算
 >
-> **在本项目中的体现**：Mapbox GL JS 底层就是 WebGL。切换到 GeoJSON Layer 方案后，10w 个灾害点位交给 GPU 的一次 draw call 处理，帧率从 5fps 恢复到 55fps+。DOM Marker 方案的瓶颈不在 JS 逻辑，而在浏览器渲染引擎的 Layout/Paint 阶段——这是 WebGL 层面才能解决的问题，JS 层面的优化触碰不到。
+> CPU 是 **10 个博士**，GPU 是 **10000 个流水线工人**。渲染 10w 个点时，每个点的操作完全相同（计算坐标→填色），GPU 让 10000 个核**同时**各处理一个顶点，CPU 只能一个一个来——这就是 WebGL 快的根本原因。
+>
+> **在本项目中的体现**：
+> - DOM Marker 方案的瓶颈在浏览器渲染引擎的 Layout/Paint 阶段，JS 层面的优化触碰不到，必须跨到 WebGL 层解决
+> - Mapbox GL JS 底层就是 WebGL，切换到 GeoJSON Layer 后，10w 个点位交给 GPU 一次 draw call，帧率从 5fps → 55fps+
+>
+> **本项目中 WebGL 的具体使用**：
+> 1. **Mapbox GL JS 底图** — 地图瓦片、道路、建筑全部 WebGL 渲染
+> 2. **LOD cluster 图层** — `hazards-lod` GeoJSON Source + circle layer，10w 点位批量绘制
+> 3. **热力图图层** — `hazards-heatmap` layer，实时计算密度热力值
+> 4. **deck.gl Tile3DLayer** — WebGL 渲染 3D Tiles 建筑模型
+> 5. **fill-extrusion** — Mapbox 原生 3D 建筑拉伸，着色器计算高度
 
 #### Q26：什么是 BFF？为什么要用它？
 
