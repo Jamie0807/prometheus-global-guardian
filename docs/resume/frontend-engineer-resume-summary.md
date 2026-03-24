@@ -776,6 +776,27 @@ function useHazardFetch(filter: string) {
 
 ##### 解决方案二：Promise.allSettled 并发聚合，互不阻断
 
+> **💡 概念解释：Promise.all vs Promise.allSettled**
+>
+> 两者都是**并发执行多个 Promise**的方法，区别在于如何处理失败：
+>
+> | | **`Promise.all`** | **`Promise.allSettled`** |
+> |---|---|---|
+> | **失败处理** | 一个失败 → 整体立即失败 | 等所有结束，各自汇报状态 |
+> | **返回值** | 所有成功值的数组 | `{status, value/reason}` 数组 |
+> | **适合场景** | 所有数据缺一不可 | 多源容错，部分失败可接受 |
+>
+> ```typescript
+> // Promise.all：GDACS 超时 → 其他3个成功的数据全部丢失 ❌
+> const [usgs, nasa, gdacs, da] = await Promise.all([fetchUSGS(), fetchNASA(), fetchGDACS(), fetchDA()]);
+>
+> // Promise.allSettled：GDACS 超时 → 其他3个数据照常展示 ✅
+> const results = await Promise.allSettled([fetchUSGS(), fetchNASA(), fetchGDACS(), fetchDA()]);
+> // [{ status:'fulfilled', value:[...] }, ..., { status:'rejected', reason:Error }]
+> ```
+>
+> **本项目必须用 `allSettled` 的原因**：4 个数据源来自不同机构，网络稳定性各不相同。`Promise.all` 会让 GDACS 一次超时导致用户连地震数据都看不到——对灾害监测平台不可接受。
+
 多数据源并发时，不用 `Promise.all`（一个失败全部失败），改用 `Promise.allSettled` 收集所有结果后统一合并：
 
 ```typescript
