@@ -428,31 +428,6 @@ map.current.addLayer({
 
 ##### 解决方案二：GeoJSON Source `diff` 增量更新
 
-> **💡 概念解释：GeoJSON Source diff 机制是什么？**
->
-> 调用 `source.setData()` 时，Mapbox 不会全量替换所有数据，而是**对比新旧 FeatureCollection，只把变化的部分上传到 GPU**。
->
-> **没有 diff（全量重传）**：
-> ```
-> setData(newData) → GPU 清空全部顶点 → 重新上传 10w 个点 → 耗时 ~800ms，屏幕闪烁
-> ```
->
-> **有 diff（增量上传）**：
-> ```
-> setData(newData) → Mapbox 对比新旧（基于顶层 id）→ 只上传新增/删除/变化的点 → 耗时 ~20ms，无感知
-> ```
->
-> **diff 生效的唯一条件**：每个 Feature 必须有**顶层稳定 `id` 字段**（不是 `properties.id`）：
-> ```typescript
-> // ✅ 正确：顶层 id，Mapbox 能识别每个 Feature
-> { type: 'Feature', id: 'usgs-eq-12345', geometry: {...}, properties: {...} }
->
-> // ❌ 错误：id 在 properties 里，Mapbox 看不到，退化为全量重传
-> { type: 'Feature', geometry: {...}, properties: { id: 'usgs-eq-12345' } }
-> ```
->
-> 灾害数据 5 分钟刷新一次，每次变化的点位只有少量（相对 10w 总量），diff 机制让 GPU 只处理极少数变化，这就是为什么更新耗时从 800ms 降到 20ms。
-
 全量替换 `setData()` 每次都会触发 GPU 重新上传全部顶点数据。对于实时刷新（5 分钟轮询），只有少量新增/消失的点位，应使用 **增量 diff**：
 
 ```typescript
@@ -1698,9 +1673,31 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > **第三层（线程分离）**：把格式转换、去重、异常坐标过滤拆到 Web Worker 里跑。主线程只接收处理好的干净数据，Worker 处理 10w 条约 80ms 但完全在子线程，主线程不感知，页面始终流畅。
 
-#### Q6：GeoJSON diff 增量更新为什么需要稳定 id？
+#### Q6：GeoJSON diff 增量更新是什么原理？为什么需要稳定 id？
 
-> Mapbox 用 Feature 的**顶层 `id` 字段**（不是 `properties.id`）做新旧数据对比，判断哪些是新增、哪些是删除、哪些是修改。如果 `id` 不稳定（比如每次用 `Date.now()` 生成），Mapbox 无法识别哪个 Feature 对应旧数据里的哪个，就会退化成全量重传，等于没有 diff。
+> 调用 `source.setData()` 时，Mapbox 不会全量替换所有数据，而是**对比新旧 FeatureCollection，只把变化的部分上传到 GPU**。
+>
+> **没有 diff（全量重传）**：
+> ```
+> setData(newData) → GPU 清空全部顶点 → 重新上传 10w 个点 → 耗时 ~800ms，屏幕闪烁
+> ```
+>
+> **有 diff（增量上传）**：
+> ```
+> setData(newData) → Mapbox 对比新旧（基于顶层 id）→ 只上传新增/删除/变化的点 → 耗时 ~20ms，无感知
+> ```
+>
+> **diff 生效的唯一条件**：每个 Feature 必须有**顶层稳定 `id` 字段**（不是 `properties.id`）。Mapbox 用顶层 `id` 做新旧对比，如果 `id` 不稳定（比如每次用 `Date.now()` 生成），就无法识别哪个 Feature 对应旧数据里的哪个，退化为全量重传，等于没有 diff。
+>
+> ```typescript
+> // ✅ 正确：顶层 id，Mapbox 能识别每个 Feature
+> { type: 'Feature', id: 'usgs-eq-12345', geometry: {...}, properties: {...} }
+>
+> // ❌ 错误：id 在 properties 里，Mapbox 看不到，退化为全量重传
+> { type: 'Feature', geometry: {...}, properties: { id: 'usgs-eq-12345' } }
+> ```
+>
+> 灾害数据 5 分钟刷新一次，每次实际变化的点位只有少量（相对 10w 总量），diff 机制让 GPU 只处理极少数变化，更新耗时从 800ms 降到 ~20ms，刷新完全无感知。
 
 #### Q7：为什么不用 requestIdleCallback 代替 Web Worker？
 
