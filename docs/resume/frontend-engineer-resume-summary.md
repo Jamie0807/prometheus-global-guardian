@@ -63,7 +63,7 @@
 
 #### 3. 复杂状态管理与模块解耦
 
-**难在哪**：地图、筛选、图表、AI 助手四个模块共享大量状态，Props drilling 导致 App.tsx 膨胀到 400+ 行，每次新增功能都要改动整条 props 链路，牵一发动全身。
+**难在哪**：地图、筛选、图表、AI 助手四个模块共享大量状态（hazards / filter / mapStyle / loading），随功能迭代 Props drilling 风险持续增加，每次新增功能都需评估整条 props 链路，设计上需要主动解耦。
 
 **解法思路**：按职责域拆分 4 个独立 Context + useReducer，封装自定义 Hook 作为唯一消费入口，组件重渲染次数降低 60%。
 
@@ -113,7 +113,7 @@ React 19.1 + TypeScript 5.9 严格模式 + Vite 7.1，选用当时最新稳定�
 #### 对工程团队的价值
 
 **可维护性显著提升**：
-- Context 分层解耦后，`App.tsx` 从 400+ 行缩减至 150 行，新增功能模块（如 AI 助手）无需修改现有组件 props 链路
+- Context 分层解耦方案设计后，`App.tsx` 保持 150 行以内，新增功能模块（如 AI 助手）无需修改现有组件 props 链路
 - 18 个高复用组件 + TypeScript 严格模式，新成员上手成本低，组件边界清晰
 
 **交付效率提升**：
@@ -939,7 +939,7 @@ App
 └── InsightsPanel    ← 需要 hazards / riskScore / trends
 ```
 
-最初通过 props 层层传递，`App.tsx` 膨胀到 400+ 行，任何一处状态变更都需要改动多个组件的 props 签名，**牵一发动全身**。
+随着模块增加（地图、筛选、图表、AI 助手、分析页），多个组件需要共享 `hazards`、`filter`、`mapStyle` 等状态，若全部通过 props 层层传递，`App.tsx` 会随迭代持续膨胀，任何一处状态变更都需要改动多个组件的 props 签名，**牵一发动全身**。主动引入 Context 分层方案，将状态拆分到职责域 Context 中，保持 App.tsx 在 150 行以内。
 
 典型的 Props Drilling 场景：
 ```typescript
@@ -1070,9 +1070,9 @@ export const StatisticsCard = React.memo(() => {
 });
 ```
 
-##### 进阶方案：Zustand 原子化状态（如项目规模扩大）
+##### 进阶方案：Zustand / Jotai 原子化状态（规模扩大时）
 
-如果组件树继续扩大，Context 的局限性会显现（Provider 嵌套地狱、跨域订阅繁琐），可迁移至 **Zustand**：
+如果组件树继续扩大，Context 的局限性会显现（Provider 嵌套地狱、跨域订阅繁琐），可迁移至 **Zustand** 或 **Jotai**：
 
 ```typescript
 // store/useHazardStore.ts
@@ -1112,15 +1112,16 @@ function StatusPanel() {
 }
 ```
 
-Zustand vs Context + useReducer 对比：
+Zustand vs Jotai vs Context + useReducer 对比：
 
-| 维度 | Context + useReducer | Zustand |
-|---|---|---|
-| **包体积** | 0（内置） | ~1KB gzip |
-| **Provider 嵌套** | 需要，多域时嵌套深 | 无需 Provider |
-| **精确订阅** | 需手动拆分 Context | selector 函数天然支持 |
-| **DevTools** | 需手动接入 | 内置 Redux DevTools 支持 |
-| **适用规模** | 中小型，域边界清晰 | 中大型，跨域状态频繁 |
+| 维度 | Context + useReducer | Zustand | Jotai |
+|---|---|---|---|
+| **包体积** | 0（内置） | ~1KB gzip | ~3KB gzip |
+| **Provider 嵌套** | 需要，多域时嵌套深 | 无需 Provider | 无需 Provider |
+| **精确订阅** | 需手动拆分 Context | selector 函数 | 原子天然隔离 |
+| **更新粒度** | Context 域级别 | selector 级别 | 原子级别（最细） |
+| **DevTools** | 需手动接入 | 内置 Redux DevTools | 内置 Jotai DevTools |
+| **适用规模** | 中小型，域边界清晰 | 中大型，跨域状态频繁 | 高频局部更新场景 |
 
 ##### 面试表达指南
 
@@ -1131,7 +1132,7 @@ Zustand vs Context + useReducer 对比：
 
 **S（背景）**
 
-随着功能迭代，地图、筛选面板、图表、统计卡片这几个模块之间共享的状态越来越多——hazards 数据、filter 条件、loading 状态、mapStyle、通知列表，最后都汇聚到 `App.tsx` 里，再通过 props 一层层往下传。我加 AI 分析面板那个迭代，光是为了把 hazards 和 filter 传下去，就要改 Header、AnalyticsPage 这些中间组件的 props 签名，而这些组件本身根本不用这两个状态，它们只是"过道"。`App.tsx` 撑到了 400+ 行，每次改需求都要先在脑子里把整条 props 链路理清楚，开发体验很差，极容易漏改。
+项目有地图、筛选面板、图表、统计卡片、AI 分析助手这几个核心模块，它们需要共享 hazards 数据、filter 条件、mapStyle 等状态。在加 AI 分析面板那个迭代时，发现为了把 hazards 和 filter 传给新组件，必须评估整条 props 链路，涉及多个中间组件的签名变更——而这些中间组件本身并不使用这些状态，它们只是"过道"。随功能继续扩展，Props drilling 是必须主动解决的设计瓶颈。
 
 **T（问题定位）**
 
@@ -1147,7 +1148,7 @@ Context 拆分本身也带来了性能收益：`filter` 变化时，只有订阅
 
 **R（结果）**
 
-重构完之后，`App.tsx` 从 400+ 行缩到了 150 行左右，中间层组件的 props 签名全部清干净，各自只关心自己的逻辑。后续加 AI 分析面板时，直接在组件内调 `useHazards()` 拿数据，完全不需要改上游组件。这让我理解到：**组件的 props 应该只描述这个组件自身需要什么，而不是替别人转交什么——一旦出现"过道 props"，就是状态管理需要重新设计的信号**。
+通过 Context 分层方案，`App.tsx` 保持在 150 行以内，中间层组件的 props 签名干净，各自只关心自己的逻辑。AI 分析面板直接在组件内调 `useHazards()` 拿数据，无需改上游组件。如果规模进一步扩大，可平滑迁移到 **Zustand**（无 Provider 嵌套、selector 精确订阅）或 **Jotai**（原子粒度更细、适合高频局部更新）等原子化方案。这让我理解到：**组件的 props 应该只描述自身需要什么，而不是替别人转交——一旦出现"过道 props"，就是状态管理需要重新设计的信号**。
 
 **可能被追问的点**：
 
