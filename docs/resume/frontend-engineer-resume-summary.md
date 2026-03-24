@@ -1699,3 +1699,264 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ---
 
+## 🎯 面试题全集（速查手册）
+
+> 按模块整理，每题附完整答案要点，适合面试前快速回顾。
+
+---
+
+### 一、项目介绍类（必问）
+
+#### Q1：介绍一下这个项目
+
+> 这个项目的背景是全球灾害数据分散在 USGS、NASA、GDACS 等不同机构，各家格式不统一，应急响应人员需要同时盯多个平台。我们要做的是把这些数据源统一接入，构建一个**实时、可交互的全球灾害态势感知平台**，核心用户是应急响应团队和研究人员。
+>
+> 技术栈是 **React 19.1 + TypeScript 5.9 + Mapbox GL JS 3.15**，集成 4 个权威数据源（DisasterAware / USGS / NASA EONET / GDACS），覆盖地震、火山、洪水等 10+ 类灾害实时追踪，带 3D 地图可视化、AI 灾害分析助手和 Python 数据分析微服务。
+>
+> 我在其中主要负责前端整体架构，从数据接入、地图可视化、性能优化到 AI 分析模块都有参与。
+
+#### Q2：项目最大的技术挑战是什么？
+
+> 有三个核心挑战：
+>
+> **第一，渲染性能**：DOM Marker 在万级点位下帧率从 60fps 崩到 5fps，通过 LOD 三级调度 + GeoJSON diff 增量更新 + Web Worker 数据清洗，恢复到稳定 55fps+。
+>
+> **第二，竞态处理**：4 个数据源响应时间差异 200ms 到 3s+，用户快速切换筛选时旧请求结果会覆盖新数据。通过 AbortController 取消 + Promise.allSettled 容错 + 版本号丢弃三层方案彻底解决。
+>
+> **第三，异构数据统一**：4 个数据源格式完全不同（OAuth 鉴权 / GeoJSON / JSON 数组 / XML），通过 BFF 适配器层统一转换为标准 `Hazard` 接口，任一数据源故障自动降级。
+
+#### Q3：有什么可量化的数据指标？
+
+> | 指标 | 优化前 | 优化后 |
+> |---|---|---|
+> | 万级点位帧率 | ~5fps | **55fps+** |
+> | 地图内存占用 | 400 MB | **60 MB（-85%）** |
+> | 首屏 bundle 体积 | 669 KB | **71 KB gzip（-89%）** |
+> | 构建时间 | 17.76s | **12.60s（-29%）** |
+> | 数据同步成功率 | 不稳定 | **99.5%+** |
+> | AI 首字响应延迟 | — | **<1s** |
+
+---
+
+### 二、地图渲染性能（高频）
+
+#### Q4：DOM Marker 为什么会卡？
+
+> DOM Marker 的本质是真实的 HTML 元素，每个 Marker 都在浏览器的渲染树里。浏览器每帧都要对所有 DOM 节点做 **Layout（计算位置）→ Paint（绘制像素）→ Composite（合并图层）**，节点数越多耗时线性增长。几百个时没有感知，到几千个时每帧渲染时间从正常的 16ms 涨到 60ms+，到几万个时地图基本卡死。这是 DOM 渲染路径的天花板，靠优化 JavaScript 代码无法突破。
+
+#### Q5：你用了什么方案解决万级点位的渲染？
+
+> 三层方案联动：
+>
+> **第一层（渲染架构）**：引入基于 zoom 的 LOD 调度。远景（zoom < 8）用 Mapbox GeoJSON Layer + cluster 交给 GPU 统一渲染——10w 个点对 GPU 来说只是一次 draw call，完全绕开 DOM；近景（zoom ≥ 8）保留 Marker，这个缩放级别视口内只有几十个点，DOM 没有压力，且 Marker 可以挂 Popup 做交互。
+>
+> **第二层（增量更新）**：把数据刷新从 `setData()` 全量替换改为 GeoJSON diff 增量更新。给每个 Feature 挂上稳定的顶层 `id`，Mapbox 内部 diff 只上传变化的部分，增量更新耗时从 800ms 降到 ~20ms。
+>
+> **第三层（线程分离）**：把格式转换、去重、异常坐标过滤拆到 Web Worker 里跑。主线程只接收处理好的干净数据，Worker 处理 10w 条约 80ms 但完全在子线程，主线程不感知，页面始终流畅。
+
+#### Q6：GeoJSON diff 增量更新为什么需要稳定 id？
+
+> Mapbox 用 Feature 的**顶层 `id` 字段**（不是 `properties.id`）做新旧数据对比，判断哪些是新增、哪些是删除、哪些是修改。如果 `id` 不稳定（比如每次用 `Date.now()` 生成），Mapbox 无法识别哪个 Feature 对应旧数据里的哪个，就会退化成全量重传，等于没有 diff。
+
+#### Q7：为什么不用 requestIdleCallback 代替 Web Worker？
+
+> `requestIdleCallback` 仍然运行在**主线程**，只是在浏览器空闲时才执行。数据量大时处理耗时长，哪怕分批，也会占用主线程的帧时间。Web Worker 是**真正的并行子线程**，与主线程完全隔离，处理数据时不影响渲染和交互。
+
+#### Q8：什么是 LOD？
+
+> LOD（Level of Detail，细节层次）= 根据观察距离动态调整渲染精度。在地图里体现为根据缩放级别调整渲染方式：
+> - 远景（zoom 小）：用 WebGL cluster 只渲染聚合圆，GPU 处理，帧率不受点位数影响
+> - 中景（zoom 中）：展开聚合，显示独立点位
+> - 近景（zoom 大）：切换为 DOM Marker，支持点击 Popup 等交互
+>
+> 核心思想：**用户看不到的细节不需要渲染，把渲染资源留给用户能感知到的部分**。
+
+---
+
+### 三、并发控制与竞态（高频）
+
+#### Q9：什么是 Race Condition？在项目中是什么场景？
+
+> Race Condition（竞态条件）= 两个或多个异步操作同时进行，最终结果取决于它们完成的顺序，而这个顺序不可预测，导致数据错误。
+>
+> 项目里的具体场景：用户连续切换筛选条件——比如快速点「地震 → 洪水 → 野火」，每次切换都发出 4 个新请求。如果 DisasterAware 响应慢（3s+），用户已经切换到「野火」，但地震的请求才刚回来，`setState` 把地图覆盖成地震数据——用户选的是野火，看到的是地震，数据完全错误，且这类 bug 偶发、难以稳定复现。
+
+#### Q10：你用了什么方案解决竞态？
+
+> 三层方案：
+>
+> **第一层（网络层）**：在自定义 Hook `useHazardFetch` 里用 `AbortController`。每次 filter 变化，先 `abort()` 上一个控制器，再新建一个绑到本次请求的 `signal`。旧请求在网络层被取消，浏览器抛 `AbortError`，不再触发任何 `setState`。组件卸载时同样 abort，防止内存泄漏。
+>
+> **第二层（聚合层）**：4 个数据源并发请求用 `Promise.allSettled` 代替 `Promise.all`。所有请求共用同一个 AbortController，切换筛选时 4 个请求同时被取消，不存在部分请求还在跑的情况。单个数据源失败静默降级，不影响其他源。
+>
+> **第三层（状态层）**：用 `useRef` 维护单调递增的请求版本号作为兜底。有些异步操作无法 abort（比如第三方 SDK 回调），版本号机制确保只有当前版本号匹配时才调 `setState`，其余静默丢弃。
+
+#### Q11：AbortController abort 之后，请求真的立刻停止了吗？
+
+> 不完全是。已经发出的网络数据包无法召回（TCP 层面），但浏览器会**忽略响应**并向 fetch 的 Promise 抛出 `AbortError`，不再消耗 JavaScript 处理时间，也不会触发 `.then()` 回调。所以 abort 的作用是：**阻止响应数据进入 JavaScript 执行链**，而不是物理撤回网络包。
+
+#### Q12：Promise.all 和 Promise.allSettled 的区别？
+
+> | | `Promise.all` | `Promise.allSettled` |
+> |---|---|---|
+> | **行为** | 任一 reject → 整体立刻 reject | 等全部 settle 再返回 |
+> | **结果** | 全部成功才拿到值 | 每项都有 `{status, value/reason}` |
+> | **适合场景** | 所有请求都必须成功（串联依赖） | 多源容错（部分失败不影响整体） |
+>
+> 本项目用 `allSettled`：4 个数据源哪个失败都静默降级，成功的数据正常合并。
+
+---
+
+### 四、状态管理（高频）
+
+#### Q13：什么是 Props Drilling？你是怎么避免的？
+
+> Props Drilling（属性钻透）= 为了把数据传给深层组件，不得不让中间每一层都转手传递 props，即使这些中间组件根本不使用这个数据。
+>
+> 本项目通过**按职责域拆分 Context + useReducer** 解决：
+> - `HazardContext`：灾害数据和 loading 状态
+> - `FilterContext`：筛选条件和日期范围
+> - `UIContext`：地图样式和 Tab 切换
+> - `NotificationContext`：通知列表
+>
+> 每个 Context 配一个自定义 Hook（`useHazards()`、`useFilter()` 等）作为唯一消费入口，组件直接调 Hook 拿数据，不经过任何中间层传递。`App.tsx` 保持在 150 行以内，中间层组件的 props 签名干净。
+
+#### Q14：Context 拆分为什么能减少重渲染？
+
+> React Context 的机制是：Context value 变化时，**所有订阅了该 Context 的组件都会重渲染**。如果把所有状态放在一个 Context 里，`filter` 字段变化会导致只关心 `hazards` 的 `StatisticsCard` 也重渲染。
+>
+> 拆成 4 个 Context 后，`filter` 变化只触发 `FilterContext` 的消费者重渲染，`StatisticsCard` 只订阅 `HazardContext`，完全隔离。配合 `React.memo` 和 `useMemo` 稳定 value 引用，整体重渲染次数降低约 60%。
+
+#### Q15：为什么 Provider 的 value 要用 useMemo 包裹？
+
+> Provider 的 `value` 如果直接写成对象字面量（`value={{ state, dispatch }}`），每次父组件渲染都会创建一个新的对象引用，React 会认为 Context value 发生了变化，触发所有消费者重渲染——即使 `state` 和 `dispatch` 本身没有任何变化。用 `useMemo` 包裹，只有 `state` 真正变化时才生成新对象，避免无意义的重渲染。
+
+#### Q16：为什么不用 Redux？Zustand 和 Jotai 有什么区别？
+
+> **不用 Redux**：项目体量中等，Redux 的 action / reducer / selector 分层 boilerplate 较重，Context + useReducer 在这个规模已经足够，且零依赖。
+>
+> **Zustand vs Jotai**：
+> | | Zustand | Jotai |
+> |---|---|---|
+> | **模型** | Store（整体对象 + selector） | 原子（每个状态独立 atom） |
+> | **适合** | 有关联的状态（互相依赖） | 完全独立的细粒度状态 |
+> | **Provider** | 不需要（模块级单例） | 需要（或用默认 store） |
+> | **订阅** | `useStore(s => s.xxx)` selector | `useAtom(xxxAtom)` |
+>
+> 本项目若规模扩大，优先迁移 Zustand（状态有关联性）；若频繁出现只需要一两个字段的高频局部更新，Jotai 原子粒度更合适。
+
+---
+
+### 五、AI 模块（加分题）
+
+#### Q17：介绍 AI 智能分析模块的整体实现
+
+> 整体分三层：
+>
+> **第一层 BFF 代理层**（`server.js`）：OpenAI API Key 不能暴露在浏览器里，前端请求本地 `/api/chat`，由 `server.js` 带 Key 去请求 OpenAI，同时把 SSE 流直接 pipe 给前端。
+>
+> **第二层 API 通信层**（`aiAssistant.ts`）：核心是 `buildSystemPrompt()` 和 `streamChatMessage()`。`buildSystemPrompt` 在每次请求前把当前地图实时灾害数据（事件总数、类型分布、近期代表事件）动态注入 System Prompt，让 AI 能回答"现在哪个地区最危险"这类实时问题。`streamChatMessage` 用原生 `fetch` + `ReadableStream` 手写 SSE 解析，`buf` 缓冲区处理跨 chunk 的不完整行，每解析出一个 token 通过 `onChunk` 回调传给 UI 层。没有 API Key 时自动进入 Demo 降级模式。
+>
+> **第三层 组件层**（`AIChatAssistant.tsx`）：发消息时先插入 `content: '', isStreaming: true` 占位消息，`onChunk` 每次追加 delta 触发重渲染，`MessageBubble` 做 Markdown 增量渲染，`onDone` 时 `isStreaming` 置 false，光标消失。
+
+#### Q18：什么是 SSE？为什么不用 WebSocket？
+
+> SSE（Server-Sent Events）= 服务端单向推流，基于 HTTP 长连接，服务端可以持续向客户端发送数据，客户端无法通过同一连接反向发送。
+>
+> 对 LLM 流式输出选 SSE 的原因：
+> - LLM 的场景是**单向推流**（服务端把 token 一个个发过来），WebSocket 的双向通信能力用不到
+> - SSE 基于普通 HTTP，天然兼容现有的代理、负载均衡和 CDN，WebSocket 需要特殊支持
+> - 实现更简单，用原生 `fetch + ReadableStream` 即可，无需握手协议
+
+#### Q19：为什么不用 EventSource？
+
+> `EventSource` 是浏览器原生 SSE API，但有两个关键限制：
+> 1. **只支持 GET 请求**，无法发 POST body（LLM 需要在 body 里传 messages 历史）
+> 2. **不支持自定义 Header**，无法传 `Authorization` token
+>
+> 所以用原生 `fetch + ReadableStream` 手写 SSE 解析，完全控制请求方式和 Header。
+
+#### Q20：打字机效果和 Markdown 增量渲染是怎么实现的？
+
+> **打字机效果**：发消息时在 messages 数组里插入一条 `{ content: '', isStreaming: true }` 的占位消息，每次 `onChunk` 回调把 delta 追加到 `content`，React 检测到 state 变化触发重渲染，视觉上就是文字逐渐出现。`onDone` 时把 `isStreaming` 置为 false，光标（`▌`）消失。
+>
+> **Markdown 增量渲染**：`MessageBubble` 组件对 `content` 字符串做实时解析（正则匹配加粗/标题/列表/表格/分割线），每次 chunk 到来触发重渲染，React diff 只更新变化的 DOM 节点，不是整体替换。视觉上 Markdown 格式随文字流式出现，而不是等全部内容到了才格式化。
+
+#### Q21：动态上下文注入是 RAG 吗？
+
+> 不是标准的 RAG（Retrieval-Augmented Generation）。RAG 的核心是**向量检索**：把文档分块、embedding 后存入向量数据库，查询时先检索最相关的 chunk，再注入 Prompt。
+>
+> 本项目是**动态上下文注入**：`buildSystemPrompt()` 在每次请求前直接把当前地图的实时数据（事件总数、类型分布、近期代表事件的 title/severity/location）拼进 System Prompt，无向量检索，无持久化存储。适合实时数据量不大（几十条代表事件）、需要每次都是最新状态的场景。
+
+---
+
+### 六、工程化与 API 集成
+
+#### Q22：bundle 体积从 669KB 降到 71KB 是怎么做的？
+
+> 两个核心手段：
+>
+> **`manualChunks` 代码分割**：在 `vite.config.ts` 里按路由和按库拆分 chunk。把 Mapbox GL、Recharts、OpenAI 等大型依赖单独打成独立 chunk，首屏只加载业务代码，地图库按需加载。
+>
+> **`React.lazy()` 懒加载大组件**：`AIChatAssistant`、`AnalyticsPage`、`SaveReportModal`、`SettingsModal` 这些不在首屏渲染的大组件用 `lazy()` 包裹 + `Suspense` 边界，用户首次打开时不下载这些代码，触发对应功能时才异步加载。
+>
+> 结合 Vite 的 Tree Shaking（按需导入，移除未使用代码），最终 gzip 后从 669KB 降到 71KB，降幅 89%。
+
+#### Q23：OAuth 2.0 Token 自动刷新是怎么做的？
+
+> `authFetch` 是对 `fetch` 的封装：
+> 1. 正常请求时带 `Authorization: Bearer ${accessToken}` Header
+> 2. 如果服务端返回 **401 或 403**，说明 token 过期
+> 3. 自动调 `refreshAccessToken()` 用 refreshToken 换新的 accessToken
+> 4. 拿到新 token 后**重试原始请求**，对调用方完全透明
+> 5. accessToken 和 refreshToken 存在 localStorage，减少每次请求都需要重新鉴权的频率
+
+#### Q24：4 个异构数据源如何统一格式？
+
+> 通过 **BFF 适配器层**：
+> - 每个数据源对应一个 adapter 函数（如 `fetchDisasterAwareHazards`、`fetchUSGSEarthquakes`）
+> - 各 adapter 内部做字段映射，把各自不同的字段名、坐标格式、时间格式统一转换成标准 `Hazard` 接口（`{ id, title, type, geometry, severity, timestamp, source }`）
+> - 上层代码（`Promise.allSettled` 聚合 + 地图渲染）只需要处理 `Hazard[]`，完全不感知各数据源的差异
+> - 单个 adapter 失败时返回空数组，不影响整体
+
+---
+
+### 七、核心概念速答
+
+#### Q25：什么是 WebGL？
+
+> WebGL = 浏览器里调用 GPU 的 JavaScript API（基于 OpenGL ES）。普通 DOM 渲染走 CPU + 浏览器渲染引擎，WebGL 绕过 DOM，直接用 GPU 并行处理大量顶点和像素。对地图来说，GPU 同时处理 10w 个点只是一次 draw call，而 DOM 处理 10w 个节点需要 Layout → Paint 的线性遍历。
+
+#### Q26：什么是 BFF？为什么要用它？
+
+> BFF（Backend for Frontend）= 专为前端定制的代理/聚合层，介于前端和真正的后端服务之间。
+>
+> 本项目用 `server.js` 作为 BFF 的原因：
+> 1. **安全**：OpenAI API Key 不能写在浏览器代码里（会被用户看到），server.js 保管 Key 代替前端发请求
+> 2. **格式适配**：把 OpenAI 的 SSE 流直接 pipe 给前端，前端无需二次处理
+> 3. **代理 CORS**：DisasterAware 等第三方 API 不允许浏览器直接跨域访问，由 BFF 转发
+
+#### Q27：什么是 Hook？自定义 Hook 的规则是什么？
+
+> Hook = React 函数组件里**复用状态逻辑**的机制，以 `use` 开头的函数。内置 Hook 有 `useState`、`useEffect`、`useRef`、`useMemo` 等。
+>
+> 自定义 Hook（如 `useHazardFetch`、`useFilter()`）= 把可复用的状态逻辑封装成函数，让多个组件共享逻辑而不共享状态。
+>
+> 两条核心规则：
+> 1. **只能在函数组件或自定义 Hook 的顶层调用**，不能在条件语句、循环或普通函数里调用
+> 2. **只能在 React 函数组件或自定义 Hook 里调用**，不能在普通 JS 函数里调用
+
+#### Q28：fetch 和 XMLHttpRequest 的区别？
+
+> | | `fetch` | `XMLHttpRequest` |
+> |---|---|---|
+> | **API 风格** | Promise-based，支持 async/await | 回调式，`.onload` / `.onerror` |
+> | **流式读取** | 原生支持 `ReadableStream` | 不支持 |
+> | **取消请求** | `AbortController` | `xhr.abort()` |
+> | **上传进度** | 不支持（需用 XHR） | 支持 `onprogress` |
+> | **使用场景** | 现代项目首选 | 需要上传进度条时 |
+>
+> 本项目用 `fetch` + `ReadableStream` 手写 SSE 解析，正是利用了 fetch 原生支持流式读取这一点。
+
+---
+
