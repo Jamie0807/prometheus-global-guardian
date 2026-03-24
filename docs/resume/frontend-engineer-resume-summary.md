@@ -1236,24 +1236,6 @@ function buildSystemPrompt(ctx?: DisasterContext): string {
 
 ##### 核心二：SSE 流式响应解析（`streamChatMessage`）
 
-> **💡 概念解释：SSE 是什么？**
->
-> **SSE（Server-Sent Events）** 是浏览器原生支持的**服务器单向推送技术**，服务端可以通过一条长连接持续向客户端推送数据流，客户端无需反复轮询。
->
-> | 技术 | 方向 | 适用场景 |
-> |---|---|---|
-> | **普通 fetch** | 一次请求，一次响应 | 普通 API 请求 |
-> | **SSE** | 服务端持续推送 → 客户端 | **AI 流式输出**、实时通知 |
-> | **WebSocket** | 双向通信 | 聊天室、多人游戏 |
->
-> SSE 的数据格式极简，每条消息以 `data:` 开头、`\n\n` 结尾：
-> ```
-> data: {"choices":[{"delta":{"content":"当"}}]}
-> data: {"choices":[{"delta":{"content":"前"}}]}
-> data: [DONE]
-> ```
-> OpenAI 的流式接口（`stream: true`）就是 SSE——每生成一个 token 就立刻推一条 `data:`，浏览器实时渲染，形成打字机效果。
-
 用原生 `fetch` + `ReadableStream` 逐行解析 OpenAI SSE 格式，零依赖：
 
 ```typescript
@@ -1833,12 +1815,26 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 #### Q19：什么是 SSE？为什么不用 WebSocket？
 
-> SSE（Server-Sent Events）= 服务端单向推流，基于 HTTP 长连接，服务端可以持续向客户端发送数据，客户端无法通过同一连接反向发送。
+> **SSE（Server-Sent Events）** 是浏览器原生支持的**服务器单向推送技术**，服务端通过一条持久 HTTP 长连接持续向客户端推送数据，客户端无需反复轮询，也无法通过同一连接反向发送数据。
 >
-> 对 LLM 流式输出选 SSE 的原因：
-> - LLM 的场景是**单向推流**（服务端把 token 一个个发过来），WebSocket 的双向通信能力用不到
-> - SSE 基于普通 HTTP，天然兼容现有的代理、负载均衡和 CDN，WebSocket 需要特殊支持
-> - 实现更简单，用原生 `fetch + ReadableStream` 即可，无需握手协议
+> | 技术 | 方向 | 协议 | 适用场景 |
+> |---|---|---|---|
+> | **普通 fetch** | 一次请求，一次响应 | HTTP | 普通 API 请求 |
+> | **SSE** | 服务端持续推送 → 客户端 | HTTP | **AI 流式输出**、实时通知 |
+> | **WebSocket** | 双向通信 | WS（需升级握手） | 聊天室、多人游戏 |
+>
+> **SSE 数据格式极简**，每条消息以 `data:` 开头、`\n\n` 结尾：
+> ```
+> data: {"choices":[{"delta":{"content":"当"}}]}
+> data: {"choices":[{"delta":{"content":"前"}}]}
+> data: [DONE]
+> ```
+> OpenAI 的 `stream: true` 接口就是 SSE——每生成一个 token 就立刻推一条 `data:`，浏览器实时渲染，形成打字机效果。
+>
+> **本项目选 SSE 不用 WebSocket 的原因**：
+> - LLM 的场景是**单向推流**，WebSocket 双向通信能力完全用不到
+> - SSE 基于普通 HTTP，天然兼容现有代理、负载均衡和 CDN；WebSocket 需要服务端特殊支持
+> - 实现更简单，用原生 `fetch + ReadableStream` 即可，无需握手协议和心跳维持
 
 #### Q20：为什么不用 EventSource？
 
