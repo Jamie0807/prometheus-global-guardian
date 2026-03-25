@@ -1824,6 +1824,31 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ---
 
+#### 工程化与 API 集成
+
+**OAuth 2.0 Token 鉴权**
+> 一套授权框架，核心逻辑：用用户名+密码**一次性换取两个 Token**，后续用 Token 代替密码发请求，密码不再反复传输。
+>
+> | Token | 作用 | 有效期 |
+> |---|---|---|
+> | **accessToken** | 每次请求带在 Header（`Authorization: Bearer xxx`），证明"我有权限访问" | 短，通常 1 小时 |
+> | **refreshToken** | 专门用来换新 accessToken，不用于业务请求本身 | 长，通常 30 天 |
+>
+> **本项目流程**：
+> ```
+> 1. 首次授权：POST /api/authorize（用户名+密码）→ 换取 accessToken + refreshToken
+> 2. 正常请求：fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+> 3. Token 过期：服务端返回 401/403
+> 4. 自动刷新：用 refreshToken 换新 accessToken（POST /api/token/refresh）
+> 5. 透明重试：新 Token 重发原始请求，调用方完全无感知
+> ```
+>
+> **类比**：accessToken = 地铁一日票（短期有效），refreshToken = 身份证（凭它随时买新票），密码 = 你本人（只在买第一张票时出示）。
+>
+> **`authFetch` 的价值**：把「401 检测 → 刷新 → 重试」封装在一个函数里，业务层只调 `authFetch(url)` 拿数据，完全不关心 Token 状态。这是本项目接入 DisasterAware API 的核心机制。
+
+---
+
 #### AI 模块
 
 **BFF（Backend For Frontend）**
