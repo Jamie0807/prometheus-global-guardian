@@ -1626,13 +1626,21 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 #### Q2：项目最大的技术挑战是什么？
 
-> 有三个核心挑战：
+> 有四个核心挑战，每个都有具体的解决方案：
 >
-> **第一，渲染性能**：DOM Marker 在万级点位下帧率从 60fps 崩到 5fps，通过 LOD 三级调度 + GeoJSON diff 增量更新 + Web Worker 数据清洗，恢复到稳定 55fps+。
+> **第一，海量地理数据渲染性能**
+> 难点在于 DOM Marker 方案在万级点位下帧率直接从 60fps 崩到 5fps，根本矛盾是 DOM 渲染路径（Layout → Paint → Composite）随节点数线性增长，靠 JS 层面的优化根本触碰不到这个瓶颈。解法是跨越渲染范式——引入 LOD 三级调度把远景全量渲染交给 GPU，GeoJSON diff 增量更新把 5 分钟刷新从 800ms 降到 20ms，Web Worker 把数据清洗移出主线程。三层叠加，帧率恢复 55fps+，内存从 400MB 降到 60MB。
 >
-> **第二，竞态处理**：4 个数据源响应时间差异 200ms 到 3s+，用户快速切换筛选时旧请求结果会覆盖新数据。通过 AbortController 取消 + Promise.allSettled 容错 + 版本号丢弃三层方案彻底解决。
+> **第二，实时数据流的并发竞态**
+> 4 个数据源响应速度差异 200ms 到 3s+，用户快速切换筛选时旧请求会比新请求晚到，覆盖正确的数据。这类 bug 偶发性强、难以稳定复现，很容易被忽视。解法是三层保障：AbortController 在网络层取消过期请求，Promise.allSettled 做多源容错聚合，useRef 版本号兜底无法 abort 的异步操作，彻底消除数据错乱。
 >
-> **第三，异构数据统一**：4 个数据源格式完全不同（OAuth 鉴权 / GeoJSON / JSON 数组 / XML），通过 BFF 适配器层统一转换为标准 `Hazard` 接口，任一数据源故障自动降级。
+> **第三，复杂状态管理与模块解耦**
+> 地图、筛选、图表、AI 助手四个模块共享大量状态，随功能迭代 Props drilling 风险持续增加，每加一个新功能都要评估整条 props 链路。解法是按职责域拆分 4 个独立 Context + useReducer，封装自定义 Hook 作为唯一消费入口，App.tsx 始终保持在 150 行以内，组件重渲染次数降低 60%。
+>
+> **第四，多异构数据源统一治理**
+> 4 个数据源格式完全不同——DisasterAware 需要 OAuth 鉴权，USGS 是 GeoJSON，NASA 是 JSON 数组，GDACS 是 XML/RSS，字段命名和坐标精度也各不相同。解法是 BFF 适配器层把所有源统一转换为标准 `Hazard` 接口，authFetch 封装 Token 自动刷新，Promise.allSettled 实现单源故障自动降级，整体可用性不受任一数据源影响。
+>
+> _(通常说前两个就够，等面试官追问再展开后两个)_
 
 #### Q3：有什么可量化的数据指标？
 
