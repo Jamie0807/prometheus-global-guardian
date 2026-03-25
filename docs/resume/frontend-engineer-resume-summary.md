@@ -550,47 +550,6 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 
 #### 🔀 **实时数据流的并发控制与竞态处理**
 
-> **💡 概念解释：Race Condition（竞态条件）是什么？**
->
-> 两个或多个异步操作**同时进行，但最终结果取决于它们完成的顺序**，而这个顺序不可预测，从而导致数据错误。
->
-> **直观例子**：用户快速切换筛选条件——地震 → 洪水 → 野火
-> ```
-> 用户操作：  [地震]      [洪水]      [野火]
-> 请求发出：   req1        req2        req3
-> 响应返回：   req3(200ms) req2(500ms) req1(800ms)  ← 顺序乱了！
->
-> ❌ 无保护时：
->   req3 先回来 → 显示"野火" ✅
->   req2 回来   → 显示"洪水" ❌（覆盖野火）
->   req1 最后到 → 显示"地震" ❌（用户选的是野火，却看到地震数据）
-> ```
->
-> **为什么难排查**：不是代码逻辑错误，只在请求响应时间差异大时触发，测试时难以稳定复现，用户看到的只是"数据不对"而不报错。
->
-> **本质**：异步操作的完成顺序和发起顺序不一致，而程序没有感知这一点，用后完成的结果覆盖了先完成的。
-
-> **💡 概念解释：竞态保护是什么？**
->
-> 竞态保护 = **防止竞态条件导致数据错乱的一系列机制**，核心目标：确保最终状态永远对应最新的用户操作。
->
-> 本项目三层防护：
->
-> | 层级 | 机制 | 作用 |
-> |---|---|---|
-> | **网络层** | `AbortController.abort()` | 发新请求前取消旧请求，旧请求在网络层直接死亡 |
-> | **数据层** | `Promise.allSettled` | 4个源并发，失败不阻断，且共享同一 `signal` 同时取消 |
-> | **状态层** | 版本号 Hook（`fetchVersion`） | 旧请求侥幸回来时，版本号对不上则丢弃，不更新 state |
->
-> ```
-> ❌ 无保护：req1(800ms) 最后返回 → 覆盖用户当前选择的野火数据
-> ✅ 有保护：
->   网络层 → abort() 直接 cancel req1，浏览器抛 AbortError
->   状态层 → 即使回来，version 不匹配，setHazards 不执行
-> ```
->
-> **一句话**：竞态保护 = **取消旧请求（网络层）+ 丢弃旧结果（状态层）**，双重兜底。
-
 ##### 痛点：Race Condition 导致数据错乱
 
 项目存在两类竞态场景：
@@ -609,47 +568,6 @@ worker.onmessage = (e: MessageEvent<Hazard[]>) => {
 ```
 
 ##### 解决方案一：AbortController 取消过期请求
-
-> **💡 概念解释：fetch 是什么？**
->
-> `fetch` 是浏览器内置的 HTTP 请求 API，是 `XMLHttpRequest（XHR）` 的现代替代品。
->
-> | | **XHR（旧）** | **fetch（新）** |
-> |---|---|---|
-> | **语法** | 回调嵌套，繁琐 | Promise / async-await，简洁 |
-> | **流式读取** | ❌ 不支持 | ✅ `ReadableStream`（SSE 依赖它） |
-> | **取消请求** | 复杂 | `AbortController.abort()` 一行搞定 |
->
-> 本项目两处关键用法：
-> - **AI 流式响应**：`fetch` + `response.body.getReader()` 逐块读 SSE 数据
-> - **灾害数据并发拉取**：多个 `fetch` 共享同一个 `AbortController.signal`，一次 `abort()` 全部取消
-
-> **💡 概念解释：AbortController 是什么？**
->
-> `AbortController` 是浏览器原生提供的 Web API，用于**取消异步操作**（主要是 `fetch` 请求）。它由两个核心部分组成：
-> - `controller.signal`：一个 `AbortSignal` 对象，传给需要被取消的 `fetch`
-> - `controller.abort()`：调用后立即触发取消，`signal.aborted` 变为 `true`，`fetch` 抛出 `AbortError`
->
-> 关键特性：同一个 `controller` 可以同时传给多个 `fetch`，调一次 `abort()` 全部取消；`AbortError` 需要在 catch 里单独处理，不要当成真正的错误上报。
-
-> **💡 概念解释：什么是 Hook？**
->
-> Hook = React 提供的一类特殊函数，让**函数组件也能使用状态、生命周期等能力**（React 16.8 引入）。
->
-> | Hook | 作用 | 本项目典型用法 |
-> |---|---|---|
-> | `useState` | 存储状态，变化触发重渲染 | `const [hazards, setHazards] = useState([])` |
-> | `useEffect` | 副作用（请求、订阅、DOM操作） | 地图初始化、数据拉取、事件监听 |
-> | `useRef` | 存储不触发渲染的可变值 | `abortControllerRef`、`map.current`、`markers.current` |
-> | `useMemo` | 缓存计算结果，依赖不变不重算 | `disasterContext` 从 `hazards` 派生 |
-> | `useCallback` | 缓存函数引用，避免子组件无效重渲染 | `sendMessage`、`scrollToBottom` |
->
-> **自定义 Hook**：把多个内置 Hook 组合成可复用逻辑，以 `use` 开头命名。本项目的 `useHazardFetch` 就是自定义 Hook——把 `useState + useEffect + useRef` 三者组合，把竞态保护逻辑封装成一行可复用的调用：
-> ```typescript
-> const hazards = useHazardFetch(filter);  // 一行调用，内部处理所有竞态逻辑
-> ```
->
-> **两条使用规则**：① 只能在函数组件或自定义 Hook 的**顶层**调用（不能在 if/for 里）；② 只能在 **React 函数**里调用（不能在普通 JS 函数里）。
 
 每次发起新请求前，先 abort 上一次未完成的请求，确保只有最新请求的结果会被处理：
 
@@ -694,27 +612,6 @@ function useHazardFetch(filter: string) {
 ```
 
 ##### 解决方案二：Promise.allSettled 并发聚合，互不阻断
-
-> **💡 概念解释：Promise.all vs Promise.allSettled**
->
-> 两者都是**并发执行多个 Promise**的方法，区别在于如何处理失败：
->
-> | | **`Promise.all`** | **`Promise.allSettled`** |
-> |---|---|---|
-> | **失败处理** | 一个失败 → 整体立即失败 | 等所有结束，各自汇报状态 |
-> | **返回值** | 所有成功值的数组 | `{status, value/reason}` 数组 |
-> | **适合场景** | 所有数据缺一不可 | 多源容错，部分失败可接受 |
->
-> ```typescript
-> // Promise.all：GDACS 超时 → 其他3个成功的数据全部丢失 ❌
-> const [usgs, nasa, gdacs, da] = await Promise.all([fetchUSGS(), fetchNASA(), fetchGDACS(), fetchDA()]);
->
-> // Promise.allSettled：GDACS 超时 → 其他3个数据照常展示 ✅
-> const results = await Promise.allSettled([fetchUSGS(), fetchNASA(), fetchGDACS(), fetchDA()]);
-> // [{ status:'fulfilled', value:[...] }, ..., { status:'rejected', reason:Error }]
-> ```
->
-> **本项目必须用 `allSettled` 的原因**：4 个数据源来自不同机构，网络稳定性各不相同。`Promise.all` 会让 GDACS 一次超时导致用户连地震数据都看不到——对灾害监测平台不可接受。
 
 多数据源并发时，不用 `Promise.all`（一个失败全部失败），改用 `Promise.allSettled` 收集所有结果后统一合并：
 
@@ -800,21 +697,6 @@ Race Condition 的本质是：异步操作的完成顺序和发起顺序不一�
 
 三层叠加之后，数据错乱问题彻底消失，无论用户切换多快，地图展示的数据始终和当前筛选条件一致。浏览器 Network 面板能清楚看到旧请求被 cancel，没有多余的带宽浪费。这个问题的核心思路是：**不能假设异步操作按发起顺序完成，必须在状态更新层面主动感知请求时序**。
 
-> **💡 概念解释：RxJS 是什么？**
->
-> **RxJS**（Reactive Extensions for JavaScript）= 用**流（Observable）**处理异步事件的库。把网络请求、用户事件、定时器等任何异步数据源抽象成"数据流"，再用操作符变换、过滤、合并。
->
-> | | **Promise / async-await** | **RxJS Observable** |
-> |---|---|---|
-> | **适合** | 一次性请求 | 持续数据流、复杂事件组合 |
-> | **取消** | `AbortController`（手动） | `takeUntil()` 自动取消 |
-> | **重试** | 手动 try/catch 循环 | `retry(3)` 一行 |
-> | **防抖** | `setTimeout` 手写 | `debounceTime(300)` |
-> | **多流合并** | `Promise.allSettled` | `combineLatest` / `merge` |
-> | **包体积** | 0（原生） | ~40KB+ |
->
-> RxJS 最擅长"搜索框自动补全"这类场景——防抖 + 取消旧请求 + 重试可以各用一行操作符解决。但有一定学习曲线，且打包体积较大。
-
 **可能被追问的点**：
 
 | 追问 | 答 |
@@ -831,21 +713,6 @@ Race Condition 的本质是：异步操作的完成顺序和发起顺序不一�
 #### 🧩 **复杂状态管理与模块解耦**
 
 ##### 痛点：Props Drilling 导致组件高度耦合
-
-> **💡 概念解释：什么是 Props Drilling？**
->
-> Props Drilling（属性钻透）= 为了把数据传给深层组件，不得不让中间每一层都转手传递 props，即使这些中间组件**根本不需要这个数据**。
->
-> ```
-> App（持有 filter）
->   └── Header（不需要 filter，但必须接收并往下传 ← 过道）
->         └── FilterBar（不需要 filter，但必须接收并往下传 ← 过道）
->               └── TypeSelector（真正需要 filter 的地方）
-> ```
->
-> 带来的问题：中间组件被迫知道它不关心的数据；加一个新 prop，中间所有层都要改签名；App.tsx 积累大量状态，组件臃肿。
->
-> **解决方案**：用 Context，让 `TypeSelector` 直接消费 `useFilter()`，中间层 props 签名完全干净。
 
 随着功能迭代，地图视图（MapView）、筛选面板（StatusPanel）、图表区域（ChartsPanel）、统计卡片（StatisticsCard）、洞察面板（InsightsPanel）之间需要共享大量状态：
 
@@ -873,30 +740,6 @@ App
 ```
 
 ##### 解决方案：Context + useReducer 分层状态管理
-
-> **💡 概念解释：Context 是什么？**
->
-> Context = React 提供的**跨层级数据共享机制**，让任意深度的组件直接读取数据，无需逐层传 props。三个核心部分：
->
-> ```typescript
-> // 1. createContext：创建"数据频道"
-> const FilterContext = createContext<FilterState | null>(null);
->
-> // 2. Provider：在组件树顶部"广播"数据
-> <FilterContext.Provider value={{ filter, setFilter }}>
->   <Header />     {/* 内部所有组件都能收到 */}
->   <MapView />
-> </FilterContext.Provider>
->
-> // 3. useContext：在任意深度"收听"数据，不需要任何 props
-> function TypeSelector() {
->   const { filter, setFilter } = useContext(FilterContext)!;
-> }
-> ```
->
-> **重要注意**：Context 值变化时，所有消费该 Context 的组件都会重渲染——所以要按职责域**拆分细粒度 Context**，而不是一个巨型 Context，否则任何状态变化都导致整树重渲染。
->
-> **本项目 4 个 Context 的分工**：`HazardContext`（灾害数据）/ `FilterContext`（筛选条件）/ `UIContext`（地图样式/Tab）/ `NotificationContext`（通知列表），每个都封装了自定义 Hook 作为唯一消费入口（`useHazards()` / `useFilter()` 等）。
 
 将全局状态按**职责域**拆分为独立 Context，避免单一巨型 Store 导致任何状态变更都触发全局重渲染：
 
@@ -990,36 +833,6 @@ export const StatisticsCard = React.memo(() => {
 ```
 
 ##### 进阶方案：Zustand / Jotai 原子化状态（规模扩大时）
-
-> **💡 概念解释：Zustand 和 Jotai 是什么？**
->
-> **Zustand** = 极简全局状态库，核心思路"一个 store，按需订阅"，无 Provider、无 boilerplate：
-> ```typescript
-> const useHazardStore = create((set) => ({
->   hazards: [], filter: 'ALL',
->   setFilter: (filter) => set({ filter }),
-> }));
-> // selector 精确控制渲染：filter 变化不触发 MapView 重渲染
-> const hazards = useHazardStore(state => state.hazards);
-> ```
->
-> **Jotai** = 原子化状态，把状态拆成最小单元 `atom`，组件只订阅用到的 atom，更新粒度最细：
-> ```typescript
-> const hazardsAtom = atom<Hazard[]>([]);
-> const filterAtom = atom<string>('ALL');
-> // 派生 atom：自动追踪依赖，类似 useMemo
-> const filteredAtom = atom((get) =>
->   get(hazardsAtom).filter(h => h.type === get(filterAtom))
-> );
-> ```
->
-> **本项目选择路径**：
-> ```
-> 当前规模 → useState + 扁平 props（零依赖，够用）
-> 层级加深 → Context + useReducer（原生，按域拆分）
-> 跨域频繁 → Zustand（最常见选择，生态成熟）
-> 极细粒度 → Jotai（地图点位高频更新等特殊场景）
-> ```
 
 如果组件树继续扩大，Context 的局限性会显现（Provider 嵌套地狱、跨域订阅繁琐），可迁移至 **Zustand** 或 **Jotai**：
 
@@ -1124,65 +937,11 @@ server.js（BFF 层）
 OpenAI Chat Completions API（stream: true）
 ```
 
-> **💡 概念解释：什么是 BFF？**
->
-> **BFF**（Backend For Frontend，服务于前端的后端）= 专门为前端量身定制的中间层服务。
->
-> 本项目需要 BFF 的核心原因：**OpenAI API Key 不能暴露给浏览器**——用户可以在 Chrome Network 面板看到所有请求头，直连 OpenAI 会导致 Key 泄露。
->
-> ```
-> ❌ 无 BFF：前端 → 直接带 API Key 请求 OpenAI  →  Key 暴露在浏览器
-> ✅ 有 BFF：前端 → 请求 server.js → server.js 带 Key 请求 OpenAI → Key 只在服务端
-> ```
->
-> `server.js` 作为 BFF 还承担了 SSE 流转发（`response.body.pipe(res)`）和请求代理两个职责，前端只需请求本地 `/api/chat`，完全不感知 OpenAI 的存在。
-
 两个核心文件职责分离：`aiAssistant.ts` 负责所有 LLM 通信逻辑（System Prompt 构建、SSE 流解析、Demo 降级），`AIChatAssistant.tsx` 负责 UI 状态管理和逐字打印动画，互不耦合。
 
 ---
 
 ##### 核心一：System Prompt 上下文动态注入（`buildSystemPrompt`）
-
-> **💡 概念解释：什么是 Prompt？**
->
-> **Prompt**（提示词）= 发给 AI 的"指令"，决定 AI 怎么回答。LLM 对话中通常有两种 Prompt：
->
-> | | **System Prompt** | **User Prompt** |
-> |---|---|---|
-> | **是什么** | 系统级指令，用户看不到 | 用户输入的消息 |
-> | **作用** | 设定 AI 的角色、行为规则、背景知识 | 具体的问题或请求 |
-> | **类比** | 给员工的岗前培训手册 | 员工每天接到的具体任务 |
->
-> **本项目的做法**：每次用户发消息，都把当前地图上的实时灾害数据注入进 System Prompt，AI 才能回答"现在哪个地区最危险"这类问题——这就是下面的"上下文注入"技术。
->
-> **Prompt Engineering**（提示词工程）= 研究如何写出更好的 Prompt，让 AI 输出更准确的内容，是当前 AI 应用开发的核心技能之一。
-
-> **💡 概念解释：什么是上下文注入？**
->
-> LLM 本身只有训练时学到的知识，它不知道你的平台当前有多少条灾害、最新发生了哪些地震。**上下文注入就是在发请求前，把你想让它知道的信息提前塞进 Prompt 里**，让它回答时能参考这些信息。
->
-> LLM 的对话分三种角色：
->
-> | 角色 | 作用 |
-> |---|---|
-> | `system` | 系统指令——告诉 LLM 它是谁、职责是什么、能看到哪些背景数据 |
-> | `user` | 用户发的问题 |
-> | `assistant` | LLM 的回答 |
->
-> 注入就是往 `system` 消息里拼字符串：
-> ```
-> 你是灾害分析助手。
->
-> 📡 当前平台实时数据：
-> - 活跃事件：342 条
-> - 类型分布：EARTHQUAKE(89)、FLOOD(54)、WILDFIRE(31)...
-> - 近期事件：「M6.2 日本本州」地震；「亚马逊洪水」洪水...
->
-> 请结合以上数据回答用户问题。
-> ```
-> 不注入时问"当前全球灾害态势怎么样"，LLM 只能泛泛而谈；注入之后，它能回答"当前平台监控 342 条事件，其中地震 89 起……"
->
-> **本项目的注入时机**：每次用户点击发送 → `useMemo` 从 `hazards` 实时计算 `DisasterContext` → `buildSystemPrompt(ctx)` 拼成字符串 → 作为 `{ role: 'system' }` 发给 OpenAI。每次对话都重新构建，LLM 永远看到最新数据快照。
 
 不是简单地把用户问题转发给 LLM，而是每次请求前，将平台实时监控数据动态拼入 System Prompt：
 
@@ -1309,30 +1068,6 @@ const sendMessage = useCallback(async (text: string) => {
 ```
 
 UI 侧的打字机光标 `▌` 通过 `msg.isStreaming && <span className="ai-cursor">▌</span>` 实现，无需额外定时器。
-
-> **💡 概念解释：Markdown 增量渲染是什么？**
->
-> 就是 AI 回复**一边输出一边被渲染成格式化内容**的过程。拆开理解：
-> - **"增量"**：每收到一个 token，`content` 字符串就变长
-> - **"Markdown 渲染"**：把 `**粗体**`、`### 标题`、`- 列表` 纯文本转成真正的 HTML 标签
->
-> 实际发生的过程：
-> ```
-> 收到 "当"     → content="当"           → <p>当</p>
-> 收到 "前"     → content="当前"          → <p>当前</p>
-> 收到 "**地"   → content="当前**地"      → <p>当前**地</p>   ← 格式还不完整
-> 收到 "震**"   → content="当前**地震**"  → <p>当前<strong>地震</strong></p>  ← 粗体出现
-> ```
->
-> 本项目 `renderMarkdown` 的工作方式：每次 `content` 增长触发重渲染 → **全量重 parse 整个字符串** → React diff 只更新变化的 DOM 节点。
->
-> | | 说明 |
-> |---|---|
-> | **数据是增量的** | `content` 每次 +delta，不断增长 |
-> | **渲染是全量的** | `renderMarkdown` 每次重新 parse 整个字符串 |
-> | **DOM 更新是增量的** | React diff 只改变化的节点 |
->
-> 三者结合，视觉上表现为**文字逐字出现并自动带格式**。
 
 ---
 
@@ -1992,3 +1727,76 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ---
 
+### 八、概念名词速查
+
+> 所有技术名词集中于此，面试前快速过一遍。按主题分组，每条：**是什么 + 本项目怎么用**。
+
+---
+
+#### 并发与异步
+
+**Race Condition（竞态条件）**
+> 两个或多个异步操作同时进行，最终结果取决于它们完成的顺序，而这个顺序不可预测，导致数据错误。本质：程序没有感知异步操作的完成顺序可能与发起顺序不一致，后完成的结果覆盖了先完成的。本项目场景：用户快速切换「地震→洪水→野火」，旧请求晚回来覆盖新数据。
+
+**竞态保护**
+> 防止竞态条件导致数据错乱的机制集合，核心目标：确保最终状态永远对应最新的用户操作。本项目三层：网络层 `AbortController.abort()` 取消旧请求 → 数据层 `Promise.allSettled` 容错聚合 → 状态层 `useRef` 版本号兜底过期回调。
+
+**AbortController**
+> 浏览器原生 Web API，用于取消 `fetch` 请求。`controller.signal` 传给 `fetch`，调 `controller.abort()` 后 fetch 抛 `AbortError`。同一个 controller 可绑多个请求，一次 `abort()` 全部取消。本项目：每次 filter 变化创建新 controller，先 abort 旧请求再发新请求。
+
+**useRef 版本号**
+> 用 `useRef` 维护单调递增数字标记请求代次，异步回调里版本号不匹配则静默丢弃，不执行 `setState`。作用：兜底 AbortController 无法覆盖的场景（第三方 SDK 回调、已 resolve 的 Promise）。与 AbortController 分工：AbortController 是网络层防线，版本号是状态层兜底。
+
+**Promise.all vs Promise.allSettled**
+> `Promise.all`：任一 reject 整体立即失败，适合所有数据缺一不可的场景。`Promise.allSettled`：等全部 settle，每项返回 `{status, value/reason}`，适合多源容错。本项目必须用 `allSettled`：GDACS 一次超时不能让用户连地震数据都看不到。
+
+**fetch**
+> 浏览器内置 HTTP 请求 API，XHR 的现代替代品。Promise-based，支持 `async/await`；原生支持 `ReadableStream`（SSE 依赖它）；用 `AbortController` 取消。本项目两处关键用法：AI 流式 SSE 解析 + 多数据源并发容错聚合。
+
+**RxJS**
+> 用 Observable 流处理异步事件的库。把网络请求、用户事件、定时器抽象成"数据流"，用操作符变换/过滤/合并。擅长防抖+取消+重试组合场景，但打包约 40KB+。本项目选择原生 AbortController 替代，零依赖。
+
+---
+
+#### React 概念
+
+**Hook**
+> React 函数组件里以 `use` 开头的特殊函数，让函数组件能使用状态和生命周期。常用：`useState`（存状态）、`useEffect`（副作用）、`useRef`（不触发渲染的可变值）、`useMemo`（缓存计算）、`useCallback`（缓存函数引用）。两条规则：只能在顶层调用（不能在 if/for 里）；只能在 React 函数里调用。
+
+**自定义 Hook**
+> 把多个内置 Hook 组合成可复用逻辑，以 `use` 开头命名。本项目 `useHazardFetch(filter)` 封装了 `useState + useEffect + AbortController + 版本号`，竞态保护逻辑一行调用。
+
+**Props Drilling（属性钻透）**
+> 为了把数据传给深层组件，不得不让中间每一层都转手传递 props，即使中间组件根本不需要这个数据。症状：中间层被迫知道它不关心的数据；加一个新 prop 整条链都要改签名。解决方案：Context，让深层组件直接消费，跳过中间层。
+
+**Context**
+> React 跨层级数据共享机制，`createContext` 创建频道，`Provider` 在顶部广播，`useContext` 在任意深度收听，无需 props 传递。注意：Context value 变化时所有消费者都重渲染，所以要按职责域拆分细粒度 Context。本项目 4 个：HazardContext / FilterContext / UIContext / NotificationContext。
+
+**Zustand**
+> 极简全局状态库，无 Provider、无 boilerplate，用 selector 函数精确订阅，`filter` 变化不触发只用 `hazards` 的组件重渲染。适合有关联的中型状态。
+
+**Jotai**
+> 原子化状态库，把每个状态拆成独立 `atom`，组件只订阅用到的 atom，更新粒度最细。可派生 atom 自动追踪依赖（类似 `useMemo`）。适合完全独立的高频局部状态。
+
+**三者选择路径**：`useState`（当前规模）→ `Context + useReducer`（层级加深）→ `Zustand`（跨域频繁）→ `Jotai`（极细粒度更新）。
+
+---
+
+#### AI 模块
+
+**BFF（Backend For Frontend）**
+> 专为前端定制的中间层服务，介于前端和真正的后端之间。本项目用 `server.js` 作 BFF 的核心原因：OpenAI API Key 不能暴露在浏览器里（Network 面板可见），由 server.js 保管并代替前端发请求；同时承担 SSE 流转发（`response.body.pipe(res)`）和 CORS 代理。
+
+**Prompt（提示词）**
+> 发给 AI 的"指令"，决定 AI 怎么回答。System Prompt：系统级指令，用户看不到，设定 AI 角色和背景知识（类比岗前培训手册）。User Prompt：用户输入的消息（类比具体任务）。本项目每次请求前动态重建 System Prompt，把实时灾害数据注入其中。
+
+**上下文注入（Dynamic Context Injection）**
+> 在发请求前，把当前运行时数据结构化地拼进 System Prompt，让 LLM 能参考这些信息回答实时问题。区别于 RAG（无向量检索）：直接把结构化数据拼字符串，适合少量、高频更新的实时数据。本项目：把当前灾害事件总数、类型分布、近期代表事件注入每次请求的 System Prompt。
+
+**Markdown 增量渲染**
+> AI 回复一边输出一边被渲染成格式化内容。数据是增量的（每次 +delta）→ 渲染是全量的（每次重 parse 整个字符串）→ DOM 更新是增量的（React diff 只改变化的节点）。三者结合，视觉上文字逐字出现并自动带格式。
+
+**SSE（Server-Sent Events）**
+> 浏览器原生服务器单向推送技术，基于 HTTP 长连接，服务端持续推送，客户端不能反向发送。每条消息 `data: {json}\n\n` 格式。LLM 流式输出用 SSE：每生成一个 token 推一条，形成打字机效果。本项目用原生 `fetch + ReadableStream` 手写解析，不用 EventSource（不支持 POST 和自定义 Header）。
+
+---
