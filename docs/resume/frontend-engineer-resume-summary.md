@@ -1773,7 +1773,39 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 #### Q31：React 19 的 Suspense 有什么变化？怎么用？
 
-> **Suspense 是什么**：让组件在异步内容（懒加载、数据请求）尚未就绪时，自动显示 fallback UI，就绪后无缝切换，无需手写 loading 状态。
+> **Suspense 是什么**：React 的「等待边界」组件，让 UI 能优雅地处理「还没准备好」的状态——把「不知道何时就绪」的事情交给 React 托管，无需手写 loading 状态。
+>
+> **传统写法 vs Suspense 对比：**
+> ```tsx
+> // ❌ 传统写法：自己管理 loading 状态，每个组件都要写一遍
+> function HazardList() {
+>   const [data, setData] = useState(null);
+>   const [loading, setLoading] = useState(true);
+>
+>   useEffect(() => {
+>     fetchHazards().then(d => { setData(d); setLoading(false); });
+>   }, []);
+>
+>   if (loading) return <Spinner />;  // 手写
+>   return <List data={data} />;
+> }
+>
+> // ✅ Suspense 写法：loading 逻辑由框架接管，组件只管渲染
+> function App() {
+>   return (
+>     <Suspense fallback={<Spinner />}>  {/* fallback = 等待时显示什么 */}
+>       <HazardList />                   {/* 没准备好时自动显示 Spinner */}
+>     </Suspense>
+>   );
+> }
+> ```
+>
+> **两种触发方式：**
+>
+> | 场景 | 触发方式 |
+> |---|---|
+> | **代码懒加载** | `React.lazy(() => import('./Component'))` |
+> | **数据请求**（React 19） | `use(somePromise)`，Promise pending 时自动挂起 |
 >
 > **React 19 的核心变化**：
 >
