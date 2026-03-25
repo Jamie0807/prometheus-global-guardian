@@ -1689,11 +1689,32 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 灾害数据 5 分钟刷新一次，每次实际变化的点位只有少量（相对 10w 总量），diff 机制让 GPU 只处理极少数变化，更新耗时从 800ms 降到 ~20ms，刷新完全无感知。
 
-#### Q7：为什么不用 requestIdleCallback 代替 Web Worker？
+#### Q7：什么是 Web Worker？
+
+> **Web Worker** 是浏览器提供的**后台线程机制**，让 JavaScript 可以在主线程之外开一个独立线程运行代码。
+>
+> JavaScript 本身是单线程的——渲染、事件响应、数据处理都挤在主线程。一旦主线程被耗时操作占用，页面就会冻结：
+>
+> ```
+> 没有 Worker（主线程阻塞）：
+> 渲染 → [处理 10w 条数据，400ms，UI 冻结] → 渲染 → ...
+>
+> 有 Worker（并行处理）：
+> 主线程：渲染 → 事件响应 → 渲染 → ...（始终流畅）
+> Worker：  [处理 10w 条数据，80ms，子线程] → postMessage 返回结果
+> ```
+>
+> **两条核心限制**：
+> 1. **不能操作 DOM**：Worker 里没有 `document` / `window`，只能做纯计算
+> 2. **通过 `postMessage` 通信**：主线程与 Worker 之间传递数据是**拷贝**（不共享内存），大数据可用 `ArrayBuffer` 转移所有权避免拷贝开销
+>
+> **本项目中的用法**：把格式转换、去重、异常坐标过滤这些纯数据处理逻辑放进 Worker，主线程只接收处理好的干净数据直接调 `source.setData()`。处理 10w 条约 80ms，但完全在子线程，主线程不感知，地图交互始终流畅。
+
+#### Q8：为什么不用 requestIdleCallback 代替 Web Worker？
 
 > `requestIdleCallback` 仍然运行在**主线程**，只是在浏览器空闲时才执行。数据量大时处理耗时长，哪怕分批，也会占用主线程的帧时间。Web Worker 是**真正的并行子线程**，与主线程完全隔离，处理数据时不影响渲染和交互。
 
-#### Q8：什么是 LOD？
+#### Q9：什么是 LOD？
 
 > LOD（Level of Detail，细节层次）= 根据观察距离动态调整渲染精度。在地图里体现为根据缩放级别调整渲染方式：
 > - 远景（zoom 小）：用 WebGL cluster 只渲染聚合圆，GPU 处理，帧率不受点位数影响
@@ -1702,7 +1723,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 核心思想：**用户看不到的细节不需要渲染，把渲染资源留给用户能感知到的部分**。
 
-#### Q9：deck.gl 是什么？和 Mapbox 是什么关系？
+#### Q10：deck.gl 是什么？和 Mapbox 是什么关系？
 
 > **deck.gl** 是 Uber 开源的**大规模地理数据 WebGL 可视化框架**，专为海量地理数据高性能绘制设计，底层同样基于 WebGL。
 >
@@ -1737,13 +1758,13 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ### 三、并发控制与竞态（高频）
 
-#### Q10：什么是 Race Condition？在项目中是什么场景？
+#### Q11：什么是 Race Condition？在项目中是什么场景？
 
 > Race Condition（竞态条件）= 两个或多个异步操作同时进行，最终结果取决于它们完成的顺序，而这个顺序不可预测，导致数据错误。
 >
 > 项目里的具体场景：用户连续切换筛选条件——比如快速点「地震 → 洪水 → 野火」，每次切换都发出 4 个新请求。如果 DisasterAware 响应慢（3s+），用户已经切换到「野火」，但地震的请求才刚回来，`setState` 把地图覆盖成地震数据——用户选的是野火，看到的是地震，数据完全错误，且这类 bug 偶发、难以稳定复现。
 
-#### Q11：你用了什么方案解决竞态？
+#### Q12：你用了什么方案解决竞态？
 
 > 三层方案：
 >
@@ -1753,11 +1774,11 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > **第三层（状态层）**：用 `useRef` 维护单调递增的请求版本号作为兜底。有些异步操作无法 abort（比如第三方 SDK 回调），版本号机制确保只有当前版本号匹配时才调 `setState`，其余静默丢弃。
 
-#### Q12：AbortController abort 之后，请求真的立刻停止了吗？
+#### Q13：AbortController abort 之后，请求真的立刻停止了吗？
 
 > 不完全是。已经发出的网络数据包无法召回（TCP 层面），但浏览器会**忽略响应**并向 fetch 的 Promise 抛出 `AbortError`，不再消耗 JavaScript 处理时间，也不会触发 `.then()` 回调。所以 abort 的作用是：**阻止响应数据进入 JavaScript 执行链**，而不是物理撤回网络包。
 
-#### Q13：Promise.all 和 Promise.allSettled 的区别？
+#### Q14：Promise.all 和 Promise.allSettled 的区别？
 
 > | | `Promise.all` | `Promise.allSettled` |
 > |---|---|---|
@@ -1771,7 +1792,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ### 四、状态管理（高频）
 
-#### Q14：什么是 Props Drilling？你是怎么避免的？
+#### Q15：什么是 Props Drilling？你是怎么避免的？
 
 > Props Drilling（属性钻透）= 为了把数据传给深层组件，不得不让中间每一层都转手传递 props，即使这些中间组件根本不使用这个数据。
 >
@@ -1783,17 +1804,17 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 每个 Context 配一个自定义 Hook（`useHazards()`、`useFilter()` 等）作为唯一消费入口，组件直接调 Hook 拿数据，不经过任何中间层传递。`App.tsx` 保持在 150 行以内，中间层组件的 props 签名干净。
 
-#### Q15：Context 拆分为什么能减少重渲染？
+#### Q16：Context 拆分为什么能减少重渲染？
 
 > React Context 的机制是：Context value 变化时，**所有订阅了该 Context 的组件都会重渲染**。如果把所有状态放在一个 Context 里，`filter` 字段变化会导致只关心 `hazards` 的 `StatisticsCard` 也重渲染。
 >
 > 拆成 4 个 Context 后，`filter` 变化只触发 `FilterContext` 的消费者重渲染，`StatisticsCard` 只订阅 `HazardContext`，完全隔离。配合 `React.memo` 和 `useMemo` 稳定 value 引用，整体重渲染次数降低约 60%。
 
-#### Q16：为什么 Provider 的 value 要用 useMemo 包裹？
+#### Q17：为什么 Provider 的 value 要用 useMemo 包裹？
 
 > Provider 的 `value` 如果直接写成对象字面量（`value={{ state, dispatch }}`），每次父组件渲染都会创建一个新的对象引用，React 会认为 Context value 发生了变化，触发所有消费者重渲染——即使 `state` 和 `dispatch` 本身没有任何变化。用 `useMemo` 包裹，只有 `state` 真正变化时才生成新对象，避免无意义的重渲染。
 
-#### Q17：为什么不用 Redux？Zustand 和 Jotai 有什么区别？
+#### Q18：为什么不用 Redux？Zustand 和 Jotai 有什么区别？
 
 > **不用 Redux**：项目体量中等，Redux 的 action / reducer / selector 分层 boilerplate 较重，Context + useReducer 在这个规模已经足够，且零依赖。
 >
@@ -1811,7 +1832,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ### 五、AI 模块（加分题）
 
-#### Q18：介绍 AI 智能分析模块的整体实现
+#### Q19：介绍 AI 智能分析模块的整体实现
 
 > 整体分三层：
 >
@@ -1821,7 +1842,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > **第三层 组件层**（`AIChatAssistant.tsx`）：发消息时先插入 `content: '', isStreaming: true` 占位消息，`onChunk` 每次追加 delta 触发重渲染，`MessageBubble` 做 Markdown 增量渲染，`onDone` 时 `isStreaming` 置 false，光标消失。
 
-#### Q19：什么是 SSE？为什么不用 WebSocket？
+#### Q20：什么是 SSE？为什么不用 WebSocket？
 
 > **SSE（Server-Sent Events）** 是浏览器原生支持的**服务器单向推送技术**，服务端通过一条持久 HTTP 长连接持续向客户端推送数据，客户端无需反复轮询，也无法通过同一连接反向发送数据。
 >
@@ -1844,7 +1865,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > - SSE 基于普通 HTTP，天然兼容现有代理、负载均衡和 CDN；WebSocket 需要服务端特殊支持
 > - 实现更简单，用原生 `fetch + ReadableStream` 即可，无需握手协议和心跳维持
 
-#### Q20：为什么不用 EventSource？
+#### Q21：为什么不用 EventSource？
 
 > `EventSource` 是浏览器原生 SSE API，但有两个关键限制：
 > 1. **只支持 GET 请求**，无法发 POST body（LLM 需要在 body 里传 messages 历史）
@@ -1852,13 +1873,13 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 所以用原生 `fetch + ReadableStream` 手写 SSE 解析，完全控制请求方式和 Header。
 
-#### Q21：打字机效果和 Markdown 增量渲染是怎么实现的？
+#### Q22：打字机效果和 Markdown 增量渲染是怎么实现的？
 
 > **打字机效果**：发消息时在 messages 数组里插入一条 `{ content: '', isStreaming: true }` 的占位消息，每次 `onChunk` 回调把 delta 追加到 `content`，React 检测到 state 变化触发重渲染，视觉上就是文字逐渐出现。`onDone` 时把 `isStreaming` 置为 false，光标（`▌`）消失。
 >
 > **Markdown 增量渲染**：`MessageBubble` 组件对 `content` 字符串做实时解析（正则匹配加粗/标题/列表/表格/分割线），每次 chunk 到来触发重渲染，React diff 只更新变化的 DOM 节点，不是整体替换。视觉上 Markdown 格式随文字流式出现，而不是等全部内容到了才格式化。
 
-#### Q22：动态上下文注入是 RAG 吗？
+#### Q23：动态上下文注入是 RAG 吗？
 
 > 不是标准的 RAG（Retrieval-Augmented Generation）。RAG 的核心是**向量检索**：把文档分块、embedding 后存入向量数据库，查询时先检索最相关的 chunk，再注入 Prompt。
 >
@@ -1868,7 +1889,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ### 六、工程化与 API 集成
 
-#### Q23：bundle 体积从 669KB 降到 71KB 是怎么做的？
+#### Q24：bundle 体积从 669KB 降到 71KB 是怎么做的？
 
 > 两个核心手段：
 >
@@ -1878,7 +1899,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 结合 Vite 的 Tree Shaking（按需导入，移除未使用代码），最终 gzip 后从 669KB 降到 71KB，降幅 89%。
 
-#### Q24：OAuth 2.0 Token 自动刷新是怎么做的？
+#### Q25：OAuth 2.0 Token 自动刷新是怎么做的？
 
 > `authFetch` 是对 `fetch` 的封装：
 > 1. 正常请求时带 `Authorization: Bearer ${accessToken}` Header
@@ -1887,7 +1908,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > 4. 拿到新 token 后**重试原始请求**，对调用方完全透明
 > 5. accessToken 和 refreshToken 存在 localStorage，减少每次请求都需要重新鉴权的频率
 
-#### Q25：4 个异构数据源如何统一格式？
+#### Q26：4 个异构数据源如何统一格式？
 
 > 通过 **BFF 适配器层**：
 > - 每个数据源对应一个 adapter 函数（如 `fetchDisasterAwareHazards`、`fetchUSGSEarthquakes`）
@@ -1899,7 +1920,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ### 七、核心概念速答
 
-#### Q26：什么是 WebGL？
+#### Q27：什么是 WebGL？
 
 > **WebGL**（Web Graphics Library）是浏览器内置的**调用 GPU 的 JavaScript API**，基于 OpenGL ES 2.0 标准，让网页可以直接使用显卡做硬件加速渲染，无需插件。
 >
@@ -1930,7 +1951,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > 4. **deck.gl Tile3DLayer** — WebGL 渲染 3D Tiles 建筑模型
 > 5. **fill-extrusion** — Mapbox 原生 3D 建筑拉伸，着色器计算高度
 
-#### Q27：什么是 BFF？为什么要用它？
+#### Q28：什么是 BFF？为什么要用它？
 
 > BFF（Backend for Frontend）= 专为前端定制的代理/聚合层，介于前端和真正的后端服务之间。
 >
@@ -1939,7 +1960,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > 2. **格式适配**：把 OpenAI 的 SSE 流直接 pipe 给前端，前端无需二次处理
 > 3. **代理 CORS**：DisasterAware 等第三方 API 不允许浏览器直接跨域访问，由 BFF 转发
 
-#### Q28：什么是 Hook？自定义 Hook 的规则是什么？
+#### Q29：什么是 Hook？自定义 Hook 的规则是什么？
 
 > Hook = React 函数组件里**复用状态逻辑**的机制，以 `use` 开头的函数。内置 Hook 有 `useState`、`useEffect`、`useRef`、`useMemo` 等。
 >
@@ -1949,7 +1970,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > 1. **只能在函数组件或自定义 Hook 的顶层调用**，不能在条件语句、循环或普通函数里调用
 > 2. **只能在 React 函数组件或自定义 Hook 里调用**，不能在普通 JS 函数里调用
 
-#### Q29：fetch 和 XMLHttpRequest 的区别？
+#### Q30：fetch 和 XMLHttpRequest 的区别？
 
 > | | `fetch` | `XMLHttpRequest` |
 > |---|---|---|
