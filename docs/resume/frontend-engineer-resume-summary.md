@@ -1985,6 +1985,120 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > **一句话总结**：React Compiler = 把「写业务逻辑」和「写性能优化」分开——开发者只管业务，编译器负责性能，彻底消除因遗漏 `useMemo` 依赖项导致的 bug。
 
+#### Q34：React 19 状态管理方案有哪些？如何在 Zustand 和 Context 之间选择？
+
+> **状态管理全景**：
+>
+> | 方案 | 包体积 | 适用规模 | 核心特点 |
+> |---|---|---|---|
+> | `useState` + props | 0（原生） | 单组件 / 简单父子 | 零依赖，数据流最清晰 |
+> | `Context` + `useReducer` | 0（原生） | 中小型，域边界清晰 | 跨层级共享，按域拆分 |
+> | **Zustand** | ~1KB gzip | 中大型，跨域状态频繁 | 无 Provider，selector 精确订阅 |
+> | **Jotai** | ~3KB gzip | 高频局部更新 | 原子模型，粒度最细 |
+> | Redux Toolkit | ~11KB gzip | 超大型，严格单向数据流 | DevTools 完善，boilerplate 重 |
+>
+> ---
+>
+> **Context + useReducer — 本项目实际方案**
+>
+> 按**职责域**拆分 4 个独立 Context，每个配自定义 Hook 作为唯一消费入口：
+>
+> ```tsx
+> // HazardContext：灾害数据域
+> const HazardContext = createContext<{ state: HazardState; dispatch: Dispatch } | null>(null);
+>
+> export function HazardProvider({ children }: { children: ReactNode }) {
+>   const [state, dispatch] = useReducer(hazardReducer, initialState);
+>   // useMemo 稳定 value 引用，防止 Provider 每次渲染都产生新对象
+>   const value = useMemo(() => ({ state, dispatch }), [state]);
+>   return <HazardContext.Provider value={value}>{children}</HazardContext.Provider>;
+> }
+>
+> // 封装消费 Hook，禁止裸用 useContext
+> export function useHazards() {
+>   const ctx = useContext(HazardContext);
+>   if (!ctx) throw new Error('useHazards must be used within HazardProvider');
+>   return ctx;
+> }
+> ```
+>
+> Context 拆分的性能收益：`filter` 变化只触发订阅 `FilterContext` 的组件，`StatisticsCard` 只订阅 `HazardContext`，完全不受筛选切换影响，重渲染次数降低 ~60%。
+>
+> ---
+>
+> **Zustand — 规模扩大时的升级路径**
+>
+> ```tsx
+> // 无 Provider，无 boilerplate，直接定义 store
+> const useHazardStore = create<HazardStore>((set) => ({
+>   hazards: [],
+>   filter: 'ALL',
+>   loading: false,
+>   setFilter: (filter) => set({ filter }),
+>   setHazards: (hazards) => set({ hazards, loading: false }),
+> }));
+>
+> // selector 精确订阅：filter 变化不会触发 MapView 重渲染
+> function MapView() {
+>   const hazards = useHazardStore(state => state.hazards);  // 只订阅 hazards
+>   // ...
+> }
+>
+> function StatusPanel() {
+>   const filter = useHazardStore(state => state.filter);    // 只订阅 filter
+>   const setFilter = useHazardStore(state => state.setFilter);
+>   // ...
+> }
+> ```
+>
+> ---
+>
+> **Zustand vs Context + useReducer 深度对比**：
+>
+> | 维度 | Context + useReducer | Zustand |
+> |---|---|---|
+> | **包体积** | 0（内置） | ~1KB gzip |
+> | **Provider 嵌套** | 需要，多域时嵌套深 | **无需 Provider** |
+> | **精确订阅** | 需手动拆分 Context 域 | selector 函数，任意粒度 |
+> | **跨域访问** | 需嵌套多个 Context | 一个 store，按需 selector |
+> | **异步 action** | `useEffect` 手写 | middleware（thunk/immer）支持 |
+> | **DevTools** | 需手动接入 | 内置 Redux DevTools 支持 |
+> | **迁移成本** | 低（原生） | 极低，可渐进替换单个 Context |
+> | **适用信号** | 域边界清晰、状态不频繁跨域 | 状态频繁跨域、跨多个 Context |
+>
+> **何时从 Context 迁移到 Zustand？** 出现以下任一信号就该考虑：
+> - 组件需要同时订阅 3 个以上 Context
+> - `Provider` 嵌套层数 > 4 层，形成「Provider 地狱」
+> - 某个状态变化需要同步更新多个域的数据
+> - 异步 action 逻辑复杂，写在 `useEffect` 里难以维护
+>
+> **迁移策略（渐进式）**：只改自定义 Hook 内部，消费组件零感知：
+> ```tsx
+> // 迁移前：useHazards() 内部读 Context
+> export function useHazards() {
+>   return useContext(HazardContext)!;
+> }
+>
+> // 迁移后：useHazards() 内部改读 Zustand store，消费组件代码不用改一行
+> export function useHazards() {
+>   const hazards = useHazardStore(state => state.hazards);
+>   const dispatch = useHazardStore(state => state.dispatch);
+>   return { state: { hazards }, dispatch };
+> }
+> ```
+>
+> **选择路径**：
+> ```
+> 单组件局部状态         → useState
+> 父子层级不深           → props（直接传）
+> 跨层级 / 按域隔离      → Context + useReducer（本项目当前方案）
+> 跨域频繁 / Provider 地狱 → Zustand（首选升级方向）
+> 高频局部更新（地图点位）  → Jotai（原子粒度最细）
+> 超大型团队 / 严格架构    → Redux Toolkit
+> ```
+>
+> _🎤 **口述提示**：「我们项目用的是 Context + useReducer，按职责域拆成 4 个 Context，重渲染降了 60%。如果组件树继续扩大、状态跨域更频繁，我的升级方向是 Zustand——好处是无 Provider 嵌套、selector 精确订阅更灵活，而且通过封装自定义 Hook，迁移时消费组件一行代码不用改。」_
+
 ---
 
 ### 九、概念名词速查
