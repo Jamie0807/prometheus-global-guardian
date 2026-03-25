@@ -1769,9 +1769,208 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ---
 
-### 八、概念名词速查
+### 八、React 19 进阶特性
+
+#### Q31：React 19 的 Suspense 有什么变化？怎么用？
+
+> **Suspense 是什么**：让组件在异步内容（懒加载、数据请求）尚未就绪时，自动显示 fallback UI，就绪后无缝切换，无需手写 loading 状态。
+>
+> **React 19 的核心变化**：
+>
+> | | React 16–18 | React 19 |
+> |---|---|---|
+> | **服务端支持** | 仅客户端 | 完整 SSR Streaming 支持 |
+> | **与 `use()` 配合** | ❌ 不支持 | ✅ `use(promise)` 直接触发 Suspense |
+> | **兄弟节点行为** | 触发时隐藏全部兄弟节点 | 触发时**不再隐藏**已渲染的兄弟节点 |
+> | **Transition 集成** | 手动 `startTransition` | `useTransition` + Suspense 自动协调 |
+>
+> **用法一：代码分割（懒加载）**
+> ```tsx
+> // 首屏不下载 AIChatAssistant，用户触发时才加载
+> const AIChatAssistant = React.lazy(() => import('./components/AIChatAssistant'));
+>
+> function App() {
+>   return (
+>     <Suspense fallback={<div className="loading-spinner" />}>
+>       <AIChatAssistant />
+>     </Suspense>
+>   );
+> }
+> ```
+>
+> **用法二：数据请求（React 19 `use()` 配合）**
+> ```tsx
+> // React 19：Suspense 边界捕获 promise 挂起
+> function HazardList({ filterPromise }: { filterPromise: Promise<Hazard[]> }) {
+>   const hazards = use(filterPromise);  // 挂起时自动触发上层 Suspense
+>   return <ul>{hazards.map(h => <li key={h.id}>{h.title}</li>)}</ul>;
+> }
+>
+> function App() {
+>   return (
+>     <Suspense fallback={<SkeletonList />}>
+>       <HazardList filterPromise={fetchHazards(filter)} />
+>     </Suspense>
+>   );
+> }
+> ```
+>
+> **用法三：搭配 `useTransition` 避免 loading 闪烁**
+> ```tsx
+> function FilterBar() {
+>   const [isPending, startTransition] = useTransition();
+>   const [filter, setFilter] = useState('ALL');
+>
+>   const handleChange = (newFilter: string) => {
+>     startTransition(() => {
+>       setFilter(newFilter);  // 标记为低优先级，UI 不立即挂起
+>     });
+>   };
+>
+>   return (
+>     <>
+>       <select onChange={e => handleChange(e.target.value)} />
+>       {isPending && <span>更新中...</span>}  {/* 细粒度 pending 状态 */}
+>     </>
+>   );
+> }
+> ```
+>
+> **本项目中的用法**：`React.lazy() + Suspense` 包裹 `AIChatAssistant`、`AnalyticsPage`、`SaveReportModal`、`SettingsModal`，首屏 bundle 从 669KB 降到 71KB（gzip），AI 面板等不在首屏的大组件按需加载。
+
+#### Q32：React 19 的 `use()` Hook 是什么？和 `useEffect` + `useState` 有什么区别？
+
+> **`use()` 是什么**：React 19 新增的 Hook，可以在渲染阶段直接「读取」一个 Promise 或 Context 的值。读取 Promise 时，若 Promise 未 resolve，组件自动挂起并触发上层 `<Suspense>` 显示 fallback。
+>
+> **核心特性**：`use()` 是目前唯一**可以在条件语句或循环里调用**的 Hook（其他 Hook 都只能在顶层调用）。
+>
+> **读取 Promise：**
+> ```tsx
+> // 传统写法：命令式，需要手写 loading/error 状态
+> function HazardList({ filter }: { filter: string }) {
+>   const [hazards, setHazards] = useState<Hazard[]>([]);
+>   const [loading, setLoading] = useState(true);
+>
+>   useEffect(() => {
+>     setLoading(true);
+>     fetchHazards(filter).then(data => {
+>       setHazards(data);
+>       setLoading(false);
+>     });
+>   }, [filter]);
+>
+>   if (loading) return <Spinner />;
+>   return <ul>{hazards.map(h => <li key={h.id}>{h.title}</li>)}</ul>;
+> }
+>
+> // React 19 写法：声明式，Suspense 接管 loading，代码极简
+> function HazardList({ hazardsPromise }: { hazardsPromise: Promise<Hazard[]> }) {
+>   const hazards = use(hazardsPromise);  // 未 resolve 时自动挂起
+>   return <ul>{hazards.map(h => <li key={h.id}>{h.title}</li>)}</ul>;
+>   // 无需手写 loading/error，由 Suspense + ErrorBoundary 处理
+> }
+> ```
+>
+> **读取 Context（支持条件调用）：**
+> ```tsx
+> function ThemeButton({ showTheme }: { showTheme: boolean }) {
+>   // ✅ use() 可以在 if 里调用，useContext 不行
+>   if (showTheme) {
+>     const theme = use(ThemeContext);
+>     return <button style={{ color: theme.primary }}>按钮</button>;
+>   }
+>   return <button>按钮</button>;
+> }
+> ```
+>
+> **对比总结：**
+>
+> | | `useEffect` + `useState` | `use(promise)` |
+> |---|---|---|
+> | **代码量** | 需手写 loading / error / cleanup | 零样板，Suspense 接管 |
+> | **数据流** | 命令式（副作用触发） | 声明式（渲染驱动） |
+> | **条件调用** | ❌ 不能在 if/for 里 | ✅ 可以 |
+> | **适合场景** | 副作用（订阅、定时器、DOM操作） | 纯数据读取 |
+>
+> **什么时候还用 `useEffect`？**：凡是有**副作用**的场景（订阅 WebSocket、注册事件监听、手动操控 DOM）仍然用 `useEffect`，`use()` 只负责「读数据」。
+
+#### Q33：React Compiler 是什么？解决了什么问题？
+
+> **是什么**：React 19 引入的**编译时自动优化工具**（原名 React Forget），在构建阶段自动分析组件，给需要缓存的值和函数**自动插入 `useMemo` / `useCallback`**，无需开发者手动优化。
+>
+> **解决的核心问题**：React 默认每次父组件重渲染，子组件也跟着重渲染，即使 props 没变。开发者过去需要手动用 `React.memo` + `useCallback` + `useMemo` 控制渲染边界，容易遗漏、容易过度优化、容易写错依赖数组。
+>
+> **手动优化 vs Compiler 自动优化：**
+> ```tsx
+> // ❌ 手动优化：boilerplate 多，useMemo 依赖数组容易写错
+> function MapView({ hazards, filter, onSelect }: Props) {
+>   const filtered = useMemo(
+>     () => hazards.filter(h => h.type === filter),
+>     [hazards, filter]   // 忘了写 filter → bug；多写了 → 过度缓存
+>   );
+>   const handleClick = useCallback(
+>     (id: string) => onSelect(id),
+>     [onSelect]          // onSelect 每次父组件渲染都是新引用 → 缓存失效
+>   );
+>   return <Map data={filtered} onClick={handleClick} />;
+> }
+>
+> // ✅ React Compiler：直接写业务逻辑，编译器自动识别不变的值并缓存
+> function MapView({ hazards, filter, onSelect }: Props) {
+>   const filtered = hazards.filter(h => h.type === filter);  // 编译器自动 memoize
+>   const handleClick = (id: string) => onSelect(id);        // 编译器自动稳定引用
+>   return <Map data={filtered} onClick={handleClick} />;
+> }
+> ```
+>
+> **核心原理**：Compiler 在编译时做**值不变性分析**——追踪每个变量在每次渲染中是否可能变化，对「不变的计算」自动生成类似 `useMemo` 的缓存逻辑，对「不变的函数」自动稳定引用。
+>
+> **使用方式**：在 Vite/Babel 插件配置里启用，现有代码**零改动**直接受益：
+> ```typescript
+> // vite.config.ts
+> import { defineConfig } from 'vite';
+> import react from '@vitejs/plugin-react';
+>
+> export default defineConfig({
+>   plugins: [
+>     react({
+>       babel: {
+>         plugins: [['babel-plugin-react-compiler', {}]],
+>       },
+>     }),
+>   ],
+> });
+> ```
+>
+> **注意事项与局限**：
+>
+> | | 说明 |
+> |---|---|
+> | **前提条件** | 代码必须遵守 React 规则（Hook 规则、纯函数组件）；有副作用的组件可能跳过优化 |
+> | **不能完全替代 `useCallback`** | 跨组件传递回调、与第三方库配合时仍可能需要手动控制 |
+> | **当前状态（2025）** | 已在 React 19 正式发布，Meta 内部大规模使用；生产可用，但新项目建议逐步引入 |
+> | **能否和手动 memo 共存** | 能，Compiler 不会影响已有的 `useMemo` / `useCallback`；可混用 |
+>
+> **一句话总结**：React Compiler = 把「写业务逻辑」和「写性能优化」分开——开发者只管业务，编译器负责性能，彻底消除因遗漏 `useMemo` 依赖项导致的 bug。
+
+---
+
+### 九、概念名词速查
 
 > 所有技术名词集中于此，面试前快速过一遍。按主题分组，每条：**是什么 + 本项目怎么用**。
+
+---
+
+#### React 19 新特性
+
+**Suspense**
+> 让组件在异步内容未就绪时自动显示 fallback，就绪后无缝切换，无需手写 loading 状态。React 19 新增：兄弟节点不再被隐藏、完整 SSR Streaming 支持、与 `use()` + `useTransition` 深度集成。本项目：`React.lazy() + Suspense` 懒加载 AI 面板等大组件，首屏 bundle 从 669KB → 71KB。
+
+**`use()` Hook**
+> React 19 新增，在渲染阶段直接「读取」Promise 或 Context 的值。读 Promise 时若未 resolve 自动触发上层 Suspense；读 Context 时可在条件语句里调用（唯一可条件调用的 Hook）。对比 `useEffect + useState`：代码量极少，声明式，Suspense 接管 loading/error。仍需 `useEffect` 的场景：订阅、定时器、DOM 操作等副作用。
+
+**React Compiler（React Forget）**
+> React 19 的编译时自动优化工具，在构建阶段分析组件，自动插入 `useMemo` / `useCallback`，无需开发者手动优化。原理：编译时做值不变性分析，追踪哪些计算/函数在每次渲染中不变，自动生成缓存逻辑。使用：Vite/Babel 插件一行启用，现有代码零改动受益。局限：要求代码遵守 React 纯函数规则，跨组件传回调等场景仍可能需手动控制。
 
 ---
 
