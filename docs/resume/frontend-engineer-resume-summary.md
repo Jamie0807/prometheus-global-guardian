@@ -1645,7 +1645,43 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 本项目用 `allSettled`：4 个数据源哪个失败都静默降级，成功的数据正常合并。
 
----
+#### Q：简单介绍一下 Promise 的状态机机制，以及 all 和 allSettled 的区别。
+
+> **1. Promise 的状态机机制**  
+> Promise 本质上是一个状态机，有三种状态：  
+> - **pending（进行中）**：初始状态，异步操作尚未完成  
+> - **fulfilled（已成功）**：操作成功结束并返回结果  
+> - **rejected（已失败）**：操作失败，返回失败原因  
+> 状态一旦从 pending 转为 fulfilled 或 rejected，就会被“锁定”下来，不能再变。这保证了 Promise 的可靠性和一致性。Promise 的 then 和 catch 回调会在状态变成 fulfilled 或 rejected 时被调用。
+>
+> **2. Promise.all 和 Promise.allSettled 的区别**  
+> - **Promise.all**：接收一组 Promise，必须全部成功才返回所有结果，否则只要有一个失败就立即 reject，返回第一个失败原因。常用于所有任务都成功才算整体成功的场景。  
+> - **Promise.allSettled**：接收一组 Promise，等待全部完成，无论成功还是失败。返回结果数组，每一项包含该 Promise 的最终状态（fulfilled/rejected）和对应的值或原因。常用于需要收集所有异步结果，不关心有没有失败的场景。
+>
+> **总结：**  
+> - Promise 是三态状态机且状态不可逆  
+> - all 是“全成一成”，有一个失败就失败；  
+> - allSettled 是“收集所有结果”，每个都给出最终的状态。
+
+
+#### Q：在处理多个 AI 模型并行调用时，Promise.all 和 Promise.allSettled 有什么区别？
+
+> 在多个 AI 模型并行调用（比如批量请求多个 AI 接口）时：
+>
+> **Promise.all**
+> - 所有模型的请求（Promise）都成功才返回全部结果；
+> - 只要有一个模型失败，整体立即 reject，无法获得其他模型的结果，处理流程提前中断。
+> - 适合：必须都成功才算通过的场景，比如所有模型结果缺一不可。
+>
+> **Promise.allSettled**
+> - 等待所有模型请求完成，不管成功还是失败；
+> - 返回每个模型的执行结果（成功或失败及其原因），可以逐个分析；
+> - 不会因个别模型失败而影响整体流程。
+> - 适合：希望了解所有模型执行情况，比如部分失败也要收集全部状态。
+>
+> **面试总结句式：**
+> 使用 Promise.all 时，若有一个模型调用失败，整体结果就被拒绝，无法拿到其他模型的成功结果。而 Promise.allSettled 能收集所有模型的最终状态和输出，更有利于分析和容错。因此，实际业务中并行多模型调用通常推荐 Promise.allSettled，方便整体监控和后续处理。
+
 
 ### 四、状态管理（高频）
 
