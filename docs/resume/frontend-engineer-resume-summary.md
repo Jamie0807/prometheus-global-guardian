@@ -1929,7 +1929,12 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ### 六、工程化与 API 集成
 
-#### Q24：bundle 体积从 669KB 降到 71KB 是怎么做的？
+
+#### Q24：manualChunks 是怎么实现的？
+
+> 在我的项目中，`manualChunks` 主要用于 Vite 的代码分割优化。在 `vite.config.ts` 里，我根据路由和依赖库进行 chunk 拆分。比如把 Mapbox GL、Recharts、OpenAI 等大型依赖单独打成独立 chunk，首屏只加载业务代码，地图库等按需加载。这样可以显著减少首屏包体积，提高加载速度。最终结合 Tree Shaking 和懒加载，gzip 后 bundle 体积从 669KB 降到 71KB，提升了 89% 的性能。
+
+#### Q25：bundle 体积从 669KB 降到 71KB 是怎么做的？
 
 > 两个核心手段：
 >
@@ -1958,7 +1963,19 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 ---
 
+
 ### 七、核心概念速答
+
+#### Q27：Tree Shaking 是什么？你的项目中怎么用的？
+
+> **Tree Shaking** 是一种在打包阶段**移除未被引用（未使用）代码**的优化技术，常见于 ES Module 体系。它通过静态分析 import/export，找出哪些函数、变量、模块没有被实际用到，然后在最终 bundle 里剔除这些“死代码”，从而减小包体积、提升加载速度。
+>
+> **在本项目中的应用**：
+> - 使用 Vite + ESBuild 打包，天然支持 Tree Shaking。
+> - 只按需 import 需要的函数、组件和第三方库（如 lodash、date-fns、echarts 等），避免全量引入。
+> - 结合 manualChunks 和 React.lazy 懒加载，未被引用的代码和 chunk 会被自动剔除。
+> - 通过分析打包报告（如 vite-plugin-visualizer），持续优化依赖引用方式，确保无用代码不会进入最终产物。
+> - 实际效果：配合 Tree Shaking，bundle 体积从 669KB 降到 71KB。
 
 #### Q27：什么是 WebGL？
 
