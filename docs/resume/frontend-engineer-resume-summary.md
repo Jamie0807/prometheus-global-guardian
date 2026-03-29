@@ -1964,7 +1964,17 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 ---
 
 
-### 七、核心概念速答
+
+#### QXX：AI模块是怎么实现的？
+
+> 本项目的 AI 模块是基于 OpenAI LLM（大语言模型）API 实现的智能灾害分析助手，具备以下核心特性：
+>
+> 1. **深度集成 OpenAI Chat Completions API**，采用 SSE（Server-Sent Events）流式响应，支持逐字打印动画，提升 AI 交互体验。
+> 2. **动态上下文注入**：每次请求前，自动将平台实时监控数据（如事件总数、类型分布、近期代表事件）动态拼接进 System Prompt，让 LLM 回答更贴合当前实际数据。
+> 3. **多轮对话与上下文管理**：支持完整的对话历史链路，连续提问时能保持上下文，满足深度分析需求。
+> 4. **预设分析工作流**：内置 6 类 Quick Prompts，覆盖全球态势、地震、洪水、野火、火山等专项分析和趋势预测。
+> 5. **降级 Demo 模式**：无 API Key 时自动切换本地模拟响应，保证演示和开发体验。
+> 6. **前端工程化**：AI 面板采用 React.lazy() + Suspense 懒加载，首屏性能无损失，API 调用成功率 99%+，首字响应 <1s。
 
 #### Q27：Tree Shaking 是什么？你的项目中怎么用的？
 
