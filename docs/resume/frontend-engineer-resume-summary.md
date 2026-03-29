@@ -1913,11 +1913,21 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 所以用原生 `fetch + ReadableStream` 手写 SSE 解析，完全控制请求方式和 Header。
 
-#### Q22：打字机效果和 Markdown 增量渲染是怎么实现的？
 
-> **打字机效果**：发消息时在 messages 数组里插入一条 `{ content: '', isStreaming: true }` 的占位消息，每次 `onChunk` 回调把 delta 追加到 `content`，React 检测到 state 变化触发重渲染，视觉上就是文字逐渐出现。`onDone` 时把 `isStreaming` 置为 false，光标（`▌`）消失。
+> **打字机效果**：
+> - 当用户在 AI 聊天助手界面输入并发送消息时，首先会在 messages 数组中插入一条用户消息和一条内容为空、`isStreaming: true` 的 AI 占位消息。
+> - 前端调用 `streamChatMessage`，与后端/LLM 建立流式连接。
+> - 每收到 LLM 返回的新内容（chunk），会通过 `onChunk` 回调将该 chunk 追加到 AI 占位消息的 `content` 字段。
+> - React 检测到 messages 状态变化后自动重渲染，用户界面上就能看到 AI 回复内容逐字出现，形成打字机动画。
+> - 流式结束时（`onDone`），将 `isStreaming` 设为 false，光标（如 `▌`）消失，消息变为完整体。
+> - 这种方式不仅提升了交互体验，还能让用户实时感知 AI 回复进度。
 >
-> **Markdown 增量渲染**：`MessageBubble` 组件对 `content` 字符串做实时解析（正则匹配加粗/标题/列表/表格/分割线），每次 chunk 到来触发重渲染，React diff 只更新变化的 DOM 节点，不是整体替换。视觉上 Markdown 格式随文字流式出现，而不是等全部内容到了才格式化。
+> **Markdown 增量渲染**：
+> - `MessageBubble` 组件会对每条消息的 `content` 字符串做实时 Markdown 解析（如正则匹配加粗、标题、列表、表格、分割线等语法）。
+> - 每次有新 chunk 到来，AI 消息的 `content` 字段发生变化，组件会重新解析并渲染对应的 Markdown 结构。
+> - React diff 算法只会更新变化的 DOM 节点，不会整体替换，保证渲染高效。
+> - 这样 Markdown 格式会随文字流式出现，用户能边看边读，而不是等全部内容到齐后一次性格式化。
+> - 该机制适用于流式对话、长文本和复杂格式的实时展示。
 
 #### Q23：动态上下文注入是 RAG 吗？
 
