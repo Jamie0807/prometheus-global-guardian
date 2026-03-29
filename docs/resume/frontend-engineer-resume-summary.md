@@ -1359,6 +1359,36 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > _(说完停顿，等面试官追问具体模块)_
 
+#### Q2：说一下这个项目的技术架构
+
+> **Prometheus Global Guardian 的技术架构整体分为五大层级，前后端解耦，数据流清晰，工程化与 AI 能力深度集成：**
+>
+> **1. 前端架构（React 19 + TypeScript 5.9 + Vite 7.1）**
+> - 采用最新 React 19 组件化体系，TypeScript 严格模式，18+ 高复用组件，前端与后端完全解耦。
+> - 状态管理按职责域拆分 4 大 Context（灾害数据/筛选条件/UI 状态/通知），配合 useReducer 和自定义 Hook，彻底消除 props drilling，组件重渲染次数减少 60%。
+> - 性能优化：manualChunks 代码分割、React.lazy() 懒加载、Tree Shaking，首屏 bundle 体积降 89%。
+> - 地图与可视化：Mapbox GL JS 3.15 + deck.gl，LOD 三级调度（WebGL 聚合/DOM Marker/3D Tiles），10w+ 点位流畅渲染。
+>
+> **2. 后端与 BFF 层（Node.js + Python FastAPI）**
+> - Node.js server.js 作为 BFF（Backend for Frontend），统一代理 OpenAI、DisasterAware、USGS、NASA、GDACS 等多源 API，处理鉴权、格式适配、CORS。
+> - Python FastAPI 微服务负责 23 种统计算法和 5 个预测模型，前端通过 RESTful API 调用，支持高并发和异步处理。
+>
+> **3. 数据流与多源融合**
+> - 4 大权威数据源（DisasterAware/USGS/NASA EONET/GDACS）并发接入，BFF 层统一转换为标准 Hazard 接口，前端只消费统一数据模型。
+> - Promise.allSettled 聚合 + 单源故障自动降级，5 分钟自动轮询，数据同步成功率 99.5%+。
+>
+> **4. AI 智能分析模块**
+> - 前端集成 OpenAI Chat Completions API，SSE 流式响应，灾害上下文动态注入 System Prompt，支持多轮对话与 Demo 降级。
+> - BFF 层隐藏 API Key，前端与 LLM 通信安全隔离。
+>
+> **5. 工程化与可维护性**
+> - Vite 7.1 构建链，HMR 热更新 <200ms，CI/CD 自动化部署。
+> - ESLint + Prettier + Git Hooks 统一代码规范，TypeScript 类型安全全覆盖。
+> - 组件化、Hook 化、Context 分层，新增功能只需局部改动，易于团队协作和扩展。
+
+> **一句话总结：**
+> 项目采用前后端分离、BFF 聚合、AI 深度集成、工程化全流程自动化的现代架构，既保证了高性能和可维护性，也为后续功能扩展和团队协作打下坚实基础。
+
 #### Q2：项目最大的技术挑战是什么？
 
 > 这个项目我觉得有四个比较有挑战性的地方，我按优先级说：
