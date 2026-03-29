@@ -1721,7 +1721,124 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 >
 > 本项目若规模扩大，优先迁移 Zustand（状态有关联性）；若频繁出现只需要一两个字段的高频局部更新，Jotai 原子粒度更合适。
 
----
+#### Q：react 的 ref 是什么？
+
+> React 的 ref（Reference，引用）是一种可以让我们直接访问和操作 DOM 元素或 React 组件实例的机制。一般情况下，React 推崇数据驱动的编程，尽量不去直接操作 DOM，但有时候我们必须访问 DOM，比如获取输入框的值、控制焦点、文本选择或者执行动画等场景，这时可以用 ref。
+>
+> 在 React 16.3 及以后，推荐使用 React.createRef() 或函数组件中的 useRef Hook 创建 ref，然后通过 ref 的 current 属性访问对应的 DOM 元素或组件实例。
+>
+> **扩展说明：**
+> - ref 最常用的场景是访问原生 DOM 元素，如获取焦点、测量尺寸等。
+> - ref 也可以用于获取 class 组件实例，从而调用其方法。
+> - 不建议滥用 ref，应优先采用数据驱动的方式（state/props，受控组件），只有在必须访问 DOM 时才使用 ref。
+
+#### Q：React 19 有哪些更新？
+
+> **React 19 主要新特性与更新：**
+>
+> **1. React Actions 与 useActionState**
+> - 新的表单处理机制，客户端可以直接调用服务端 Action。
+> - 引入 useActionState、useFormStatus 等 hook，极大简化异步表单交互。
+>
+> **2. useOptimistic（乐观 UI 更新）**
+> - 支持更简单的乐观更新（Optimistic UI），用户操作可以即时反馈，提高体验。
+>
+> **3. React Server Components 和 Server Actions**
+> - 正式版支持 React Server Components（RSC），实现客户端和服务端 UI/逻辑的分层。
+> - Server Actions 允许直接在前端“调用”服务端函数，前后端界限更加平滑。
+>
+> **4. 新的 Suspense 支持**
+> - 支持在更多场景下 Suspense，异步边界和错误处理更强大。
+>
+> **5. 事件系统改进**
+> - React 19 底层事件系统全面优化，更加贴近原生事件，修复了长期异常现象，提高性能。
+>
+> **6. 新的 use 插件机制**
+> - 支持 use 关键字，可以更方便 await 服务器和客户端的数据 promise。
+>
+> **7. 更好的 TS 支持及性能改进**
+> - 类型提示更完善，SSR、hydration、JSX transform 性能进一步增强。
+
+#### Q：Babel 工作原理？
+
+> **Babel 是什么？**
+> Babel 是一个广泛使用的 JavaScript 编译器，主要用于将 ES6+ 等新一代 JavaScript 语法转换为兼容旧版浏览器的 ES5 代码。它支持最新的 ECMAScript 标准、TypeScript、JSX（React）、Flow 等扩展语法。
+
+> **核心工作原理分三步：**
+> 1. **Parse（解析）**：Babel 首先将源代码解析为抽象语法树（AST）。这一阶段会进行词法分析和语法分析，将代码字符串转为结构化的 AST。
+> 2. **Transform（转换）**：Babel 遍历并操作 AST，根据配置的插件（如 @babel/preset-env、@babel/plugin-transform-xxx）对特定语法节点进行替换、插入或删除，实现语法降级、Polyfill 注入、类型擦除（如 TS/Flow）、JSX 转换等。
+> 3. **Generate（生成）**：Babel 将转换后的 AST 重新生成 JavaScript 代码字符串，并输出到目标文件。
+
+> **详细流程：**
+> - **输入**：源代码（ES6+/TS/JSX/Flow 等）
+> - **解析**：@babel/parser 解析为 AST
+> - **转换**：@babel/traverse 遍历 AST，插件链依次处理
+> - **生成**：@babel/generator 输出最终 JS 代码
+
+> **插件机制：**
+> Babel 的强大在于其插件体系。每个插件负责处理一种语法特性（如箭头函数、类、装饰器等），preset 是插件集合。开发者可按需组合 preset 和插件，实现灵活的语法支持和定制。
+
+> **常见应用场景：**
+> - 新语法降级（ES6+ → ES5）
+> - TypeScript/Flow 类型擦除
+> - JSX 转换为 React.createElement
+> - Polyfill 注入（如 Promise、Array.from 等）
+> - 按需引入（如 lodash、Antd）
+
+> **面试总结句式：**
+> Babel 通过“解析-转换-生成”三步，把新一代 JS/TS/JSX 代码转成兼容旧环境的 ES5 代码，核心是 AST 转换和插件机制。实际工程中，Babel 是现代前端构建链的基础，配合 Webpack/Vite/TS 等工具链广泛使用。
+
+#### Q：PropsWithChildren 是什么？
+
+> **PropsWithChildren 是什么？**
+> `PropsWithChildren` 是 TypeScript 在 React 项目中常用的一个类型辅助工具。它定义在 `@types/react` 类型声明中，作用是为你的 props 类型自动加上 `children` 属性。
+
+> **详细解释：**
+> - 在 React 组件中，`children` 表示组件标签包裹的内容（可以是元素、文本、数组等）。
+> - `PropsWithChildren<T>` 实际上等价于 `{ children?: ReactNode } & T`，即在你自定义的 props 类型 T 上自动加上了可选的 `children` 属性。
+
+> **使用场景：**
+> - 当你写一个通用组件，既有自定义 props，又允许包裹子元素时，推荐用 `PropsWithChildren`。
+> - 例如：
+>   ```tsx
+>   import type { PropsWithChildren } from 'react';
+>   type MyCardProps = { title: string };
+>   function MyCard(props: PropsWithChildren<MyCardProps>) {
+>     return <div><h2>{props.title}</h2>{props.children}</div>;
+>   }
+>   ```
+
+> **面试总结句式：**
+> `PropsWithChildren<T>` 是 TypeScript 提供的类型工具，帮你在自定义 props 类型上自动加上 `children`，让组件既能接收自定义属性，也能包裹任意子元素，是 React 组件类型声明的最佳实践之一。
+
+#### Q：Babel 工作原理？
+
+> **Babel 是什么？**
+> Babel 是一个广泛使用的 JavaScript 编译器，主要用于将 ES6+ 等新一代 JavaScript 语法转换为兼容旧版浏览器的 ES5 代码。它支持最新的 ECMAScript 标准、TypeScript、JSX（React）、Flow 等扩展语法。
+
+> **核心工作原理分三步：**
+> 1. **Parse（解析）**：Babel 首先将源代码解析为抽象语法树（AST）。这一阶段会进行词法分析和语法分析，将代码字符串转为结构化的 AST。
+> 2. **Transform（转换）**：Babel 遍历并操作 AST，根据配置的插件（如 @babel/preset-env、@babel/plugin-transform-xxx）对特定语法节点进行替换、插入或删除，实现语法降级、Polyfill 注入、类型擦除（如 TS/Flow）、JSX 转换等。
+> 3. **Generate（生成）**：Babel 将转换后的 AST 重新生成 JavaScript 代码字符串，并输出到目标文件。
+
+> **详细流程：**
+> - **输入**：源代码（ES6+/TS/JSX/Flow 等）
+> - **解析**：@babel/parser 解析为 AST
+> - **转换**：@babel/traverse 遍历 AST，插件链依次处理
+> - **生成**：@babel/generator 输出最终 JS 代码
+
+> **插件机制：**
+> Babel 的强大在于其插件体系。每个插件负责处理一种语法特性（如箭头函数、类、装饰器等），preset 是插件集合。开发者可按需组合 preset 和插件，实现灵活的语法支持和定制。
+
+> **常见应用场景：**
+> - 新语法降级（ES6+ → ES5）
+> - TypeScript/Flow 类型擦除
+> - JSX 转换为 React.createElement
+> - Polyfill 注入（如 Promise、Array.from 等）
+> - 按需引入（如 lodash、Antd）
+
+> **面试总结句式：**
+> Babel 通过“解析-转换-生成”三步，把新一代 JS/TS/JSX 代码转成兼容旧环境的 ES5 代码，核心是 AST 转换和插件机制。实际工程中，Babel 是现代前端构建链的基础，配合 Webpack/Vite/TS 等工具链广泛使用。
 
 ### 五、AI 模块（加分题）
 
