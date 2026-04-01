@@ -37,6 +37,12 @@ const API_KEY   = (import.meta as any).env?.VITE_OPENAI_API_KEY  ?? '';
 const API_URL   = (import.meta as any).env?.VITE_OPENAI_API_URL  ?? 'https://api.openai.com/v1/chat/completions';
 const AI_MODEL  = (import.meta as any).env?.VITE_OPENAI_MODEL    ?? 'gpt-3.5-turbo';
 
+// ─── Miaoma AI Flow 工作流引擎配置 ──────────────────────────────────────────
+// 优先级：ai-flow 工作流引擎 > 直连 OpenAI > Demo 降级模式
+const AI_FLOW_API_URL      = (import.meta as any).env?.VITE_AI_FLOW_API_URL      ?? '';   // e.g. http://localhost:3001
+const AI_FLOW_API_KEY      = (import.meta as any).env?.VITE_AI_FLOW_API_KEY      ?? '';   // NestJS API Key 守卫鉴权
+const AI_FLOW_WORKFLOW_ID  = (import.meta as any).env?.VITE_AI_FLOW_WORKFLOW_ID  ?? '';   // 已发布的灾害分析工作流 ID
+
 // ─── System Prompt 构建 ──────────────────────────────────────────────────────
 
 function buildSystemPrompt(ctx?: DisasterContext): string {
@@ -78,6 +84,64 @@ function buildSystemPrompt(ctx?: DisasterContext): string {
   return prompt;
 }
 
+// ─── Miaoma AI Flow 工作流引擎调用 ──────────────────────────────────────────
+/**
+ * 调用 ai-flow 的 NestJS API Server（POST /workflow/run）
+ * 由 ai-engine 基于 LangGraph DAG 执行工作流，支持 LLM / RAG / Condition 节点编排
+ * 返回完整执行结果后，前端模拟流式逐字输出
+ */
+async function streamViaAIFlow(
+  messages: ChatMessage[],
+  context: DisasterContext | undefined,
+  onChunk: (chunk: string) => void,
+  onDone: () => void,
+  onError: (err: string) => void
+): Promise<void> {
+  const lastUserMessage = messages.filter(m => m.role === 'user').slice(-1)[0]?.content ?? '';
+  const chatHistory = messages
+    .filter(m => m.role !== 'system')
+    .slice(-6)
+    .map(m => ({ role: m.role, content: m.content }));
+
+  try {
+    const resp = await fetch(`${AI_FLOW_API_URL}/workflow/run`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': AI_FLOW_API_KEY,          // NestJS api-key.guard.ts 鉴权
+      },
+      body: JSON.stringify({
+        workflowId: AI_FLOW_WORKFLOW_ID,        // 已发布的灾害分析工作流 ID
+        input: {
+          userMessage: lastUserMessage,         // 用户当前输入
+          disasterContext: context ?? null,     // 平台实时灾害上下文（注入 System Prompt）
+          chatHistory,                          // 多轮对话历史（最近 6 条）
+        },
+      }),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      onError(`ai-flow API 请求失败 (${resp.status}): ${text}`);
+      return;
+    }
+
+    const data = await resp.json();
+    // ai-flow 返回统一格式 { data: { output: string } }（transform.interceptor.ts）
+    const output: string = data?.data?.output ?? data?.output ?? JSON.stringify(data);
+
+    // 工作流返回完整文本，前端模拟流式逐字输出（每 4 字符延迟 8ms，还原打字机体验）
+    const chars = output.split('');
+    for (let i = 0; i < chars.length; i++) {
+      onChunk(chars[i]);
+      if (i % 4 === 0) await new Promise(r => setTimeout(r, 8));
+    }
+    onDone();
+  } catch (err) {
+    onError(err instanceof Error ? err.message : 'ai-flow 工作流引擎连接失败，请检查服务状态');
+  }
+}
+
 // ─── 主流式请求函数 ──────────────────────────────────────────────────────────
 
 export async function streamChatMessage(
@@ -87,7 +151,13 @@ export async function streamChatMessage(
   onDone: () => void,
   onError: (err: string) => void
 ): Promise<void> {
-  // 无 API Key 时进入 Demo 演示模式
+  // 优先级 1：ai-flow 工作流引擎（LangGraph DAG 编排，支持 RAG + 条件分支）
+  if (AI_FLOW_API_URL && AI_FLOW_API_KEY) {
+    await streamViaAIFlow(messages, context, onChunk, onDone, onError);
+    return;
+  }
+
+  // 优先级 2：无 ai-flow 时直连 OpenAI，无 API Key 时进入 Demo 演示模式
   if (!API_KEY) {
     await runDemoMode(messages, context, onChunk, onDone);
     return;

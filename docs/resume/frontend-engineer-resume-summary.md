@@ -1,4 +1,27 @@
-# 简历项目经验（前端工程师版本）
+
+## 专业技能
+
+- **前端框架与基础**：精通 React 19/18 及 Vue2/3，深入理解两个框架的核心实现原理，包括虚拟 DOM diff 算法、Vue3 响应式系统（Proxy + effect 追踪机制）、React Fiber 架构与并发调度；熟练使用 TypeScript 进行高级类型设计，具备处理复杂状态管理和大型组件架构的实战能力。
+
+- **前端生态库与源码原理**：熟练使用 Vue-Router、Pinia、React Router、Element-Plus、Arco-Design 等主流生态库，并深入了解其路由匹配、状态响应式和组件渲染的核心实现；能根据业务需求对生态库进行二次封装，具备从源码视角定位框架层级问题的能力。
+
+- **打包构建与编译工具**：深入掌握 Webpack5 的模块联邦、代码分割与 Tree Shaking 原理，熟练配置 Vite 工程化方案；理解 Babel 编译流程（AST 解析 → 转换 → 代码生成），能基于 Node.js 开发自定义脚手架、打包优化插件及工程化中间件，具备从零搭建前端工具链的能力。
+
+- **大前端与多端开发**：熟悉基于 Next.js 的服务端渲染（SSR/SSG/ISR）与全栈开发模式，深入理解 App Router、API Routes 及 BFF 适配器层设计；了解 Electron 桌面端开发原理与 Taro 多端框架，具备将 Web 能力延伸至桌面端与小程序端的实践经验。
+
+- **图形学与数据可视化**：熟悉 Mapbox GL JS、Echarts、Recharts 等可视化方案的使用与原理；深入了解 WebGL 渲染管线（顶点着色器 → 光栅化 → 片元着色器），能通过 GeoJSON Layer + GPU 实例化渲染处理 10w+ 地理点位；熟悉 @xyflow/react 构建 DAG 工作流可视化，具备复杂交互图形的工程落地能力。
+
+- **AI 能力工程化落地**：具备将大语言模型能力深度融入业务的完整工程经验，包括流式 SSE 对话实现（fetch + ReadableStream 手写 SSE 解析）、动态上下文注入 System Prompt、多轮对话历史管理及无密钥降级模式；注重 AI 交互体验，实现打字机流式渲染与 Markdown 增量解析，推动业务实现"AI + 数据可视化"的深度融合；具备 Monaco Editor 深度集成与 Yjs 多人实时协同编辑的工程实践。
+
+- **AI Agent 与大模型开发**：掌握 LangChain、LangGraph 框架，深入理解其有状态工作流（DAG 执行引擎）的节点编排与状态流转机制，并具备从零实现类似编排执行器的能力；熟悉 RAG 应用全流程（文档切片、向量嵌入、混合检索召回），能本地部署 Ollama 大模型并与前端集成；具备系统化提示词工程能力，了解 MCP 协议与 Agent 工具调用机制。
+
+- **全栈开发**：掌握 Node.js 与 Python FastAPI 进行服务端开发，熟悉 RESTful API 设计与 BFF 适配器模式；掌握 PostgreSQL 与 Prisma ORM 进行数据建模与迁移，具备从接口设计到数据持久化的全链路交付能力；熟悉 Pandas、NumPy 数据清洗与统计分析，能使用 scikit-learn 完成聚类、回归等机器学习任务，具备数据分析与算法服务的前后端协同经验。
+
+- **工程化架构**：熟悉 Turborepo + pnpm Monorepo 的核心包拆分与并行构建策略；掌握 Docker 多阶段构建与 Nginx 反向代理部署，熟悉 CI/CD 自动化流水线搭建；具备微前端架构设计与落地经验，能从 Web Vitals 核心指标出发进行系统性性能优化，具备从零主导大型前端项目工程化体系建设的能力。
+
+---
+
+## 工作经历
 
 ## Prometheus Space Technologies
 **前端工程师** | Sep 2025 – present
@@ -13,12 +36,53 @@
 
 • **前端工程化与性能优化**：配置 **manualChunks 代码分割 + React.lazy() 懒加载**，**首屏 bundle 减少 89%**（669 KB → 71 KB gzip），**构建时间减少 29%**（17.76 s → 12.60 s）；设计并沉淀 **18 个高复用组件**，TypeScript 严格模式确保类型安全
 
-• **LLM 驱动的 AI 灾害分析助手**：集成 **OpenAI Chat Completions API**，实现 **SSE 流式响应**与灾害上下文动态注入 System Prompt；开发 **6 类预设分析工作流**，支持多轮对话与降级 Demo 模式，API 调用成功率 **99%+**，首字响应延迟 **<1s**
+• **LLM 驱动的 AI 灾害分析助手**：引入自研 **AI 工作流引擎平台**，基于 **LangGraph DAG** 编排 LLM 推理、RAG 知识库检索与条件分支节点，构建可视化灾害分析流水线；集成 **SSE 流式响应**与灾害上下文动态注入 System Prompt，开发 **6 类预设灾害分析工作流**，支持多轮对话与降级 Demo 模式，首字响应延迟 **<1s**，API 调用成功率 **99%+**
 
 ---
 
+# 项目经验
+
+## 项目：可视化 AI 工作流编排平台
+2025 – present
+
+**项目描述**：基于**可视化拖拽**的 AI 工作流编排平台，通过将 LLM 推理、RAG 知识库检索、HTTP 调用、条件判断等能力节点像搭积木一样组合，自动完成复杂的多步骤 AI 任务流程。平台核心是独立抽象的 `ai-engine` 执行引擎包，基于 **LangGraph DAG** 驱动，覆盖智能客服、内容生成、数据分析报告、RAG 问答等典型场景，已作为 AI 引擎集成至 Prometheus 灾害监控平台的智能分析助手模块。
+
+**核心技术栈**：Next.js 16（App Router + BFF）| NestJS 11 | TypeScript | **@xyflow/react**（DAG 画布）| **LangChain + LangGraph**（AI 编排引擎）| **Qdrant**（向量数据库）| **Ollama**（本地大模型）| PostgreSQL + Prisma ORM | pnpm + Turborepo Monorepo | shadcn/ui
+
+**核心亮点**：
+
+- **自研 AI 工作流执行引擎（ai-engine）**：基于 **LangGraph** 设计有状态 DAG 执行图，实现 6 种节点类型（LLM / RAG 知识库 / HTTP / Condition / Start / End）的统一 Executor 注册机制；支持**并行节点**、**条件分支**、**变量插值**（`{{nodeId.output}}`）；引擎独立打包（tsup，ESM + CJS 双格式），作为 Monorepo 核心共享包被前端应用与 API 服务共同引用
+
+- **可视化工作流编辑器**：基于 **@xyflow/react** 构建拖拽式 DAG 画布，支持 6 类节点的自定义渲染与右侧配置面板；集成 **Tiptap 富文本变量编辑器**（`/` 命令插入上游节点变量引用），底部测试运行面板支持输入 / 结果 / 追踪 / 详情 4 个维度的执行状态实时反馈
+
+- **RAG 知识库全链路**：实现文档切片（text / markdown 多格式）→ Ollama 向量化 → Qdrant 向量存储 → 混合检索召回的完整 RAG 管道；支持知识库文档上传、切片预览与向量搜索测试，RAG 节点可作为独立组件按需接入工作流
+
+- **全栈工程化架构**：采用 **pnpm + Turborepo Monorepo** 管理 4 个子包，Turborepo 依赖拓扑排序保证 `ai-engine` 优先构建，任务缓存实现增量构建；主应用基于 **Next.js 16 App Router** 承担 BFF 层职责；对外 API 服务基于 **NestJS 11**（守卫 / 拦截器 / 装饰器），通过 API Key 鉴权供外部系统调用已发布工作流
+
+---
+
+
+
+
 ## 项目：Prometheus Global Guardian - 实时全球环境灾害监控与可视化平台
-**Prometheus Space Technologies** | Sep 2025 – present  
+**Prometheus Space Technologies** | Sep 2025 – present
+
+**项目描述**：基于**React 19.1 + TypeScript 5.9 + Mapbox GL**构建的现代化全栈应用，整合**4大权威数据源**（USGS地震数据、NASA环境事件、GDACS全球灾害警报、DisasterAware实时灾害），为全球灾害监测提供**实时、直观、交互式**的可视化解决方案。实现**3D地球视图**、**多源数据融合**、**智能数据分析**、**交互式图表系统**、**风险评估预测**等核心功能。项目整合**Python FastAPI微服务**（23种统计算法 + 5个预测模型），实现前后端分离架构，覆盖数据可视化、状态管理、API集成、性能优化等前端全栈技能。
+
+**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | **Vite 7.1**（manualChunks代码分割 + React.lazy懒加载 + Tree Shaking）| Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | **OpenAI LLM API（流式 SSE）** | CSS Modules + Responsive Design
+
+**核心亮点**：
+- **主导全栈灾害监控平台设计与交付**：独立负责 Prometheus Global Guardian 从架构选型到上线全流程，基于 **React 19.1 + TypeScript 5.9 + Vite 7.1** 搭建现代化前端工程体系，集成 **4 大权威数据源**（DisasterAware / USGS / NASA EONET / GDACS），覆盖地震、火山、洪水等 **10+ 类灾害**实时追踪，事件响应延迟 **<3 秒**，数据同步成功率 **99.5%+**
+
+- **高性能时空可视化引擎**：基于 **Mapbox GL JS 3.15** 设计 WebGL 渲染层，利用**实例化渲染**处理 **10w+ 级灾害点位**，帧率稳定 **55fps+**；引入 **deck.gl + LOD 三级调度**（全球聚合 → 区域 Marker → 城市 3D 体块），显存占用降低 **40%**，地图交互响应 **<50ms**
+
+- **BFF 适配器层 + 数据清洗管道**：设计 **BFF** 层统一 4 个异构数据源格式为标准 `Hazard` 接口；封装 **authFetch** 实现 OAuth 2.0 Token 自动刷新与 **Promise.allSettled** 容错降级，构建去重 / 标准化 / 异常过滤清洗管道，数据融合成功率 **99.5%+**
+
+- **前端工程化与性能优化**：配置 **manualChunks 代码分割 + React.lazy() 懒加载**，**首屏 bundle 减少 89%**（669 KB → 71 KB gzip），**构建时间减少 29%**（17.76 s → 12.60 s）；设计并沉淀 **18 个高复用组件**，TypeScript 严格模式确保类型安全
+
+- **LLM 驱动的 AI 灾害分析助手**：引入自研 **AI 工作流引擎（Miaoma AI Flow）**，基于 **LangGraph DAG** 编排 LLM 推理、RAG 知识库检索与条件分支节点，构建可视化灾害分析流水线；集成 **SSE 流式响应**与灾害上下文动态注入 System Prompt，开发 **6 类预设灾害分析工作流**，支持多轮对话与降级 Demo 模式，首字响应延迟 **<1s**，API 调用成功率 **99%+**
+
+---
 
 ### 🌍 业务背景与项目目的
 
@@ -41,12 +105,6 @@
 
 ---
 
-**项目描述**：基于**React 19.1 + TypeScript 5.9 + Mapbox GL**构建的现代化全栈应用，整合**4大权威数据源**（USGS地震数据、NASA环境事件、GDACS全球灾害警报、DisasterAware实时灾害），为全球灾害监测提供**实时、直观、交互式**的可视化解决方案。实现**3D地球视图**、**多源数据融合**、**智能数据分析**、**交互式图表系统**、**风险评估预测**等核心功能。项目整合**Python FastAPI微服务**（23种统计算法 + 5个预测模型），实现前后端分离架构，覆盖数据可视化、状态管理、API集成、性能优化等前端全栈技能。
-
-**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | **Vite 7.1**（manualChunks代码分割 + React.lazy懒加载 + Tree Shaking）| Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | **OpenAI LLM API（流式 SSE）** | CSS Modules + Responsive Design
-
----
-
 ### 🔥 项目难点
 
 #### 1. 海量地理数据渲染性能瓶颈
@@ -55,11 +113,11 @@
 
 **解法思路**：跨越渲染范式——从 DOM 跨越到 GPU。Marker → WebGL Layer + GeoJSON diff 增量更新 + Web Worker 数据清洗，三层联动，帧率恢复 55fps+。
 
-#### 2. 实时数据流并发控制与竞态
+#### 2. 自研 AI 工作流执行引擎
 
-**难在哪**：4 个数据源响应速度差异 200ms 到 3s+，用户快速切换筛选条件时，旧请求结果比新请求晚到，地图展示的数据与当前选中条件不符，且这类 bug **偶发性强、难以稳定复现**。
+**难在哪**：监控平台的 AI 灾害分析助手需要支持多步骤、有条件分支的智能分析流水线（如"RAG 检索历史灾害数据 → LLM 分析研判 → 根据严重程度走不同预警分支"），直接调用 OpenAI API 无法描述此类复杂执行逻辑；不同灾害场景的分析流程完全硬编码，每新增一种分析场景都需要大量重复开发，可复用性极差。
 
-**解法思路**：AbortController 网络层取消 + Promise.allSettled 容错聚合 + 版本号丢弃双重保险，三层覆盖不同类型的竞态场景。
+**解法思路**：独立抽象出 `ai-engine` 执行引擎包，基于 **LangGraph** 构建有状态 DAG 执行图；设计 Executor 注册表 + 节点基类，6 种节点类型（LLM / RAG 知识库 / HTTP / Condition 条件分支 / Start / End）统一注册接入；支持**并行节点**、**条件分支**和**变量插值**（`{{nodeId.output}}`），前端通过 **@xyflow/react** 可视化拖拽编排工作流，后端通过 NestJS API Key 鉴权对外暴露执行能力，灾害分析流水线的新增成本从"天"级降至"分钟"级。
 
 #### 3. 复杂状态管理与模块解耦
 
