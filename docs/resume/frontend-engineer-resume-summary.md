@@ -5,17 +5,17 @@
 
 - **前端生态库与源码原理**：熟练使用 Vue-Router、Pinia、React Router、Element-Plus、Arco-Design 等主流生态库，并深入了解其路由匹配、状态响应式和组件渲染的核心实现；能根据业务需求对生态库进行二次封装，具备从源码视角定位框架层级问题的能力。
 
-- **打包构建与编译工具**：深入掌握 Webpack5 的模块联邦、代码分割与 Tree Shaking 原理，熟练配置 Vite 工程化方案；理解 Babel 编译流程（AST 解析 → 转换 → 代码生成），能基于 Node.js 开发自定义脚手架、打包优化插件及工程化中间件，具备从零搭建前端工具链的能力。
+- **打包构建与编译工具**：深入掌握 Webpack5 的模块联邦、代码分割与 Tree Shaking 原理，熟练配置 Vite 工程化方案；理解 Babel 编译流程，能基于 Node.js 开发自定义脚手架、打包优化插件及工程化中间件，具备从零搭建前端工具链的能力。
 
 - **大前端与多端开发**：熟悉基于 Next.js 的服务端渲染（SSR/SSG/ISR）与全栈开发模式，深入理解 App Router、API Routes 及 BFF 适配器层设计；了解 Electron 桌面端开发原理与 Taro 多端框架，具备将 Web 能力延伸至桌面端与小程序端的实践经验。
 
-- **图形学与数据可视化**：熟悉 Mapbox GL JS、Echarts、Recharts 等可视化方案的使用与原理；深入了解 WebGL 渲染管线（顶点着色器 → 光栅化 → 片元着色器），能通过 GeoJSON Layer + GPU 实例化渲染处理 10w+ 地理点位；熟悉 @xyflow/react 构建 DAG 工作流可视化，具备复杂交互图形的工程落地能力。
+- **图形学与数据可视化**：熟悉 Mapbox GL JS、Echarts、Recharts 等可视化方案的使用与原理；深入了解 WebGL 渲染管线，能通过 GeoJSON Layer + GPU 实例化渲染处理 10w+ 地理点位；熟悉 @xyflow/react 构建 DAG 工作流可视化，具备复杂交互图形的工程落地能力。
 
 - **AI 能力工程化落地**：具备将大语言模型能力深度融入业务的完整工程经验，包括流式 SSE 对话实现（fetch + ReadableStream 手写 SSE 解析）、动态上下文注入 System Prompt、多轮对话历史管理及无密钥降级模式；注重 AI 交互体验，实现打字机流式渲染与 Markdown 增量解析，推动业务实现"AI + 数据可视化"的深度融合；具备 Monaco Editor 深度集成与 Yjs 多人实时协同编辑的工程实践。
 
-- **AI Agent 与大模型开发**：掌握 LangChain、LangGraph 框架，深入理解其有状态工作流（DAG 执行引擎）的节点编排与状态流转机制，并具备从零实现类似编排执行器的能力；熟悉 RAG 应用全流程（文档切片、向量嵌入、混合检索召回），能本地部署 Ollama 大模型并与前端集成；具备系统化提示词工程能力，了解 MCP 协议与 Agent 工具调用机制。
+- **AI Agent 与大模型开发**：掌握 LangChain、LangGraph 框架，深入理解其有状态工作流（DAG 执行引擎）的节点编排与状态流转机制，并具备从零实现类似编排执行器的能力；熟悉 RAG 应用全流程（文档切片、向量嵌入、混合检索召回），能本地部署 Ollama 大模型并与前端集成；具备系统化提示词工程能力，了解 MCP 协议与 Agent 工具调用机制；熟悉 Pandas、NumPy 数据清洗与统计分析，能使用 scikit-learn 完成聚类、回归等机器学习任务，具备数据分析驱动 AI 服务的端到端交付能力。
 
-- **全栈开发**：掌握 Node.js 与 Python FastAPI 进行服务端开发，熟悉 RESTful API 设计与 BFF 适配器模式；掌握 PostgreSQL 与 Prisma ORM 进行数据建模与迁移，具备从接口设计到数据持久化的全链路交付能力；熟悉 Pandas、NumPy 数据清洗与统计分析，能使用 scikit-learn 完成聚类、回归等机器学习任务，具备数据分析与算法服务的前后端协同经验。
+- **全栈开发**：掌握 Node.js 与 Python FastAPI 进行服务端开发，熟悉 RESTful API 设计与 BFF 适配器模式；掌握 PostgreSQL 与 Prisma ORM 进行数据建模与迁移，具备从接口设计到数据持久化的全链路交付能力。
 
 - **工程化架构**：熟悉 Turborepo + pnpm Monorepo 的核心包拆分与并行构建策略；掌握 Docker 多阶段构建与 Nginx 反向代理部署，熟悉 CI/CD 自动化流水线搭建；具备微前端架构设计与落地经验，能从 Web Vitals 核心指标出发进行系统性性能优化，具备从零主导大型前端项目工程化体系建设的能力。
 
@@ -24,40 +24,38 @@
 ## 工作经历
 
 ## Prometheus Space Technologies
-**前端工程师** | Sep 2025 – present
+**全栈工程师** | Sep 2025 – present
 
 ### 核心职责总结：
 
-• **主导全栈灾害监控平台设计与交付**：独立负责 Prometheus Global Guardian 从架构选型到上线全流程，基于 **React 19.1 + TypeScript 5.9 + Vite 7.1** 搭建现代化前端工程体系，集成 **4 大权威数据源**（DisasterAware / USGS / NASA EONET / GDACS），覆盖地震、火山、洪水等 **10+ 类灾害**实时追踪，事件响应延迟 **<3 秒**，数据同步成功率 **99.5%+**
+• **业务职责**：独立主导 Prometheus Global Guardian 全球灾害监控平台从 0 到 1 的架构设计、开发与交付，覆盖实时地图可视化、多源数据融合、Python 数据分析服务及 AI 智能分析等核心模块，接入 4 大权威数据源、覆盖 10+ 类灾害实时追踪。
 
-• **高性能时空可视化引擎**：基于 **Mapbox GL JS 3.15** 设计 WebGL 渲染层，利用**实例化渲染**处理 **10w+ 级灾害点位**，帧率稳定 **55fps+**；引入 **deck.gl + LOD 三级调度**（全球聚合 → 区域 Marker → 城市 3D 体块），显存占用降低 **40%**，地图交互响应 **<50ms**
+• **团队基建与横向产出**：主导前端工程化体系建设，沉淀 18 个高复用业务组件，制定 TypeScript 严格模式规范；同步孵化内部 AI 工作流引擎平台，以 SaaS API 形式对内赋能，已集成至本项目 AI 分析助手模块。
 
-• **BFF 适配器层 + 数据清洗管道**：设计 **BFF (Backend for Frontend)** 层统一 4 个异构数据源格式为标准 `Hazard` 接口；封装 **authFetch** 实现 OAuth 2.0 Token 自动刷新与 **Promise.allSettled** 容错降级，构建去重 / 标准化 / 异常过滤清洗管道，数据融合成功率 **99.5%+**
-
-• **前端工程化与性能优化**：配置 **manualChunks 代码分割 + React.lazy() 懒加载**，**首屏 bundle 减少 89%**（669 KB → 71 KB gzip），**构建时间减少 29%**（17.76 s → 12.60 s）；设计并沉淀 **18 个高复用组件**，TypeScript 严格模式确保类型安全
-
-• **LLM 驱动的 AI 灾害分析助手**：引入自研 **AI 工作流引擎平台**，基于 **LangGraph DAG** 编排 LLM 推理、RAG 知识库检索与条件分支节点，构建可视化灾害分析流水线；集成 **SSE 流式响应**与灾害上下文动态注入 System Prompt，开发 **6 类预设灾害分析工作流**，支持多轮对话与降级 Demo 模式，首字响应延迟 **<1s**，API 调用成功率 **99%+**
+• **核心成就**：主导基于WebGL的渲染引擎重构，将地图帧率从 **5fps 提升至 55fps+**；Vite 代码分割将首屏 bundle 减少 **89%**（669 KB → 71 KB gzip），构建时间压缩 **29%**；AI 助手 API 调用成功率 **99%+**，首字响应 **<1s**。
 
 ---
 
 # 项目经验
 
-## 项目：可视化 AI 工作流编排平台
+## 项目：AI 工作流编排平台
 2025 – present
 
-**项目描述**：基于**可视化拖拽**的 AI 工作流编排平台，通过将 LLM 推理、RAG 知识库检索、HTTP 调用、条件判断等能力节点像搭积木一样组合，自动完成复杂的多步骤 AI 任务流程。平台核心是独立抽象的 `ai-engine` 执行引擎包，基于 **LangGraph DAG** 驱动，覆盖智能客服、内容生成、数据分析报告、RAG 问答等典型场景，已作为 AI 引擎集成至 Prometheus 灾害监控平台的智能分析助手模块。
+**业务介绍**：企业级 AI Agent 工作流编排平台，解决企业私有化部署大模型应用的难题，让业务团队通过低代码可视化画布无需编码即可编排多步骤 AI 任务流程，已以 SaaS API 形式集成至 Prometheus 灾害监控平台智能分析模块。
 
-**核心技术栈**：Next.js 16（App Router + BFF）| NestJS 11 | TypeScript | **@xyflow/react**（DAG 画布）| **LangChain + LangGraph**（AI 编排引擎）| **Qdrant**（向量数据库）| **Ollama**（本地大模型）| PostgreSQL + Prisma ORM | pnpm + Turborepo Monorepo | shadcn/ui
+**技术栈介绍**：Next.js 16（App Router + BFF）| NestJS 11 | TypeScript | **@xyflow/react**（DAG 画布）| **LangChain + LangGraph**（AI 编排引擎）| **Qdrant**（向量数据库）| **Ollama**（本地大模型）| PostgreSQL + Prisma ORM | pnpm + Turborepo Monorepo | shadcn/ui
 
-**核心亮点**：
+**工作内容和成果**：
 
-- **自研 AI 工作流执行引擎（ai-engine）**：基于 **LangGraph** 设计有状态 DAG 执行图，实现 6 种节点类型（LLM / RAG 知识库 / HTTP / Condition / Start / End）的统一 Executor 注册机制；支持**并行节点**、**条件分支**、**变量插值**（`{{nodeId.output}}`）；引擎独立打包（tsup，ESM + CJS 双格式），作为 Monorepo 核心共享包被前端应用与 API 服务共同引用
+- 【架构】自主设计并实现基于 **DAG（有向无环图）** 的 AI 工作流执行引擎（`ai-engine`），利用 **Kahn 算法**实现节点拓扑排序与循环检测，支持复杂业务逻辑编排；采用**注册模式（Registry Pattern）**设计节点扩展系统，遵循**开闭原则**，实现 LLM / RAG / HTTP / Condition / Start / End 6 种节点类型统一 Executor 注册机制；**LLMExecutor** 实现**三段式 Prompt 工程**（系统 / 用户 / 助手角色分离），支持上游节点输出**动态注入**下游 Prompt 实现跨节点上下文传递；支持 OpenAI / Anthropic / **Ollama 多 Provider** 切换，ChatOllama 直连本地实例满足**私有化部署**需求，企业敏感数据不出内网
 
-- **可视化工作流编辑器**：基于 **@xyflow/react** 构建拖拽式 DAG 画布，支持 6 类节点的自定义渲染与右侧配置面板；集成 **Tiptap 富文本变量编辑器**（`/` 命令插入上游节点变量引用），底部测试运行面板支持输入 / 结果 / 追踪 / 详情 4 个维度的执行状态实时反馈
+- 【横向产出】引擎独立打包（tsup，ESM + CJS 双格式）作为 Monorepo 核心共享包，以 **NestJS API Key 鉴权**方式对外提供 SaaS 服务；NestJS 接口同时支持**同步模式**与 **SSE 流式模式**，流式模式可逐事件推送节点执行进度与 Token 输出，满足不同客户端的接入场景；已被多个业务项目接入，灾害分析流水线新增成本从"天"级降至"分钟"级
 
-- **RAG 知识库全链路**：实现文档切片（text / markdown 多格式）→ Ollama 向量化 → Qdrant 向量存储 → 混合检索召回的完整 RAG 管道；支持知识库文档上传、切片预览与向量搜索测试，RAG 节点可作为独立组件按需接入工作流
+- 【可视化编辑器】基于 **@xyflow/react** 构建拖拽式 DAG 画布，集成 **Tiptap 富文本变量编辑器**（`/` 命令插入上游节点变量引用 `{{nodeId.output}}`），底部测试运行面板支持输入 / 结果 / 追踪 / 详情 4 个维度实时反馈
 
-- **全栈工程化架构**：采用 **pnpm + Turborepo Monorepo** 管理 4 个子包，Turborepo 依赖拓扑排序保证 `ai-engine` 优先构建，任务缓存实现增量构建；主应用基于 **Next.js 16 App Router** 承担 BFF 层职责；对外 API 服务基于 **NestJS 11**（守卫 / 拦截器 / 装饰器），通过 API Key 鉴权供外部系统调用已发布工作流
+- 【RAG 系统构建】基于 **LangChain 与 Qdrant** 搭建完整 RAG 管道：文档切片 → Ollama 向量化 → Qdrant 向量存储 → 混合检索召回（全文 + 向量），RAG 节点可作为独立组件按需接入工作流，显著提升回答准确率
+
+- 【工程化】采用 **pnpm + Turborepo Monorepo** 管理 4 个子包，依赖拓扑排序保证 `ai-engine` 优先构建，任务缓存实现增量构建；主应用基于 **Next.js 16 App Router** 承担 BFF 层职责；NestJS 11 通过守卫 / 拦截器 / 装饰器实现请求鉴权与日志追踪
 
 ---
 
@@ -67,20 +65,23 @@
 ## 项目：Prometheus Global Guardian - 实时全球环境灾害监控与可视化平台
 **Prometheus Space Technologies** | Sep 2025 – present
 
-**项目描述**：基于**React 19.1 + TypeScript 5.9 + Mapbox GL**构建的现代化全栈应用，整合**4大权威数据源**（USGS地震数据、NASA环境事件、GDACS全球灾害警报、DisasterAware实时灾害），为全球灾害监测提供**实时、直观、交互式**的可视化解决方案。实现**3D地球视图**、**多源数据融合**、**智能数据分析**、**交互式图表系统**、**风险评估预测**等核心功能。项目整合**Python FastAPI微服务**（23种统计算法 + 5个预测模型），实现前后端分离架构，覆盖数据可视化、状态管理、API集成、性能优化等前端全栈技能。
+**业务介绍**：整合 USGS、NASA EONET、GDACS、DisasterAware 四大权威数据源的实时全球灾害监控与可视化平台，覆盖地震、火山、洪水等 10+ 类灾害实时追踪，服务于政府机构、应急响应团队及科研分析人员。
 
-**核心技术栈**：React 19.1 + TypeScript 5.9 (严格模式) | **Vite 7.1**（manualChunks代码分割 + React.lazy懒加载 + Tree Shaking）| Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | **OpenAI LLM API（流式 SSE）** | CSS Modules + Responsive Design
+**技术栈介绍**：React 19.1 + TypeScript 5.9（严格模式）| **Vite 7.1**（manualChunks 代码分割 + React.lazy 懒加载）| Mapbox GL JS 3.15 | Recharts 3.5.0 | Fetch API + OAuth 2.0 | Python FastAPI 0.115.5 | **LangGraph DAG + SSE 流式响应** | CSS Modules
 
-**核心亮点**：
-- **主导全栈灾害监控平台设计与交付**：独立负责 Prometheus Global Guardian 从架构选型到上线全流程，基于 **React 19.1 + TypeScript 5.9 + Vite 7.1** 搭建现代化前端工程体系，集成 **4 大权威数据源**（DisasterAware / USGS / NASA EONET / GDACS），覆盖地震、火山、洪水等 **10+ 类灾害**实时追踪，事件响应延迟 **<3 秒**，数据同步成功率 **99.5%+**
+**工作内容和成果**：
 
-- **高性能时空可视化引擎**：基于 **Mapbox GL JS 3.15** 设计 WebGL 渲染层，利用**实例化渲染**处理 **10w+ 级灾害点位**，帧率稳定 **55fps+**；引入 **deck.gl + LOD 三级调度**（全球聚合 → 区域 Marker → 城市 3D 体块），显存占用降低 **40%**，地图交互响应 **<50ms**
+- 【架构】独立主导平台从 0 到 1 的整体架构设计与交付，设计 **BFF 适配器层**统一 4 个异构数据源为标准 `Hazard` 接口，封装 **authFetch** 实现 OAuth 2.0 Token 自动刷新（401/403 拦截）与 **Promise.allSettled** 容错降级，30 秒超时 + 最多 3 次重试确保请求稳定性，数据同步成功率 **99.5%+**，事件响应延迟 **<3 秒**；前端状态按职责域拆分 **4 个独立 Context + useReducer**（灾害数据 / 筛选条件 / UI 状态 / 通知），各自封装自定义 Hook 作为唯一消费入口，彻底消除 props drilling，组件重渲染次数降低 **60%**
 
-- **BFF 适配器层 + 数据清洗管道**：设计 **BFF** 层统一 4 个异构数据源格式为标准 `Hazard` 接口；封装 **authFetch** 实现 OAuth 2.0 Token 自动刷新与 **Promise.allSettled** 容错降级，构建去重 / 标准化 / 异常过滤清洗管道，数据融合成功率 **99.5%+**
+- 【可视化】基于 **Mapbox GL JS + WebGL 渲染管线**重构地图引擎，将原 DOM Marker 方案替换为 GPU 实例化渲染，引入 **LOD 三级调度**（全球聚合 → 区域 Marker → 城市 3D 体块），支撑 **10w+ 灾害点位**稳定渲染，帧率从 **5fps 提升至 55fps+**，显存占用降低 **40%**；利用 **GeoJSON Source diff 增量更新**机制为每个 Feature 挂稳定 id，5 分钟轮询由全量替换改为只上传变化部分，地图刷新卡顿从 **800ms 降至 20ms**；通过 **Web Worker** 实现灾害数据异步清洗与坐标转换预处理，彻底消除数据解析对主线程的阻塞
 
-- **前端工程化与性能优化**：配置 **manualChunks 代码分割 + React.lazy() 懒加载**，**首屏 bundle 减少 89%**（669 KB → 71 KB gzip），**构建时间减少 29%**（17.76 s → 12.60 s）；设计并沉淀 **18 个高复用组件**，TypeScript 严格模式确保类型安全
+- 【图表交互】基于 **Recharts** 实现柱状图 / 折线图 / 饼图 / 散点图 4 类交互图表，支持图表下钻（Quick Prompts）联动 AI 分析；使用 **React Portal** 将下钻详情弹窗挂载到 `document.body`，绕过父容器层叠上下文裁切，确保弹窗始终全屏可见；**useMemo** 缓存时间线、严重性分布等图表数据计算结果，避免每帧重算，筛选条件切换时渲染响应 **<16ms**
 
-- **LLM 驱动的 AI 灾害分析助手**：引入自研 **AI 工作流引擎（Miaoma AI Flow）**，基于 **LangGraph DAG** 编排 LLM 推理、RAG 知识库检索与条件分支节点，构建可视化灾害分析流水线；集成 **SSE 流式响应**与灾害上下文动态注入 System Prompt，开发 **6 类预设灾害分析工作流**，支持多轮对话与降级 Demo 模式，首字响应延迟 **<1s**，API 调用成功率 **99%+**
+- 【AI】调用自研 **AI 工作流引擎平台（ai-flow）** REST API（NestJS API Key 鉴权），由 **LangGraph DAG** 在服务端完成 LLM 推理、RAG 检索与条件分支节点编排，执行 **6 类预设灾害分析工作流**；前端将实时灾害数据动态构建为 `disasterContext` 注入工作流输入，携带多轮对话历史管理；响应后模拟**打字机逐字渲染 + Markdown 增量解析**；无 ai-flow 时自动降级直连 **OpenAI**（fetch + **ReadableStream 手写 SSE 解析**），最终降级 Demo 模式，首字响应 **<1s**，API 成功率 **99%+**
+
+- 【优化】配置 **manualChunks** 将 vendor 库（react / mapbox-gl / recharts / utils）独立分包，结合 **React.lazy() 懒加载** + **Tree Shaking** 自动剔除未引用模块，代码分割为 **7 个优化 chunk** 提升浏览器缓存利用率，首屏 bundle 减少 **89%**（669 KB → 71 KB gzip），构建时间压缩 **29%**（17.76s → 12.60s）；**Chrome DevTools Performance** 面板验证渲染耗时，**Network** 面板确认懒加载分包按需加载生效；Python Analytics API 客户端实现 **AbortController 30 秒超时 + 最多 3 次重试 + 并发请求队列（最大 3 个并发）**，彻底消除分析接口慢请求阻塞 UI 的问题
+
+- 【工程化】建立前端工程化规范体系：**ESLint + Prettier** 统一代码风格，**CSS Modules** 实现样式隔离避免全局污染，TypeScript 严格模式全项目覆盖，编译时捕获 99% 类型错误；沉淀 **18 个高复用组件**；**Docker 多阶段构建 + Nginx** 反向代理生产部署；集成 **Python FastAPI 微服务**（23 种统计算法 + 5 个预测模型）；全局部署 **ErrorBoundary** 错误边界捕获组件级异常并自动降级，平台稳定性提升 **55%**
 
 ---
 
@@ -207,6 +208,7 @@ React 19.1 + TypeScript 5.9 严格模式 + Vite 7.1，选用当时最新稳定�
   - 基于 **Mapbox GL JS 3.15** 设计高性能时空数据可视化引擎，利用 **WebGL 实例化渲染技术**批量处理 **10w+ 级灾害点位**，帧率稳定在 **55fps+**
   - 实现基于视距的 **LOD 三级调度**（全球气泡聚合 → 区域 Marker → 城市 3D 建筑体块），显存占用降低 **40%**
   - 使用 **GeoJSON** 驱动热力图 / 标记点渲染，支持动态类型过滤、3D 旋转/倾斜与地图样式切换，交互响应 **<50ms**
+  - 通过 **Web Worker** 实现灾害数据异步清洗与坐标转换预处理，彻底消除数据解析对主线程的阻塞
 
 • **设计 BFF (Backend for Frontend) 层或适配器模式，统一异构数据源，实现故障自动降级与数据清洗管道**：
   - 设计 **BFF 适配器层**，将 DisasterAware / USGS / NASA / GDACS 四个异构数据源统一转换为标准 `Hazard` 接口，消除下游组件的格式耦合
@@ -214,22 +216,21 @@ React 19.1 + TypeScript 5.9 严格模式 + Vite 7.1，选用当时最新稳定�
   - 构建数据清洗管道：去重、字段标准化、异常值过滤，30 秒超时 + 最多 3 次重试，确保请求稳定性
 
 • **性能优化与工程实践**：
-  - 实施**前端性能优化**：React.memo减少重渲染、useMemo缓存计算结果、响应式图表设计
-  - 配置**Vite构建优化**：manualChunks将vendor库（react、mapbox-gl、recharts、utils）独立打包，React.lazy()对AnalyticsPage/SaveReportModal/SettingsModal实施懒加载，**构建时间减少29%**（17.76s→12.60s），**首屏bundle减少89%**（669KB→71KB gzip），代码分割为7个优化chunk，提升浏览器缓存利用率
-  - 通过Chrome DevTools持续监控性能，Network面板验证懒加载生效
+  - 配置 **Vite 构建优化**：manualChunks 将 vendor 库（react、mapbox-gl、recharts、utils）独立打包，React.lazy() 对 AnalyticsPage / SaveReportModal / SettingsModal 实施懒加载，**Tree Shaking** 自动剔除未引用模块，代码分割为 **7 个优化 chunk**，提升浏览器缓存利用率，**构建时间减少 29%**（17.76s → 12.60s），**首屏 bundle 减少 89%**（669KB → 71KB gzip）
+  - 通过 **Chrome DevTools Performance** 面板验证渲染耗时，**Network** 面板确认懒加载生效，全程数据驱动优化决策
 
-• **基于 LLM 的智能分析模块（AI 灾害分析助手）**：
-  - 集成 **OpenAI Chat Completions API**，实现**流式响应（Server-Sent Events + ReadableStream）**，逐字打印动画提升 AI 交互感知体验
-  - 设计**灾害上下文自动注入机制**：将平台实时监控数据（事件总数、类型分布、近期代表事件）动态构建为 System Prompt，提升 LLM 响应的专业性与针对性
+• **AI 智能分析模块（自研工作流引擎 + LangGraph DAG）**：
+  - 引入自研 **AI 工作流引擎平台**，基于 **LangGraph DAG** 编排 LLM 推理、RAG 检索与条件分支节点，支持复杂多步骤灾害分析流水线
   - 开发 **6 类预设灾害分析工作流**（Quick Prompts）：全球态势综合分析、地震/洪水/野火/火山专项报告、趋势预测，覆盖灾害分析全场景
+  - 集成 **SSE 流式响应**，设计**灾害上下文自动注入机制**：将平台实时灾害数据（事件总数、类型分布、近期代表事件）动态构建为 System Prompt，首字响应延迟 **<1s**
   - 实现**多轮对话历史管理**（ChatMessage 链路），维护完整上下文窗口，支持连续深度分析
-  - 设计**降级 Demo 模式**：无 API Key 时自动切换本地响应模拟，确保功能演示完整性；API 调用成功率 **99%+**，首字响应延迟 **<1s**
+  - 设计**降级 Demo 模式**：无 API Key 时自动切换本地响应模拟，确保功能演示完整性；API 调用成功率 **99%+**
   - 采用 **React.lazy() + Suspense** 懒加载 AI 面板，不影响主应用首屏性能
 
 • **状态管理与业务逻辑**：
-  - 使用**React Hooks**（useState、useEffect、useCallback、useMemo）管理组件状态和副作用
-  - 使用**notify工具函数**实现消息通知系统
-  - 开发**ErrorBoundary组件**优雅处理异常，应用稳定性提升**95%**
+  - 按职责域拆分 **4 个独立 Context + useReducer**（灾害数据 / 筛选条件 / UI 状态 / 通知），封装自定义 Hook 作为唯一消费入口，彻底消除 props drilling，组件重渲染次数降低 **60%**
+  - 结合 **React.memo + useMemo** 精准控制渲染范围，避免无关状态变化触发组件重渲染
+  - 全局部署 **ErrorBoundary** 错误边界捕获组件级异常并自动降级，平台稳定性提升 **55%**
 
 • **响应式设计与用户体验**：
   - 实现**响应式布局**：桌面端/平板/移动端完美适配，使用CSS Grid + Flexbox
@@ -1419,33 +1420,27 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 #### Q2：说一下这个项目的技术架构
 
-> **Prometheus Global Guardian 的技术架构整体分为五大层级，前后端解耦，数据流清晰，工程化与 AI 能力深度集成：**
+> 整体上是一个**前后端分离、多层解耦**的架构，我把它分成六层来说：
 >
-> **1. 前端架构（React 19 + TypeScript 5.9 + Vite 7.1）**
-> - 采用最新 React 19 组件化体系，TypeScript 严格模式，18+ 高复用组件，前端与后端完全解耦。
-> - 状态管理按职责域拆分 4 大 Context（灾害数据/筛选条件/UI 状态/通知），配合 useReducer 和自定义 Hook，彻底消除 props drilling，组件重渲染次数减少 60%。
-> - 性能优化：manualChunks 代码分割、React.lazy() 懒加载、Tree Shaking，首屏 bundle 体积降 89%。
-> - 地图与可视化：Mapbox GL JS 3.15 + deck.gl，LOD 三级调度（WebGL 聚合/DOM Marker/3D Tiles），10w+ 点位流畅渲染。
+> **第一层：前端展示层（React 19.1 + TypeScript 5.9 + Vite 7.1）**
+> 组件化体系，18 个高复用组件，TypeScript 严格模式覆盖全项目；状态管理按职责域拆成 4 个独立 Context + useReducer，各自封装自定义 Hook 作为唯一消费入口，彻底消除 props drilling，重渲染次数降低 60%；构建侧配置 manualChunks 代码分割 + React.lazy() 懒加载，首屏 bundle 从 669KB 压到 71KB（gzip），降幅 89%。
 >
-> **2. 后端与 BFF 层（Node.js + Python FastAPI）**
-> - Node.js server.js 作为 BFF（Backend for Frontend），统一代理 OpenAI、DisasterAware、USGS、NASA、GDACS 等多源 API，处理鉴权、格式适配、CORS。
-> - Python FastAPI 微服务负责 23 种统计算法和 5 个预测模型，前端通过 RESTful API 调用，支持高并发和异步处理。
+> **第二层：地图可视化层（Mapbox GL JS 3.15 + WebGL 渲染管线 + deck.gl）**
+> 核心是把原来的 DOM Marker 方案替换成 WebGL GeoJSON Layer。引入 LOD 三级调度：远景（zoom < 8）全量数据交给 GPU 渲染，避开 DOM；近景（zoom ≥ 8）保留 Marker 承担弹窗交互；城市级别开启 3D 建筑体块（配置了外部 3D Tiles URL 时通过 **deck.gl Tile3DLayer + CesiumIonLoader** 加载标准 3D Tiles，否则回退到 Mapbox fill-extrusion）。GeoJSON Source 增量 diff 更新避免全量重传，**Web Worker** 承担格式转换、去重和坐标清洗，主线程完全不感知数据处理耗时，10w+ 点位帧率稳定在 55fps+。
 >
-> **3. 数据流与多源融合**
-> - 4 大权威数据源（DisasterAware/USGS/NASA EONET/GDACS）并发接入，BFF 层统一转换为标准 Hazard 接口，前端只消费统一数据模型。
-> - Promise.allSettled 聚合 + 单源故障自动降级，5 分钟自动轮询，数据同步成功率 99.5%+。
+> **第三层：数据接入层（BFF 适配器 + 4 源并发聚合）**
+> Node.js server.js 充当 BFF，统一代理 4 个异构数据源（DisasterAware 有 OAuth 鉴权、USGS 是 GeoJSON、NASA 是 JSON 数组、GDACS 是 XML/RSS），转换为统一的 `Hazard` 标准接口；封装 authFetch 实现 OAuth 2.0 Token 自动刷新，Promise.allSettled 实现单源故障自动降级，5 分钟自动轮询，数据同步成功率 99.5%+。
 >
-> **4. AI 智能分析模块**
-> - 前端集成 OpenAI Chat Completions API，SSE 流式响应，灾害上下文动态注入 System Prompt，支持多轮对话与 Demo 降级。
-> - BFF 层隐藏 API Key，前端与 LLM 通信安全隔离。
+> **第四层：AI 分析层（ai-flow 工作流引擎 + LangGraph DAG + SSE）**
+> 集成自研 AI 工作流引擎平台（Miaoma AI Flow），基于 LangGraph DAG 编排 LLM 推理、RAG 知识检索与条件分支节点；开发 6 类预设灾害分析工作流（全球态势/地震/洪水/野火等）；前端通过 SSE 流式接收响应，实时灾害数据动态注入 System Prompt，首字响应 < 1s，无 Key 时自动降级 Demo 模式，API 成功率 99%+。
 >
-> **5. 工程化与可维护性**
-> - Vite 7.1 构建链，HMR 热更新 <200ms，CI/CD 自动化部署。
-> - ESLint + Prettier + Git Hooks 统一代码规范，TypeScript 类型安全全覆盖。
-> - 组件化、Hook 化、Context 分层，新增功能只需局部改动，易于团队协作和扩展。
-
-> **一句话总结：**
-> 项目采用前后端分离、BFF 聚合、AI 深度集成、工程化全流程自动化的现代架构，既保证了高性能和可维护性，也为后续功能扩展和团队协作打下坚实基础。
+> **第五层：数据分析微服务（Python FastAPI）**
+> FastAPI 微服务独立部署，提供 23 种统计算法 + 5 个预测模型（趋势预测、风险评估等），前端通过 RESTful API 按需调用，与前端主服务完全解耦，便于独立扩容。
+>
+> **第六层：工程化与稳定性保障**
+> 全局 ErrorBoundary 捕获组件级异常并自动降级，平台稳定性提升 55%；React.memo + useMemo 精准控制渲染边界，重渲染降低 60%；Chrome DevTools Performance 面板全程验证优化效果；Docker 容器化 + Nginx 反向代理生产部署。
+>
+> **一句话总结**：前端可视化 → BFF 聚合 → 4 源数据 → AI 工作流引擎 → Python 分析服务，各层职责清晰，任意一层独立演进不影响其他层。
 
 #### Q2：项目最大的技术挑战是什么？
 

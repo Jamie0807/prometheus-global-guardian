@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { MapboxOverlay } from "@deck.gl/mapbox";
@@ -8,6 +8,24 @@ import type { Hazard, MapViewProps } from "../types";
 import { fetchHazardsActive } from "../api/disasteraware";
 import { config } from "../config";
 import { HAZARD_COLORS, defaultColor } from "../config/hazardColors";
+
+// Web Worker：子线程负责去重 + 坐标过滤，不阻塞主线程
+const hazardWorker = new Worker(
+  new URL('../workers/hazard-worker.ts', import.meta.url),
+  { type: 'module' }
+);
+
+/** 将原始灾害数组通过 Worker 清洗后返回 Promise<Hazard[]> */
+function cleanWithWorker(hazards: Hazard[]): Promise<Hazard[]> {
+  return new Promise(resolve => {
+    const handler = (e: MessageEvent<Hazard[]>) => {
+      hazardWorker.removeEventListener('message', handler);
+      resolve(e.data);
+    };
+    hazardWorker.addEventListener('message', handler);
+    hazardWorker.postMessage({ hazards });
+  });
+}
 
 const MapView: React.FC<MapViewProps> = ({
   filter,
@@ -140,8 +158,10 @@ const MapView: React.FC<MapViewProps> = ({
       // Prefer using the DisasterAware API; if it fails, fall back to other data sources.
       const res = await fetchDisasterAwareHazards();
       if (res.length > 0) {
-        setDisasters(res);
-        onDataUpdate(res);
+        // Web Worker 子线程清洗（去重 + 坐标过滤），主线程不感知耗时
+        const cleaned = await cleanWithWorker(res);
+        setDisasters(cleaned);
+        onDataUpdate(cleaned);
       } else {
         const [usgs, nasa, gdacs] = await Promise.allSettled([
           fetchUSGSEarthquakes(),
@@ -154,8 +174,10 @@ const MapView: React.FC<MapViewProps> = ({
           if (res.status === "fulfilled" && res.value.length > 0)
             all.push(...res.value);
         });
-        setDisasters(all);
-        onDataUpdate(all);
+        // 多源合并后统一清洗
+        const cleaned = await cleanWithWorker(all);
+        setDisasters(cleaned);
+        onDataUpdate(cleaned);
       }
     } catch (err) {
       console.error("Error loading disasters:", err);
