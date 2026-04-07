@@ -41,7 +41,7 @@
 ## 项目：AI 工作流编排平台
 2025 – present
 
-**业务介绍**：企业级 AI Agent 工作流编排平台，解决企业私有化部署大模型应用的难题，让业务团队通过低代码可视化画布无需编码即可编排多步骤 AI 任务流程，已以 SaaS API 形式集成至 Prometheus 灾害监控平台智能分析模块。
+**项目介绍**：企业级 AI Agent 工作流编排平台，解决企业私有化部署大模型应用的难题。平台通过**可视化拖拽画布**将 LLM 推理、RAG 知识库检索、HTTP 调用、条件分支等能力抽象为可复用节点，业务团队无需编码即可编排多步骤 AI 任务流程；底层引擎支持 **Ollama 本地大模型**私有化部署，企业敏感数据不出内网；对外以 **NestJS SaaS API** 形式开放，已集成至 Prometheus 灾害监控平台，灾害分析流水线新增成本从"天"级降至"分钟"级。
 
 **技术栈介绍**：Next.js 16（App Router + BFF）| NestJS 11 | TypeScript | **@xyflow/react**（DAG 画布）| **LangChain + LangGraph**（AI 编排引擎）| **Qdrant**（向量数据库）| **Ollama**（本地大模型）| PostgreSQL + Prisma ORM | pnpm + Turborepo Monorepo | shadcn/ui
 
@@ -77,7 +77,7 @@
 
 - 【图表交互】基于 **Recharts** 实现柱状图 / 折线图 / 饼图 / 散点图 4 类交互图表，支持图表下钻（Quick Prompts）联动 AI 分析；使用 **React Portal** 将下钻详情弹窗挂载到 `document.body`，绕过父容器层叠上下文裁切，确保弹窗始终全屏可见；**useMemo** 缓存时间线、严重性分布等图表数据计算结果，避免每帧重算，筛选条件切换时渲染响应 **<16ms**
 
-- 【AI】调用自研 **AI 工作流引擎平台（ai-flow）** REST API（NestJS API Key 鉴权），由 **LangGraph DAG** 在服务端完成 LLM 推理、RAG 检索与条件分支节点编排，执行 **6 类预设灾害分析工作流**；前端将实时灾害数据动态构建为 `disasterContext` 注入工作流输入，携带多轮对话历史管理；响应后模拟**打字机逐字渲染 + Markdown 增量解析**；无 ai-flow 时自动降级直连 **OpenAI**（fetch + **ReadableStream 手写 SSE 解析**），最终降级 Demo 模式，首字响应 **<1s**，API 成功率 **99%+**
+- 【AI】调用自研 **AI 工作流引擎平台** REST API（NestJS API Key 鉴权），由 **LangGraph DAG** 在服务端完成 LLM 推理、RAG 检索与条件分支节点编排，执行 **6 类预设灾害分析工作流**；前端将实时灾害数据动态构建为 `disasterContext` 注入工作流输入，携带多轮对话历史管理；响应后模拟**打字机逐字渲染 + Markdown 增量解析**；无调用时自动降级直连 **OpenAI**（fetch + **ReadableStream 手写 SSE 解析**），最终降级 Demo 模式，首字响应 **<1s**，API 成功率 **99%+**
 
 - 【优化】配置 **manualChunks** 将 vendor 库（react / mapbox-gl / recharts / utils）独立分包，结合 **React.lazy() 懒加载** + **Tree Shaking** 自动剔除未引用模块，代码分割为 **7 个优化 chunk** 提升浏览器缓存利用率，首屏 bundle 减少 **89%**（669 KB → 71 KB gzip），构建时间压缩 **29%**（17.76s → 12.60s）；**Chrome DevTools Performance** 面板验证渲染耗时，**Network** 面板确认懒加载分包按需加载生效；Python Analytics API 客户端实现 **AbortController 30 秒超时 + 最多 3 次重试 + 并发请求队列（最大 3 个并发）**，彻底消除分析接口慢请求阻塞 UI 的问题
 
