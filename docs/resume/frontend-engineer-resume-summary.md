@@ -2557,3 +2557,48 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > 浏览器原生服务器单向推送技术，基于 HTTP 长连接，服务端持续推送，客户端不能反向发送。每条消息 `data: {json}\n\n` 格式。LLM 流式输出用 SSE：每生成一个 token 推一条，形成打字机效果。本项目用原生 `fetch + ReadableStream` 手写解析，不用 EventSource（不支持 POST 和自定义 Header）。
 
 ---
+
+## 面试常见问题回答
+
+### Q：你接触过 Cesium 和 OpenLayers 吗？
+
+**Cesium：有间接接触**
+
+> "我没有直接使用过 CesiumJS，但在项目中通过 `@loaders.gl/3d-tiles` 的 `CesiumIonLoader` 对接了 Cesium Ion 平台，加载标准 3D Tiles 数据，了解 Cesium Ion 的 token 认证机制和 3D Tiles 格式规范。"
+
+技术依据：`MapView.tsx` 中 `import { CesiumIonLoader } from "@loaders.gl/3d-tiles"`，通过 deck.gl `Tile3DLayer` + `CesiumIonLoader` 挂载到 Mapbox overlay，支持 Bearer token 鉴权。
+
+---
+
+**OpenLayers：没有接触**
+
+> "OpenLayers 我目前没有使用过。我的项目地图模块基于 Mapbox GL JS + deck.gl 构建，实现了热力图、LOD 聚合图层、3D 建筑等功能。OpenLayers 和 Mapbox 在 API 设计上有差异，但核心的地图图层、数据源、投影、交互等概念是相通的，上手应该不会太难。"
+
+---
+
+**关键原则**：
+- 如实说没用过，但展示**迁移能力**和**相关背景**
+- 把实际做的事（Mapbox GL JS + deck.gl + 3D Tiles + WebGL LOD）说清楚，这本身就是亮点
+- 不要为了迎合面试官谎称熟悉，后续技术追问会露馅
+
+---
+
+### Q：追问——你为什么要对接 Cesium Ion 平台？
+
+**核心回答（技术决策视角）**：
+
+> "项目有一个 LOD 三级调度需求：全球缩放用聚合气泡，区域缩放用 Marker，城市级别要展示 3D 建筑体块。fill-extrusion 是 Mapbox 内置方案，只能渲染 OSM 建筑轮廓，精度和细节有限；而 Cesium Ion 托管的是符合 OGC 标准的 **3D Tiles** 格式数据，支持真正的倾斜摄影、精细建筑模型，适合城市级精准可视化需求。"
+
+**为什么选 Cesium Ion 而不是自建 3D Tiles 服务**：
+
+> "自建需要采购倾斜摄影数据、部署 3D Tiles 转换服务（如 Cesium Native），成本高、周期长。Cesium Ion 提供托管 + CDN + Bearer token 鉴权一体化方案，我们只需传入 `accessToken` 和 tileset URL，`CesiumIonLoader` 自动处理认证和分片加载，工程成本极低。"
+
+**为什么不直接用 CesiumJS 而是通过 deck.gl 桥接**：
+
+> "项目主地图引擎是 Mapbox GL JS，整个交互体系（热力图、LOD 聚合、标记点、弹窗）都建在 Mapbox 上，换引擎成本极高。deck.gl 的 `MapboxOverlay` 方案可以把 `Tile3DLayer` 作为 overlay 叠加到 Mapbox 画布上，既保留 Mapbox 完整的交互能力，又获得 deck.gl 对 3D Tiles 的渲染支持，两全其美。"
+
+**兜底说法（如果追问实际效果）**：
+
+> "这个方案在代码层面是完备的，已通过环境变量 `VITE_3D_TILES_URL` 做功能开关，未配置时自动回退到 Mapbox fill-extrusion 模式，不影响主流程。生产环境是否启用取决于是否购买了 Cesium Ion 订阅，这属于业务资源决策，技术上是随时可以接入的。"
+
+---
