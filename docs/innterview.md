@@ -182,6 +182,16 @@ FastAPI 是一个用于构建后端 API 的 Python 框架，可以理解为“�
 
 面试一句话版：FastAPI 是 Python 生态里一个高性能、类型驱动、自动文档化的 API 框架，适合快速构建可维护的后端服务。
 
+## 16. 你这个项目流式 SSE 对话怎么实现的？（备注）
+这个项目的流式对话采用“前端手写 SSE 解析”方案，不依赖 EventSource。
+实现流程是：
+1. 前端发起流式请求：请求体设置 `stream: true`；
+2. 读取响应流：通过 `resp.body?.getReader()` 持续 `read()` 分片；
+3. 手写 SSE 解析：`TextDecoder` 增量解码后按换行切分，仅处理 `data: ` 开头行，跳过 `data: [DONE]`；
+4. 增量渲染 UI：从 JSON 中提取 `choices[0].delta.content`，实时 `onChunk` 输出，形成逐字打印效果。
+
+补充：本项目有两条路径，直连模型时是真 SSE 流式解析；走 ai-flow 工作流时是“先返回完整文本，再前端模拟打字机流”。
+
 ---
 
 ## 场景模拟题（高概率）

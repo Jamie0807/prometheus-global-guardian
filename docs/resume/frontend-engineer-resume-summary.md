@@ -991,10 +991,12 @@ Context 拆分本身也带来了性能收益：`filter` 变化时，只有订阅
 AIChatAssistant.tsx（UI 层）
         ↓  调用
 aiAssistant.ts（API 层）
-        ↓  fetch /api/chat
-server.js（BFF 层）
-        ↓  带 API Key 请求
-OpenAI Chat Completions API（stream: true）
+  ↓  双路径路由
+  ├─ ai-flow /workflow/run（主链路）
+  │      ↓ 返回完整结果
+  │   前端模拟打字机流
+  └─ OpenAI-compatible（降级链路，stream: true）
+   ↓ fetch + ReadableStream 手写 SSE 解析
 ```
 
 两个核心文件职责分离：`aiAssistant.ts` 负责所有 LLM 通信逻辑（System Prompt 构建、SSE 流解析、Demo 降级），`AIChatAssistant.tsx` 负责 UI 状态管理和逐字打印动画，互不耦合。
@@ -1036,20 +1038,20 @@ function buildSystemPrompt(ctx?: DisasterContext): string {
 
 > **🎤 面试追问：这个项目的 AI 模块是基于 RAG 的吗？**
 >
-> **标准回答**：不是 RAG，我用的是更轻量的**动态上下文注入（Dynamic Context Injection）**。
+> **标准回答**：现在是“双路径”架构。主链路是 **ai-flow 工作流引擎**（LangGraph DAG，可配置 RAG 检索节点）；降级链路是直连模型 + **动态上下文注入（Dynamic Context Injection）**。
 >
-> RAG 的核心是"检索"——先把文档向量化存进数据库，用户提问时做相似度检索、召回相关片段再喂给 LLM。我这个方案没有检索步骤，而是每次请求前直接把平台当前的实时数据（事件总数、类型分布、近期代表事件）结构化地拼进 System Prompt。
+> 也就是说：
+> - 走 ai-flow 时，可以在服务端编排 LLM / RAG / Condition 等节点，属于“可接入 RAG”的能力架构；
+> - 直连降级时，不做向量检索，而是每次请求前把平台实时结构化数据（事件总数、类型分布、近期代表事件）直接拼进 System Prompt。
 >
-> 我选择不用 RAG 有三个原因：第一，灾害数据本身就是结构化的，直接注入比向量检索更精准、延迟更低；第二，数据 5 分钟刷新一次，RAG 需要维护向量索引，成本远高于收益；第三，这个场景不需要从大量文档中"找答案"，LLM 自身的地理和灾害领域知识已经足够，我只需要让它"看到"当前数据快照。
+> 我保留动态上下文注入作为兜底有三个原因：第一，灾害数据本身结构化且高频更新，直接注入延迟更低；第二，降级链路追求低成本与高可用，避免依赖向量索引；第三，这个场景更强调“当前数据快照”而不是离线文档检索。
 >
-> | | **RAG** | **本项目（动态上下文注入）** |
+> | | **ai-flow 主链路（可含 RAG）** | **直连降级链路（动态上下文注入）** |
 > |---|---|---|
-> | **数据存储** | 向量数据库（Pinecone / Chroma 等） | 无，直接用内存中的实时数据 |
-> | **检索步骤** | 提问 → Embedding → 向量相似度检索 → 召回文档片段 | 无检索，结构化数据直接拼入 System Prompt |
-> | **数据来源** | 离线索引的文档库（PDF、网页等） | 平台实时抓取的灾害事件（`hazards` 数组） |
-> | **适合场景** | 大量非结构化静态知识库 | 少量、结构化、高频更新的实时数据 |
->
-> 当然，如果将来要接入历史灾害报告、应急预案等大量非结构化文档，再升级成 RAG 也不复杂——用 **LangChain.js + Pinecone** 或 OpenAI Assistants API 的 File Search 都能快速接入。
+> | **数据能力** | 可编排 LLM / RAG / 条件分支 | 无检索，结构化数据直接注入 Prompt |
+> | **数据来源** | 可接向量库/知识库 + 实时数据 | 平台实时抓取的灾害事件（`hazards` 数组） |
+> | **适用目标** | 复杂多步骤分析、可扩展能力编排 | 快速可用、低延迟、低依赖兜底 |
+> | **系统定位** | 线上主链路 | 异常/无 Key/回退链路 |
 
 ---
 
@@ -1188,7 +1190,7 @@ onDone();
 
 > 整体分三层：
 >
-> **第一层 BFF 代理层**（`server.js`）：OpenAI API Key 不能暴露在浏览器里，前端请求本地 `/api/chat`，由 `server.js` 带 Key 去请求 OpenAI，同时把 SSE 流直接 `pipe` 给前端。
+> **第一层 BFF 代理层**（`server.js`）：`server.js` 在本项目中主要承担 DisasterAware 的 `/api` 代理与请求透传（含鉴权请求链路），用于屏蔽上游接口细节与统一跨域访问；AI 对话链路由前端直接调用 ai-flow 或 OpenAI-compatible 接口，不经过 `server.js` 转发。
 >
 > **第二层 API 通信层**（`aiAssistant.ts`）：核心是两个函数。`buildSystemPrompt()` 在每次请求前把当前地图上的实时灾害数据——事件总数、类型分布、近期代表事件——动态注入进 System Prompt，让 AI 能回答"现在哪个地区最危险"这类实时问题。`streamChatMessage()` 用原生 `fetch` + `ReadableStream` 手写 SSE 解析，用 `buf` 缓冲区处理跨 chunk 的不完整行，每解析出一个 token 就通过 `onChunk` 回调传给 UI 层。没有 API Key 时自动进入 Demo 降级模式，关键词匹配 5 套预设模板逐字模拟输出。
 >
@@ -1199,7 +1201,7 @@ onDone();
 > | 追问 | 要点 |
 > |---|---|
 > | **为什么不用 EventSource？** | 不支持 POST 和自定义 Header，无法传 `Authorization` token |
-> | **这是 RAG 吗？** | 不是标准 RAG（无向量检索），是动态上下文注入——实时数据直接拼进 Prompt |
+> | **这是 RAG 吗？** | 双路径：主链路 ai-flow 可配置 RAG 节点；降级链路是动态上下文注入（无向量检索） |
 > | **Demo 模式怎么实现？** | 关键词匹配 5 模板，`6ms/4字符` 节奏 `setTimeout` 逐字输出，体验与真实流式一致 |
 > | **如何防止流式消息乱序？** | `streamingIdRef` 记录当前消息 ID，组件卸载后收到的 chunk 通过 id 比对丢弃 |
 
@@ -1429,11 +1431,11 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 > **第二层：地图可视化层（Mapbox GL JS 3.15 + WebGL 渲染管线 + deck.gl）**
 > 核心是把原来的 DOM Marker 方案替换成 WebGL GeoJSON Layer。引入 LOD 三级调度：远景（zoom < 8）全量数据交给 GPU 渲染，避开 DOM；近景（zoom ≥ 8）保留 Marker 承担弹窗交互；城市级别开启 3D 建筑体块（配置了外部 3D Tiles URL 时通过 **deck.gl Tile3DLayer + CesiumIonLoader** 加载标准 3D Tiles，否则回退到 Mapbox fill-extrusion）。GeoJSON Source 增量 diff 更新避免全量重传，**Web Worker** 承担格式转换、去重和坐标清洗，主线程完全不感知数据处理耗时，10w+ 点位帧率稳定在 55fps+。
 >
-> **第三层：数据接入层（BFF 适配器 + 4 源并发聚合）**
-> Node.js server.js 充当 BFF，统一代理 4 个异构数据源（DisasterAware 有 OAuth 鉴权、USGS 是 GeoJSON、NASA 是 JSON 数组、GDACS 是 XML/RSS），转换为统一的 `Hazard` 标准接口；封装 authFetch 实现 OAuth 2.0 Token 自动刷新，Promise.allSettled 实现单源故障自动降级，5 分钟自动轮询，数据同步成功率 99.5%+。
+> **第三层：数据接入层（前端聚合 + BFF 代理）**
+> 本项目采用“前端聚合 + 部分 BFF 代理”：DisasterAware 通过 `server.js` 的 `/api` 代理接入并走 OAuth 鉴权；USGS / NASA / GDACS 由前端直接拉取并在 `MapView` 侧聚合为统一 `Hazard` 结构。通过 `Promise.allSettled` 实现单源故障自动降级，配合 5 分钟轮询，数据同步成功率 99.5%+。
 >
-> **第四层：AI 分析层（ai-flow 工作流引擎 + LangGraph DAG + SSE）**
-> 集成自研 AI 工作流引擎平台（Miaoma AI Flow），基于 LangGraph DAG 编排 LLM 推理、RAG 知识检索与条件分支节点；开发 6 类预设灾害分析工作流（全球态势/地震/洪水/野火等）；前端通过 SSE 流式接收响应，实时灾害数据动态注入 System Prompt，首字响应 < 1s，无 Key 时自动降级 Demo 模式，API 成功率 99%+。
+> **第四层：AI 分析层（ai-flow 工作流引擎 + LangGraph DAG + 双路径流式）**
+> 集成自研 AI 工作流引擎平台（Miaoma AI Flow），基于 LangGraph DAG 编排 LLM 推理、RAG 知识检索与条件分支节点；开发 6 类预设灾害分析工作流（全球态势/地震/洪水/野火等）。当前实现是“双路径流式”：ai-flow 路径返回完整结果后前端模拟打字机流；直连 OpenAI-compatible 路径使用 `fetch + ReadableStream` 手写 SSE 解析。两条路径都支持实时灾害数据动态注入 System Prompt，首字响应 < 1s，无 Key 时自动降级 Demo 模式，API 成功率 99%+。
 >
 > **第五层：数据分析微服务（Python FastAPI）**
 > FastAPI 微服务独立部署，提供 23 种统计算法 + 5 个预测模型（趋势预测、风险评估等），前端通过 RESTful API 按需调用，与前端主服务完全解耦，便于独立扩容。
@@ -1949,7 +1951,7 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 > 整体分三层：
 >
-> **第一层 BFF 代理层**（`server.js`）：OpenAI API Key 不能暴露在浏览器里，前端请求本地 `/api/chat`，由 `server.js` 带 Key 去请求 OpenAI，同时把 SSE 流直接 pipe 给前端。
+> **第一层 BFF 代理层**（`server.js`）：本项目 `server.js` 主要负责 DisasterAware 的 `/api` 代理与透传，不承担 OpenAI `/api/chat` 转发。AI 对话链路由前端直连 ai-flow 或 OpenAI-compatible 接口。
 >
 > **第二层 API 通信层**（`aiAssistant.ts`）：核心是 `buildSystemPrompt()` 和 `streamChatMessage()`。`buildSystemPrompt` 在每次请求前把当前地图实时灾害数据（事件总数、类型分布、近期代表事件）动态注入 System Prompt，让 AI 能回答"现在哪个地区最危险"这类实时问题。`streamChatMessage` 用原生 `fetch` + `ReadableStream` 手写 SSE 解析，`buf` 缓冲区处理跨 chunk 的不完整行，每解析出一个 token 通过 `onChunk` 回调传给 UI 层。没有 API Key 时自动进入 Demo 降级模式。
 >
@@ -2004,9 +2006,9 @@ const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
 
 #### Q23：动态上下文注入是 RAG 吗？
 
-> 不是标准的 RAG（Retrieval-Augmented Generation）。RAG 的核心是**向量检索**：把文档分块、embedding 后存入向量数据库，查询时先检索最相关的 chunk，再注入 Prompt。
+> 单看“动态上下文注入”这条链路，它不是标准 RAG（没有向量检索）；但从系统整体看，项目主链路已接入 ai-flow 工作流，支持配置 RAG 节点。
 >
-> 本项目是**动态上下文注入**：`buildSystemPrompt()` 在每次请求前直接把当前地图的实时数据（事件总数、类型分布、近期代表事件的 title/severity/location）拼进 System Prompt，无向量检索，无持久化存储。适合实时数据量不大（几十条代表事件）、需要每次都是最新状态的场景。
+> 可以这样表述更准确：本项目采用“双路径”——主链路可做 RAG 编排，降级链路用 `buildSystemPrompt()` 把实时灾害数据直接注入 Prompt，保证低延迟和高可用。
 
 ---
 

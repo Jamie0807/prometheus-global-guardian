@@ -1,4 +1,34 @@
 /**
+ * 可以，用你这个项目真实实现来讲，“后端层 -> AI 层 -> 前端层”的完整渲染链路是这样：
+ *
+ * 1. 前端发起请求
+ * 用户在聊天面板输入后，前端调用 src/api/aiAssistant.ts 的 streamChatMessage，并携带消息历史与灾害上下文。
+ *
+ * 2. 路由分支判断（AI 接入层）
+ * 在 src/api/aiAssistant.ts 内有两条执行路径：
+ * ai-flow 路径：调用工作流后端 /workflow/run。
+ * 直连模型路径：调用 OpenAI-compatible Chat Completions，stream: true。
+ *
+ * 3. 后端/模型执行
+ * ai-flow 路径：后端先完整执行 DAG 工作流（LLM/RAG/条件分支），返回完整文本结果。
+ * 直连路径：模型按 token 增量返回 SSE 数据流（data: ...）。
+ *
+ * 4. 前端接收与解析
+ *  ai-flow 路径：前端拿到完整文本后，按字符切片 + 定时器模拟“打字机流”。
+ *  直连路径：前端通过 resp.body.getReader() 持续读取 ReadableStream，TextDecoder 增量解码，按行解析 data:，提取 delta.content。
+ *
+ * 5. 状态更新与渲染
+ * 每次拿到增量文本就调用 onChunk，更新当前 assistant 消息内容；React 重新渲染对应气泡，实现逐字显示光标效果。
+ * 流结束时调用 onDone，把 isStreaming 置为 false，消息状态收敛为最终态。
+ *
+ * 6. 兜底与降级
+ * 如果没有 API Key，走本地 Demo 流式模拟，保证交互链路不断。
+ * 如果请求异常，调用 onError，前端结束流状态并展示错误提示。
+ *
+ * 你的渲染逻辑是“统一入口 + 双后端分支 + 前端流式消费/模拟 + 增量状态渲染”，最终都收敛到同一套聊天 UI 更新机制。
+ */
+
+/**
  * AI Disaster Analysis Assistant — LLM Streaming API Client
  *
  * 核心功能：
@@ -151,6 +181,14 @@ export async function streamChatMessage(
   onDone: () => void,
   onError: (err: string) => void
 ): Promise<void> {
+  /**
+   * 备注（面试可直接口述）：
+   * 1) 直连模型时，采用 fetch + ReadableStream 手写 SSE 解析：
+   *    - stream: true 发起流式请求
+   *    - resp.body.getReader() 持续 read() 读取分片
+   *    - 按 "data: ...\n\n" 协议行解析，提取 delta.content 增量渲染
+   * 2) 走 ai-flow 工作流时，不是后端 SSE 推流，而是拿到完整文本后前端模拟打字机流。
+   */
   // 优先级 1：ai-flow 工作流引擎（LangGraph DAG 编排，支持 RAG + 条件分支）
   if (AI_FLOW_API_URL && AI_FLOW_API_KEY) {
     await streamViaAIFlow(messages, context, onChunk, onDone, onError);
@@ -190,17 +228,22 @@ export async function streamChatMessage(
       return;
     }
 
+    // OpenAI 的流式响应是一个 SSE（Server-Sent Events）格式的 ReadableStream，需要逐行解析
+    // reader是 ReadableStreamDefaultReader 类型，提供 read() 方法读取流式数据块
     const reader = resp.body?.getReader();
+    // 如果没有响应体或无法获取 reader，直接报错
     if (!reader) { onError('无法读取响应流'); return; }
 
+    // SSE 格式解析，逐行处理流式输出
     const decoder = new TextDecoder();
     let buf = '';
 
-    // eslint-disable-next-line no-constant-condition
+    // OpenAI SSE 格式：data: {json}\n\n，最后以 data: [DONE] 结尾
     while (true) {
       const { done, value } = await reader.read();
+      //reader.read 返回一个 Promise，解析为 { done: boolean, value: Uint8Array }，done=true 代表流结束
       if (done) break;
-
+      //buf 是上一次残留的字符串，decoder.decode(value, { stream: true }) 是本次新读取的字符串，两者拼接后再按行分割处理
       buf += decoder.decode(value, { stream: true });
       const lines = buf.split('\n');
       buf = lines.pop() ?? '';
