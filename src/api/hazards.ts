@@ -104,7 +104,7 @@ export async function fetchNASAEONET(): Promise<Hazard[]> {
           id: event.id,
           title: event.title,
           type: hazardType,
-          severity: "ADVISORY",
+          severity: "ADVISORY" as const,
           description: `${category} - ${event.title}`,
           geometry: {
             type: geom.type,
