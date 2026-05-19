@@ -98,7 +98,7 @@ export async function fetchNASAEONET(): Promise<Hazard[]> {
       .map((event) => {
         const category = event.categories[0]?.title || "UNKNOWN";
         const hazardType = mapNASACategoryToType(category);
-        const geom = event.geometry[event.geometry.length - 1];
+        const geom = event.geometry?.length ? event.geometry[event.geometry.length - 1] : undefined;
         if (!geom) return null;
         return {
           id: event.id,
