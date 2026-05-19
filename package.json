@@ -26,6 +26,7 @@
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
     "date-fns": "^4.1.0",
+    "dompurify": "^3.4.5",
     "express": "^5.1.0",
     "lodash": "^4.17.21",
     "mapbox-gl": "^3.15.0",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@types/dompurify": "^3.0.5",
     "@types/lodash": "^4.17.21",
     "@vitejs/plugin-react": "^5.0.4",
     "eslint": "^9.36.0",

@@ -1,34 +1,4 @@
 /**
- * 可以，用你这个项目真实实现来讲，“后端层 -> AI 层 -> 前端层”的完整渲染链路是这样：
- *
- * 1. 前端发起请求
- * 用户在聊天面板输入后，前端调用 src/api/aiAssistant.ts 的 streamChatMessage，并携带消息历史与灾害上下文。
- *
- * 2. 路由分支判断（AI 接入层）
- * 在 src/api/aiAssistant.ts 内有两条执行路径：
- * ai-flow 路径：调用工作流后端 /workflow/run。
- * 直连模型路径：调用 OpenAI-compatible Chat Completions，stream: true。
- *
- * 3. 后端/模型执行
- * ai-flow 路径：后端先完整执行 DAG 工作流（LLM/RAG/条件分支），返回完整文本结果。
- * 直连路径：模型按 token 增量返回 SSE 数据流（data: ...）。
- *
- * 4. 前端接收与解析
- *  ai-flow 路径：前端拿到完整文本后，按字符切片 + 定时器模拟“打字机流”。
- *  直连路径：前端通过 resp.body.getReader() 持续读取 ReadableStream，TextDecoder 增量解码，按行解析 data:，提取 delta.content。
- *
- * 5. 状态更新与渲染
- * 每次拿到增量文本就调用 onChunk，更新当前 assistant 消息内容；React 重新渲染对应气泡，实现逐字显示光标效果。
- * 流结束时调用 onDone，把 isStreaming 置为 false，消息状态收敛为最终态。
- *
- * 6. 兜底与降级
- * 如果没有 API Key，走本地 Demo 流式模拟，保证交互链路不断。
- * 如果请求异常，调用 onError，前端结束流状态并展示错误提示。
- *
- * 你的渲染逻辑是“统一入口 + 双后端分支 + 前端流式消费/模拟 + 增量状态渲染”，最终都收敛到同一套聊天 UI 更新机制。
- */
-
-/**
  * AI Disaster Analysis Assistant — LLM Streaming API Client
  *
  * 核心功能：

@@ -22,6 +22,7 @@ export interface WorkerHazard {
 }
 
 export interface WorkerMessage {
+  id: number;
   hazards: WorkerHazard[];
 }
 
@@ -47,7 +48,7 @@ function filterCoords(hazards: WorkerHazard[]): WorkerHazard[] {
 }
 
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
-  const { hazards } = e.data;
+  const { id, hazards } = e.data;
 
   // 1. 坐标过滤
   const coordFiltered = filterCoords(hazards);
@@ -56,5 +57,5 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   const cleaned = dedup(coordFiltered);
 
   // 3. 返回主线程
-  self.postMessage(cleaned);
+  self.postMessage({ id, result: cleaned });
 };

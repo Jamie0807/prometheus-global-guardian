@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, lazy, Suspense, useCallback, useRef } from "react";
 import { authorize } from "./api/auth";
 import { notify } from "./utils/notifications";
 import Header from "./components/Header";
@@ -36,6 +36,9 @@ const App: React.FC = () => {
   const [selectedStyle, setSelectedStyle] = useState("dark-v11");
   const [disasters, setDisasters] = useState<Hazard[]>([]);
   const [filter, setFilter] = useState("ALL");
+  const refreshDataRef = useRef<() => void>(() => {});
+  const disastersRef = useRef<Hazard[]>([]);
+  disastersRef.current = disasters;
 
   useEffect(() => {
     (async () => {
@@ -49,8 +52,8 @@ const App: React.FC = () => {
   }, []);
 
   // Handle updates from MapView
-  const handleDisastersUpdate = (data: Hazard[]) => {
-    const previousCount = disasters.length;
+  const handleDisastersUpdate = useCallback((data: Hazard[]) => {
+    const previousCount = disastersRef.current.length;
     setDisasters(data);
     
     // 发送通知
@@ -60,7 +63,7 @@ const App: React.FC = () => {
     } else if (data.length > 0 && previousCount === 0) {
       notify.success('数据加载完成', `成功加载 ${data.length} 条灾害记录`);
     }
-  };
+  }, []);
 
   const handleStyleChange = (style: string) => {
     setSelectedStyle(style);
@@ -105,17 +108,20 @@ const App: React.FC = () => {
           </ErrorBoundary>
         ) : (
           <>
-            <MapView
-              mapStyle={selectedStyle}
-              onDataUpdate={handleDisastersUpdate}
-              filter={filter}
-            />
-            <StatusPanel
-              filter={filter}
-              onFilterChange={newFilter => setFilter(newFilter)}
-              onRefresh={() => window.location.reload()}
-              totalCount={disasters.length}
-            />
+              <MapView
+                mapStyle={selectedStyle}
+                onDataUpdate={handleDisastersUpdate}
+                filter={filter}
+                onRefreshReady={(refreshFn) => {
+                  refreshDataRef.current = refreshFn;
+                }}
+              />
+              <StatusPanel
+                filter={filter}
+                onFilterChange={newFilter => setFilter(newFilter)}
+                onRefresh={() => refreshDataRef.current()}
+                totalCount={disasters.length}
+              />
             <LegendPanel />
           </>
         )}

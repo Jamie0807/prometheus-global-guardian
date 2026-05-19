@@ -9,13 +9,9 @@
  * - 错误处理增强
  */
 
-const API_BASE_URL = 'http://localhost:8001';
+const API_BASE_URL = import.meta.env.VITE_PYTHON_API_URL ?? 'http://localhost:8001';
 const REQUEST_TIMEOUT = 30000; // 30秒超时
 const MAX_RETRIES = 3;
-
-// 请求队列，防止并发过多
-let requestQueue: Promise<any>[] = [];
-const MAX_CONCURRENT_REQUESTS = 3;
 
 /**
  * 带超时控制的fetch

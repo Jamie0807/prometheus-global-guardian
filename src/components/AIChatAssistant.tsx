@@ -16,6 +16,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
+import DOMPurify from 'dompurify';
 import {
   streamChatMessage,
   generateMessageId,
@@ -51,27 +52,27 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
       const boldLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
       if (line.startsWith('### ')) return (
-        <h4 key={i} className="ai-md-h4" dangerouslySetInnerHTML={{ __html: boldLine.replace(/^### /, '') }} />
+        <h4 key={i} className="ai-md-h4" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^### /, '')) }} />
       );
       if (line.startsWith('## ')) return (
-        <h3 key={i} className="ai-md-h3" dangerouslySetInnerHTML={{ __html: boldLine.replace(/^## /, '') }} />
+        <h3 key={i} className="ai-md-h3" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^## /, '')) }} />
       );
       if (line.startsWith('**') && line.endsWith('**') && !line.slice(2, -2).includes('**')) return (
-        <p key={i} className="ai-md-bold-line" dangerouslySetInnerHTML={{ __html: boldLine }} />
+        <p key={i} className="ai-md-bold-line" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }} />
       );
       if (line.startsWith('- ') || line.startsWith('• ')) return (
-        <li key={i} className="ai-md-li" dangerouslySetInnerHTML={{ __html: boldLine.replace(/^[-•] /, '') }} />
+        <li key={i} className="ai-md-li" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^[-•] /, '')) }} />
       );
       if (line.match(/^\d+\. /)) return (
-        <li key={i} className="ai-md-li ai-md-ol" dangerouslySetInnerHTML={{ __html: boldLine.replace(/^\d+\. /, '') }} />
+        <li key={i} className="ai-md-li ai-md-ol" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^\d+\. /, '')) }} />
       );
       if (line.startsWith('|') && line.endsWith('|')) return (
-        <div key={i} className="ai-md-table-row" dangerouslySetInnerHTML={{ __html: boldLine }} />
+        <div key={i} className="ai-md-table-row" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }} />
       );
       if (line === '---') return <hr key={i} className="ai-md-hr" />;
       if (line.trim() === '') return <div key={i} className="ai-md-spacer" />;
       return (
-        <p key={i} className="ai-md-p" dangerouslySetInnerHTML={{ __html: boldLine }} />
+        <p key={i} className="ai-md-p" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }} />
       );
     });
   };

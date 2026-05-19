@@ -6,34 +6,35 @@ import { Tile3DLayer } from "@deck.gl/geo-layers";
 import { CesiumIonLoader } from "@loaders.gl/3d-tiles";
 import type { Hazard, MapViewProps } from "../types";
 import { fetchHazardsActive } from "../api/disasteraware";
+import { fetchGDACS, fetchNASAEONET, fetchUSGSEarthquakes } from "../api/hazards";
 import { config } from "../config";
 import { HAZARD_COLORS, defaultColor } from "../config/hazardColors";
 
-// Web Worker：子线程负责去重 + 坐标过滤，不阻塞主线程
-const hazardWorker = new Worker(
-  new URL('../workers/hazard-worker.ts', import.meta.url),
-  { type: 'module' }
-);
+let _workerId = 0;
 
 /** 将原始灾害数组通过 Worker 清洗后返回 Promise<Hazard[]> */
-function cleanWithWorker(hazards: Hazard[]): Promise<Hazard[]> {
+function cleanWithWorker(worker: Worker, hazards: Hazard[]): Promise<Hazard[]> {
+  const id = ++_workerId;
   return new Promise(resolve => {
-    const handler = (e: MessageEvent<Hazard[]>) => {
-      hazardWorker.removeEventListener('message', handler);
-      resolve(e.data);
+    const handler = (e: MessageEvent<{ id: number; result: Hazard[] }>) => {
+      if (e.data.id !== id) return;
+      worker.removeEventListener('message', handler);
+      resolve(e.data.result);
     };
-    hazardWorker.addEventListener('message', handler);
-    hazardWorker.postMessage({ hazards });
+    worker.addEventListener('message', handler);
+    worker.postMessage({ id, hazards });
   });
 }
 
 const MapView: React.FC<MapViewProps> = ({
   filter,
   mapStyle,
-  onDataUpdate
+  onDataUpdate,
+  onRefreshReady
 }) => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const workerRef = useRef<Worker | null>(null);
   const [disasters, setDisasters] = useState<Hazard[]>([]);
   const markers = useRef<mapboxgl.Marker[]>([]);
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -44,59 +45,12 @@ const MapView: React.FC<MapViewProps> = ({
   const LOD_THRESHOLDS = { CLUSTER_MAX: 8, BUILDINGS_MIN: 14 };
 
   useEffect(() => {
-    if (map.current) return;
-    mapboxgl.accessToken = config.mapbox.token;
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current!,
-      style: `mapbox://styles/mapbox/${mapStyle}`,
-      projection: "globe",
-      center: [0, 20],
-      zoom: 1.5
-    });
-
-    map.current.on("load", () => {
-      map.current?.setFog({
-        color: "rgb(186, 210, 235)",
-        "high-color": "rgb(36, 92, 223)",
-        "horizon-blend": 0.02,
-        "space-color": "rgb(11, 11, 25)",
-        "star-intensity": 0.6
-      });
-      fetchDisasters();
-      initializeHeatmapLayer();
-      initializeLODLayers();
-      initialize3DBuildings();
-      // 注册 zoom 事件，实现基于视距的 LOD 动态切换
-      map.current?.on('zoom', () => {
-        if (map.current) applyLOD(map.current.getZoom());
-      });
-      applyLOD(1.5);
-    });
-
-    // 初始化 deck.gl overlay（仅在配置了外部 3D Tiles URL 时）
-    if (config.tiles3d.enabled) {
-      deckOverlay.current = new MapboxOverlay({ layers: [] });
-      map.current.addControl(deckOverlay.current as any);
-    }
-
-    return () => {
-      if (deckOverlay.current) {
-        map.current?.removeControl(deckOverlay.current as any);
-        deckOverlay.current = null;
-      }
-      map.current?.remove();
-      map.current = null;
-    };
-    // eslint-disable-next-line
-  }, []);
-
-  useEffect(() => {
     if (map.current && disasters.length > 0) {
       addMarkersToMap(
         filter === "ALL" ? disasters : disasters.filter(d => d.type === filter)
       );
     }
-  }, [filter, disasters, mapStyle]);
+  }, [filter, disasters]);
 
   // 当 mapStyle 改变时更新地图样式，并重新初始化所有自定义图层
   useEffect(() => {
@@ -123,12 +77,12 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [mapStyle]);
 
-  const fetchDisasterAwareHazards = async (): Promise<Hazard[]> => {
+  const fetchDisasterAwareHazards = useCallback(async (): Promise<Hazard[]> => {
     try {
       const data = await fetchHazardsActive(
         filter === "ALL" ? "EVENT" : filter
       );
-      return data.map((hazard: any) => ({
+      return data.map(hazard => ({
         id: hazard.hazard_ID || `da-${Date.now()}`,
         title: hazard.hazard_Name || "Unknown Hazard",
         type: hazard.type_ID || "UNKNOWN",
@@ -151,15 +105,15 @@ const MapView: React.FC<MapViewProps> = ({
       console.warn("DisasterAware API failed", error);
       return [];
     }
-  };
+  }, [filter]);
 
-  const fetchDisasters = async () => {
+  const fetchDisasters = useCallback(async () => {
     try {
       // Prefer using the DisasterAware API; if it fails, fall back to other data sources.
       const res = await fetchDisasterAwareHazards();
       if (res.length > 0) {
         // Web Worker 子线程清洗（去重 + 坐标过滤），主线程不感知耗时
-        const cleaned = await cleanWithWorker(res);
+        const cleaned = workerRef.current ? await cleanWithWorker(workerRef.current, res) : res;
         setDisasters(cleaned);
         onDataUpdate(cleaned);
       } else {
@@ -175,143 +129,72 @@ const MapView: React.FC<MapViewProps> = ({
             all.push(...res.value);
         });
         // 多源合并后统一清洗
-        const cleaned = await cleanWithWorker(all);
+        const cleaned = workerRef.current ? await cleanWithWorker(workerRef.current, all) : all;
         setDisasters(cleaned);
         onDataUpdate(cleaned);
       }
     } catch (err) {
       console.error("Error loading disasters:", err);
     }
-  };
+  }, [fetchDisasterAwareHazards, onDataUpdate]);
 
-  // Fetch from USGS Earthquake API
-  async function fetchUSGSEarthquakes(): Promise<Hazard[]> {
-    try {
-      const response = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson');
-      if (!response.ok) return [];
-      
-      const data = await response.json();
-      return data.features
-        .map((feature: any) => ({
-          id: feature.id,
-          title: feature.properties.title || feature.properties.place,
-          type: 'EARTHQUAKE',
-          severity: feature.properties.mag >= 6.0 ? 'WARNING' as const : 
-                  feature.properties.mag >= 5.0 ? 'WATCH' as const : 'ADVISORY' as const,
-          description: `Magnitude ${feature.properties.mag} earthquake - ${feature.properties.place}`,
-          geometry: feature.geometry,
-          magnitude: feature.properties.mag,
-          time: new Date(feature.properties.time).toISOString(),
-          source: 'USGS'
-        }));
-    } catch (error) {
-      console.error('USGS fetch error:', error);
-      return [];
-    }
-  }
+  useEffect(() => {
+    if (map.current) return;
+    workerRef.current = new Worker(
+      new URL("../workers/hazard-worker.ts", import.meta.url),
+      { type: "module" }
+    );
+    mapboxgl.accessToken = config.mapbox.token;
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current!,
+      style: `mapbox://styles/mapbox/${mapStyle}`,
+      projection: "globe",
+      center: [0, 20],
+      zoom: 1.5
+    });
 
-  // Fetch from NASA EONET
-  async function fetchNASAEONET(): Promise<Hazard[]> {
-    try {
-      const response = await fetch('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300');
-      if (!response.ok) return [];
-      
-      const data = await response.json();
-      return data.events
-        .map((event: any) => {
-          const category = event.categories[0]?.title || 'UNKNOWN';
-          const hazardType = mapNASACategoryToType(category);
-          
-          const geom = event.geometry[event.geometry.length - 1];
-          
-          return {
-            id: event.id,
-            title: event.title,
-            type: hazardType,
-            severity: 'ADVISORY' as const,
-            description: `${category} - ${event.title}`,
-            geometry: {
-              type: geom.type,
-              coordinates: geom.coordinates
-            },
-            time: geom.date,
-            source: 'NASA EONET'
-          };
-        });
-    } catch (error) {
-      console.error('NASA EONET fetch error:', error);
-      return [];
-    }
-  }
-
-  // Fetch from GDACS
-  async function fetchGDACS(): Promise<Hazard[]> {
-    try {
-      const response = await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH');
-      if (!response.ok) return [];
-      
-      const geojson = await response.json();
-      const features = geojson.features || [];
-      const results: Hazard[] = [];
-
-      features.forEach((feature: any) => {
-        const { geometry, properties } = feature;
-        if (!geometry?.coordinates) return;
-        
-        const title = properties.name || properties.eventname || 'Unknown Event';
-        const description = properties.description || properties.htmldescription || '';
-        const hazardType = detectHazardTypeFromTitle(title.concat(' ', description, ' ', properties.severitydata.severitytext || ''));
-        const severity =
-          properties.alertlevel === 'Red' ? 'WARNING' :
-          properties.alertlevel === 'Orange' ? 'WATCH' :
-          'ADVISORY';
-
-        results.push({
-          id: `gdacs-${properties.eventid || Date.now()}`,
-          title,
-          type: hazardType,
-          severity,
-          description,
-          geometry,
-          source: 'GDACS',
-          url: properties.url?.report || undefined
-        });
+    map.current.on("load", () => {
+      map.current?.setFog({
+        color: "rgb(186, 210, 235)",
+        "high-color": "rgb(36, 92, 223)",
+        "horizon-blend": 0.02,
+        "space-color": "rgb(11, 11, 25)",
+        "star-intensity": 0.6
       });
+      fetchDisasters();
+      onRefreshReady?.(fetchDisasters);
+      initializeHeatmapLayer();
+      initializeLODLayers();
+      initialize3DBuildings();
+      // 注册 zoom 事件，实现基于视距的 LOD 动态切换
+      map.current?.on('zoom', () => {
+        if (map.current) applyLOD(map.current.getZoom());
+      });
+      applyLOD(1.5);
+    });
 
-      return results;
-    } catch (error) {
-      console.error('GDACS fetch error:', error);
-      return [];
+    // 初始化 deck.gl overlay（仅在配置了外部 3D Tiles URL 时）
+    if (config.tiles3d.enabled) {
+      deckOverlay.current = new MapboxOverlay({ layers: [] });
+      map.current.addControl(deckOverlay.current as any);
     }
-  }
 
+    return () => {
+      if (deckOverlay.current) {
+        map.current?.removeControl(deckOverlay.current as any);
+        deckOverlay.current = null;
+      }
+      map.current?.remove();
+      map.current = null;
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    };
+    // eslint-disable-next-line
+  }, []);
 
-  const mapNASACategoryToType = (category: string): string => {
-    if (category.includes("Wildfires")) return "WILDFIRE";
-    if (category.includes("Volcanoes")) return "VOLCANO";
-    if (category.includes("Floods")) return "FLOOD";
-    if (category.includes("Severe Storms")) return "STORM";
-    if (category.includes("Drought")) return "DROUGHT";
-    if (category.includes("Landslides")) return "LANDSLIDE";
-    return "UNKNOWN";
-  };
-
-  const detectHazardTypeFromTitle = (title: string): string => {
-    const t = title.toLowerCase();
-    if (t.includes("earthquake")) return "EARTHQUAKE";
-    if (t.includes("flood")) return "FLOOD";
-    if (
-      t.includes("cyclone") ||
-      t.includes("hurricane") ||
-      t.includes("typhoon")
-    )
-      return "TROPICAL_CYCLONE";
-    if (t.includes("volcano")) return "VOLCANO";
-    if (t.includes("drought")) return "DROUGHT";
-    if (t.includes("tsunami")) return "TSUNAMI";
-    if (t.includes("storm")) return "STORM";
-    return "UNKNOWN";
-  };
+  useEffect(() => {
+    onRefreshReady?.(fetchDisasters);
+  }, [fetchDisasters, onRefreshReady]);
   // LOD：基于聚合的中远景图层（zoom < CLUSTER_MAX）
   const initializeLODLayers = () => {
     if (!map.current) return;
