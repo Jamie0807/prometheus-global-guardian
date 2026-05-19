@@ -110,7 +110,7 @@ export async function fetchNASAEONET(): Promise<Hazard[]> {
             type: geom.type,
             coordinates: geom.coordinates,
           },
-          timestamp: geom.date,
+          timestamp: geom.date ? new Date(geom.date).toISOString() : undefined,
           source: "NASA EONET",
         } as Hazard;
       })

@@ -192,9 +192,6 @@ const MapView: React.FC<MapViewProps> = ({
     // eslint-disable-next-line
   }, []);
 
-  useEffect(() => {
-    onRefreshReady?.(fetchDisasters);
-  }, [fetchDisasters, onRefreshReady]);
   // LOD：基于聚合的中远景图层（zoom < CLUSTER_MAX）
   const initializeLODLayers = () => {
     if (!map.current) return;
