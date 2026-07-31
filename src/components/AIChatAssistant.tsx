@@ -300,8 +300,8 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
               <div className="ai-welcome-icon">🛰️</div>
               <h3>Prometheus AI 灾害分析助手</h3>
               <p>基于大语言模型，实时分析全球灾害态势，提供专业风险研判与应急建议。</p>
-              {!((import.meta as any).env?.VITE_OPENAI_API_KEY) && (
-                <div className="ai-demo-badge">🎭 Demo 演示模式（配置 VITE_OPENAI_API_KEY 启用完整 AI）</div>
+              {!((import.meta as any).env?.VITE_VOLCENGINE_ARK_API_KEY || (import.meta as any).env?.VITE_ARK_API_KEY || (import.meta as any).env?.VITE_OPENAI_API_KEY) && (
+                <div className="ai-demo-badge">🎭 Demo 演示模式（配置 VITE_VOLCENGINE_ARK_API_KEY 启用火山方舟模型）</div>
               )}
             </div>
           )}

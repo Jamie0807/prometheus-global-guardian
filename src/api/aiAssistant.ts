@@ -2,7 +2,7 @@
  * AI Disaster Analysis Assistant — LLM Streaming API Client
  *
  * 核心功能：
- * - 基于 OpenAI Chat Completions API（兼容任意 OpenAI-compatible 接口）
+ * - 基于火山方舟 / OpenAI-compatible Chat Completions API
  * - 流式输出（SSE / ReadableStream）实现逐字打印效果
  * - 自动注入灾害实时上下文，提供 Demo 降级模式（无 API Key 时）
  */
@@ -31,11 +31,11 @@ export interface DisasterContext {
   }>;
 }
 
+import { resolveAIProviderConfig } from './aiProviderConfig';
+
 // ─── 环境配置 ────────────────────────────────────────────────────────────────
 
-const API_KEY   = (import.meta as any).env?.VITE_OPENAI_API_KEY  ?? '';
-const API_URL   = (import.meta as any).env?.VITE_OPENAI_API_URL  ?? 'https://api.openai.com/v1/chat/completions';
-const AI_MODEL  = (import.meta as any).env?.VITE_OPENAI_MODEL    ?? 'gpt-3.5-turbo';
+const AI_PROVIDER = resolveAIProviderConfig((import.meta as any).env ?? {});
 
 // ─── Miaoma AI Flow 工作流引擎配置 ──────────────────────────────────────────
 // 优先级：ai-flow 工作流引擎 > 直连 OpenAI > Demo 降级模式
@@ -165,14 +165,19 @@ export async function streamChatMessage(
     return;
   }
 
-  // 优先级 2：无 ai-flow 时直连 OpenAI，无 API Key 时进入 Demo 演示模式
-  if (!API_KEY) {
+  // 优先级 2：无 ai-flow 时直连火山方舟 / OpenAI-compatible 服务，无 API Key 时进入 Demo 演示模式
+  if (!AI_PROVIDER.apiKey) {
     await runDemoMode(messages, context, onChunk, onDone);
     return;
   }
 
+  if (AI_PROVIDER.missingModel) {
+    onError('火山方舟模型未配置，请在 .env 中设置 VITE_VOLCENGINE_ARK_MODEL');
+    return;
+  }
+
   const payload = {
-    model: AI_MODEL,
+    model: AI_PROVIDER.model,
     stream: true,
     temperature: 0.7,
     max_tokens: 1500,
@@ -183,18 +188,18 @@ export async function streamChatMessage(
   };
 
   try {
-    const resp = await fetch(API_URL, {
+    const resp = await fetch(AI_PROVIDER.apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
+        Authorization: `Bearer ${AI_PROVIDER.apiKey}`,
       },
       body: JSON.stringify(payload),
     });
 
     if (!resp.ok) {
       const text = await resp.text();
-      onError(`API 请求失败 (${resp.status}): ${text}`);
+      onError(`${AI_PROVIDER.providerName} API 请求失败 (${resp.status}): ${text}`);
       return;
     }
 
@@ -401,7 +406,7 @@ ${ctx ? `📡 当前平台正在监控 **${ctx.total} 条**活跃灾害事件。
 
 > 💡 **提示**：你可以点击下方快捷问题，或直接输入想了解的内容。
 > 
-> ⚙️ **配置真实 LLM**：在 \`.env\` 中设置 \`VITE_OPENAI_API_KEY\` 即可启用完整 AI 能力（当前为 Demo 演示模式）。`;
+> ⚙️ **配置真实 LLM**：在 \`.env\` 中设置 \`VITE_VOLCENGINE_ARK_API_KEY\` 和 \`VITE_VOLCENGINE_ARK_MODEL\` 即可启用火山方舟模型服务（当前为 Demo 演示模式）。`;
   }
 
   // 逐字流式输出，模拟打字效果

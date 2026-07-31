@@ -318,27 +318,26 @@ chmod +x start-python-service.sh
 
 ### **配置 AI 灾害分析助手（可选）**
 
-在 `.env` 中添加 LLM 配置即可启用完整 AI 功能，**不配置则自动进入 Demo 演示模式**：
+在 `.env` 中添加火山方舟模型服务配置即可启用完整 AI 功能，**不配置则自动进入 Demo 演示模式**：
 
 ```dotenv
-# 填入 API Key（选择以下任一服务）
-VITE_OPENAI_API_KEY=sk-你的key
+# 火山方舟 API Key
+VITE_VOLCENGINE_ARK_API_KEY=你的火山方舟APIKey
 
-# 可选：模型名称（默认 gpt-3.5-turbo）
-# VITE_OPENAI_MODEL=deepseek-chat
+# 火山方舟模型名称或 endpoint id
+VITE_VOLCENGINE_ARK_MODEL=你的模型或EndpointID
 
-# 可选：自定义接口地址（兼容国内服务）
-# VITE_OPENAI_API_URL=https://api.deepseek.com/v1/chat/completions
+# 可选：默认就是北京区域 OpenAI-compatible Chat Completions 地址
+VITE_VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
 ```
 
-**推荐 LLM 服务（均兼容 OpenAI 格式）：**
+也保留兼容旧的 OpenAI-format 配置：
 
-| 服务 | Key 获取 | API URL | 特点 |
-|------|---------|---------|------|
-| **DeepSeek** | [platform.deepseek.com](https://platform.deepseek.com) | `https://api.deepseek.com/v1/chat/completions` | 国内直连、性价比高 |
-| **OpenAI** | [platform.openai.com](https://platform.openai.com/api-keys) | 不填（默认） | 原生接口 |
-| **通义千问** | [bailian.aliyun.com](https://bailian.aliyun.com) | 阿里云控制台获取 | 有免费额度 |
-| **智谱 GLM** | [open.bigmodel.cn](https://open.bigmodel.cn) | `https://open.bigmodel.cn/api/paas/v4/chat/completions` | 免费额度多 |
+```dotenv
+VITE_OPENAI_API_KEY=sk-你的key
+VITE_OPENAI_MODEL=deepseek-chat
+VITE_OPENAI_API_URL=https://api.deepseek.com/v1/chat/completions
+```
 
 ## **数据源**
 
@@ -431,12 +430,12 @@ VITE_OPENAI_API_KEY=sk-你的key
 只需在 `.env` 中配置，代码无需修改：
 
 ```dotenv
-VITE_OPENAI_API_KEY=sk-你的key
-VITE_OPENAI_MODEL=deepseek-chat
-VITE_OPENAI_API_URL=https://api.deepseek.com/v1/chat/completions
+VITE_VOLCENGINE_ARK_API_KEY=你的火山方舟APIKey
+VITE_VOLCENGINE_ARK_MODEL=你的模型或EndpointID
+VITE_VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
 ```
 
-兼容：**OpenAI** / **DeepSeek** / **通义千问** / **智谱 GLM** / **Azure OpenAI** / **本地 Ollama** 等任意 OpenAI-format 接口。
+优先使用：**火山方舟**。同时兼容旧的 **OpenAI** / **DeepSeek** / **通义千问** / **智谱 GLM** / **Azure OpenAI** / **本地 Ollama** 等任意 OpenAI-format 接口配置。
 
 ---
 
