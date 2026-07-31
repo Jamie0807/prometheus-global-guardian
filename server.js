@@ -3,6 +3,7 @@ import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 import getRawBody from "raw-body";
+import { fetchAllHazards } from "./hazards-source.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,40 @@ app.use(async (req, res, next) => {
     console.error("Raw body error:", err);
   }
   next();
+});
+
+// Aggregated multi-source hazards endpoint (USGS / NASA EONET / GDACS).
+// Register before the generic /api proxy so this route is handled locally.
+app.get("/api/hazards", async (req, res) => {
+  try {
+    const sourcesParam = req.query.source ?? req.query.sources;
+    const sources =
+      typeof sourcesParam === "string" && sourcesParam.trim().length > 0
+        ? sourcesParam.split(",").map((s) => s.trim()).filter(Boolean)
+        : undefined;
+
+    const typeParam = req.query.type;
+    const typeFilter =
+      typeof typeParam === "string" && typeParam.trim().length > 0
+        ? new Set(typeParam.split(",").map((s) => s.trim().toUpperCase()))
+        : null;
+
+    const { hazards, meta } = await fetchAllHazards({ sources });
+    const filtered = typeFilter
+      ? hazards.filter((h) => typeFilter.has(String(h.type).toUpperCase()))
+      : hazards;
+
+    res.status(200).json({
+      success: true,
+      data: filtered,
+      meta: { ...meta, returned: filtered.length },
+    });
+  } catch (err) {
+    console.error("/api/hazards error:", err);
+    res
+      .status(500)
+      .json({ success: false, error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 // Proxy all /api requests to the DisasterAware API
