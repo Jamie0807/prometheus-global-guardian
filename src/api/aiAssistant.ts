@@ -84,7 +84,7 @@ function buildSystemPrompt(ctx?: DisasterContext): string {
   return prompt;
 }
 
-// ─── Miaoma AI Flow 工作流引擎调用 ──────────────────────────────────────────
+// ─── AI Flow 工作流引擎调用 ──────────────────────────────────────────
 /**
  * 调用 ai-flow 的 NestJS API Server（POST /workflow/run）
  * 由 ai-engine 基于 LangGraph DAG 执行工作流，支持 LLM / RAG / Condition 节点编排
@@ -152,7 +152,7 @@ export async function streamChatMessage(
   onError: (err: string) => void
 ): Promise<void> {
   /**
-   * 备注（面试可直接口述）：
+   * 备注：
    * 1) 直连模型时，采用 fetch + ReadableStream 手写 SSE 解析：
    *    - stream: true 发起流式请求
    *    - resp.body.getReader() 持续 read() 读取分片

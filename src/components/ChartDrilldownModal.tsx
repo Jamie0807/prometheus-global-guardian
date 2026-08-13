@@ -16,7 +16,6 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
   onClose,
   title,
   filteredHazards,
-  drilldownType: _,
   drilldownValue,
 }) => {
   if (!isOpen) {

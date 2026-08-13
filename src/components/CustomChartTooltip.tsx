@@ -54,7 +54,7 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
           </div>
         );
 
-      case 'severity':
+      case 'severity': {
         const severityDescriptions: Record<string, string> = {
           'Extreme': 'Immediate action required - life-threatening situation',
           'Severe': 'Significant threat - prepare for impact',
@@ -93,8 +93,9 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
             </div>
           </div>
         );
+      }
 
-      case 'timeline':
+      case 'timeline': {
         const totalForDate = Object.values(data).reduce((acc: number, val) => {
           if (typeof val === 'number') return acc + val;
           return acc;
@@ -142,6 +143,7 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
             </div>
           </div>
         );
+      }
 
       case 'source':
         return (

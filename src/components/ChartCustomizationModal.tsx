@@ -282,13 +282,3 @@ const ChartCustomizationModal: React.FC<ChartCustomizationModalProps> = ({
 };
 
 export default ChartCustomizationModal;
-
-// Default settings export
-export const DEFAULT_CHART_SETTINGS: ChartSettings = {
-  colorScheme: 'default',
-  customColors: COLOR_SCHEMES.default,
-  chartStyle: 'smooth',
-  gridLines: true,
-  animations: true,
-  fontSize: 'medium'
-};

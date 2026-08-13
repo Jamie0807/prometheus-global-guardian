@@ -1,0 +1,32 @@
+{
+  "version": "0.2",
+  "language": "en,zh-CN",
+  "ignorePaths": [
+    "dist",
+    "node_modules",
+    "package-lock.json",
+    "python-analytics-service/.venv"
+  ],
+  "words": [
+    "DisasterAware",
+    "EONET",
+    "FastAPI",
+    "GDACS",
+    "GeoJSON",
+    "Mapbox",
+    "Mapboxgl",
+    "NumPy",
+    "OpenAI",
+    "Pandas",
+    "Recharts",
+    "Scikit",
+    "TypeScript",
+    "USGS",
+    "Vite",
+    "Volcengine",
+    "WebGL",
+    "deck",
+    "loaders",
+    "uvicorn"
+  ]
+}

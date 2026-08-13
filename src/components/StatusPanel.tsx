@@ -19,7 +19,6 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 }) => {
   const [hazardTypes, setHazardTypes] = useState<HazardType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [pythonServiceOnline, setPythonServiceOnline] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -45,8 +44,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
   }, []);
 
   const checkPythonService = async () => {
-    const isOnline = await checkHealth();
-    setPythonServiceOnline(isOnline);
+    await checkHealth();
   };
 
   return (

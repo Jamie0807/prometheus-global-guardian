@@ -78,7 +78,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [, setErrorMessage] = useState<string>('');
   const [retryCount, setRetryCount] = useState(0);
   
   // 数据缓存：避免重复分析相同数据
@@ -109,7 +109,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
       } else {
         notify.error('服务离线', '无法连接到Python分析服务');
       }
-    } catch (error) {
+    } catch {
       setServiceStatus('offline');
       notify.error('连接失败', '检查服务状态失败');
     }
