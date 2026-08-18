@@ -1,6 +1,392 @@
 # Prometheus Global Guardian
 
-Languages: [中文](#中文) | [English](#english)
+Languages: [English](#english) | [中文](#中文)
+
+---
+
+## English
+
+Prometheus Global Guardian is an operational platform for global hazard monitoring, geospatial visualization, analytics, and AI-assisted incident assessment.
+
+The system consolidates live hazard feeds, normalizes event data, renders global situational awareness on an interactive map, and provides analytical workflows for risk review, reporting, and decision support.
+
+### Table of Contents
+
+- [Platform Overview](#platform-overview)
+- [Core Capabilities](#core-capabilities)
+- [System Architecture](#system-architecture)
+- [Service Topology](#service-topology)
+- [Technology Stack](#technology-stack)
+- [Runtime Requirements](#runtime-requirements)
+- [Configuration](#configuration)
+- [Local Development](#local-development)
+- [Python Analytics Service](#python-analytics-service)
+- [AI Assistant Provider](#ai-assistant-provider)
+- [Production Build](#production-build)
+- [API Surface](#api-surface)
+- [Data Sources](#data-sources)
+- [Operational Notes](#operational-notes)
+- [Security Notes](#security-notes)
+- [Project Structure](#project-structure)
+
+### Platform Overview
+
+The platform is organized around four operational domains:
+
+- **Hazard ingestion**: integrates DisasterAware, USGS, NASA EONET, and GDACS feeds.
+- **Geospatial operations**: presents active events through Mapbox GL, markers, heatmap mode, clustering, and 3D building layers.
+- **Analytics and reporting**: provides statistical summaries, charting, risk assessment, data quality checks, and exportable reports.
+- **AI-assisted analysis**: injects live hazard context into an LLM assistant for structured situation summaries and response recommendations.
+
+The platform consists of a React frontend, a lightweight Express API layer, a Python FastAPI analytics service, and external data/model providers.
+
+### Core Capabilities
+
+#### Global Hazard Monitoring
+
+- Visualizes active disaster events across multiple authoritative sources.
+- Supports hazard filtering by earthquake, volcano, flood, wildfire, storm, drought, tsunami, and landslide.
+- Uses a unified `Hazard` data model across mapping, analytics, AI context, and reporting.
+- Cleans hazard data through a Web Worker to reduce UI thread pressure.
+
+#### Geospatial Visualization
+
+- Interactive global map powered by Mapbox GL.
+- Supports event markers, contextual popups, and heatmap mode.
+- Uses LOD clustering for mid and low zoom levels.
+- Provides optional 3D Tiles overlays through deck.gl and loaders.gl.
+- Supports configurable Mapbox base map styles.
+
+#### Analytics Workspace
+
+- Presents statistical summaries of active hazard records.
+- Renders type, severity, timeline, and source distribution charts with Recharts.
+- Uses the Python service for statistics, predictions, risk assessment, ETL, and data quality checks.
+- Includes service health, loading, error, retry, and cached-analysis states.
+
+#### AI-Assisted Incident Analysis
+
+- Provides a streaming LLM chat interface.
+- Injects current hazard context into the system prompt.
+- Offers quick prompts for global situation review, flood risk, seismic activity, wildfire threat, forecasting, and emergency response.
+- Falls back to local demo responses when no model key is configured.
+- Prioritizes Volcengine Ark through an OpenAI-compatible Chat Completions endpoint.
+- Retains compatibility with generic OpenAI-format providers.
+
+#### Reporting and Notifications
+
+- Generates HTML reports from filtered hazard data.
+- Uses an in-memory singleton notification manager with a subscription API.
+- Integrates browser notifications when permission is granted.
+- Provides modal workflows for settings, reporting, analytics, and AI assistance.
+
+### System Architecture
+
+```mermaid
+flowchart LR
+  Browser["React Client"]
+  Express["Express API Layer"]
+  Python["Python Analytics Service"]
+  DisasterAware["DisasterAware API"]
+  PublicFeeds["USGS / NASA EONET / GDACS"]
+  LLM["Volcengine Ark / OpenAI-Compatible LLM"]
+
+  Browser -->|/api/authorize, /api/hazards/active| Express
+  Express --> DisasterAware
+  Express -->|/api/hazards aggregation| PublicFeeds
+  Browser -->|analytics requests| Python
+  Browser -->|streaming chat completions| LLM
+```
+
+The Express layer currently handles production static hosting, DisasterAware API proxying, and multi-source hazard aggregation under `/api/hazards`.
+
+The Python analytics service runs as an independent FastAPI process on port `8001` by default.
+
+### Service Topology
+
+| Service | Runtime | Default Port | Responsibility |
+|---|---:|---:|---|
+| React / Vite client | Node.js | 5173 | Frontend development server |
+| Express server | Node.js | 8080 | Static hosting, API proxying, hazard aggregation |
+| Python analytics service | Python 3.13 | 8001 | Statistics, prediction, ETL, risk, quality APIs |
+| External LLM provider | SaaS | HTTPS | Chat completion and streaming response |
+
+### Technology Stack
+
+#### Frontend
+
+| Technology | Purpose |
+|---|---|
+| React 19 | Component model and UI rendering |
+| TypeScript 5.9 | Static typing and application contracts |
+| Vite 7 | Development server and production build |
+| Mapbox GL | Interactive map rendering |
+| deck.gl / loaders.gl | Optional 3D Tiles integration |
+| Recharts | Analytics visualizations |
+| DOMPurify | Sanitization for rendered assistant output |
+
+#### Backend and Analytics
+
+| Technology | Purpose |
+|---|---|
+| Express 5 | API proxy layer and production app server |
+| node-fetch | Server-side requests to external providers |
+| raw-body | Request body forwarding for proxied API calls |
+| FastAPI | Python analytics API service |
+| Pandas / NumPy | Data processing and numerical computation |
+| SciPy / Statsmodels | Statistical analysis |
+| Scikit-learn | Prediction and modeling workflows |
+
+### Runtime Requirements
+
+| Runtime | Version |
+|---|---|
+| Node.js | 18.x |
+| npm | Compatible with Node 18 |
+| Python | 3.13 recommended for analytics |
+
+The repository includes `.nvmrc`; use the following command to switch Node versions:
+
+```bash
+nvm use
+```
+
+### Configuration
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+#### Required Frontend Configuration
+
+```dotenv
+VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
+```
+
+#### Optional DisasterAware Credentials
+
+```dotenv
+VITE_USERNAME=your_username_here
+VITE_PASSWORD=your_password_here
+```
+
+When DisasterAware credentials are unavailable, the application can still use public feed fallbacks where supported.
+
+#### Optional Python Analytics Endpoint
+
+```dotenv
+VITE_PYTHON_API_URL=http://localhost:8001
+```
+
+#### Optional AI Provider Configuration
+
+```dotenv
+VITE_VOLCENGINE_ARK_API_KEY=your_volcengine_ark_api_key_here
+VITE_VOLCENGINE_ARK_MODEL=auto
+VITE_VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
+```
+
+`VITE_VOLCENGINE_ARK_MODEL` may be set to `auto` or to a concrete model / endpoint ID from the Volcengine Ark console.
+
+The AI client also supports generic OpenAI-format configuration:
+
+```dotenv
+VITE_OPENAI_API_KEY=sk-your-key
+VITE_OPENAI_MODEL=your-model
+VITE_OPENAI_API_URL=https://provider.example.com/v1/chat/completions
+```
+
+### Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the frontend development server:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+Run linting:
+
+```bash
+npm run lint
+```
+
+Build the frontend:
+
+```bash
+npm run build
+```
+
+### Python Analytics Service
+
+The analytics service runs independently from the React application and must be started separately when analytics features are required.
+
+Recommended command from the repository root:
+
+```bash
+chmod +x start-python-service.sh && ./start-python-service.sh
+```
+
+Manual startup:
+
+```bash
+cd python-analytics-service
+python3.13 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Service endpoints:
+
+| URL | Purpose |
+|---|---|
+| `http://localhost:8001/health` | Health check |
+| `http://localhost:8001/docs` | Swagger API documentation |
+| `http://localhost:8001/redoc` | ReDoc API documentation |
+
+### AI Assistant Provider
+
+The AI assistant selects providers in this order:
+
+1. Uses ai-flow when `VITE_AI_FLOW_API_URL` + `VITE_AI_FLOW_API_KEY` are configured.
+2. Uses Volcengine Ark when Ark variables are configured.
+3. Uses a generic OpenAI-compatible provider when configured.
+4. Falls back to local demo responses when no model key is configured.
+
+Direct browser-based model configuration is convenient for local development and demos. For production usage, route model calls through a server-side endpoint so provider keys are not exposed in browser assets.
+
+### Production Build
+
+Build the client:
+
+```bash
+npm run build
+```
+
+Start the production Express server:
+
+```bash
+npm start
+```
+
+Default server URL:
+
+```text
+http://localhost:8080
+```
+
+Static-only hosting:
+
+```bash
+npm run start:static
+```
+
+### API Surface
+
+#### Express API Layer
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/hazards` | `GET` | Aggregates public hazard feeds from USGS, NASA EONET, and GDACS |
+| `/api/hazards?source=USGS,NASA` | `GET` | Filters aggregation by source |
+| `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET` | Filters aggregation by hazard type |
+| `/api/*` | Any | Proxies remaining API calls to DisasterAware |
+
+#### Python Analytics API
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | `GET` | Service health check |
+| `/api/v1/statistics` | `POST` | Statistical analysis |
+| `/api/v1/predictions` | `POST` | Predictive analysis |
+| `/api/v1/risk-assessment` | `POST` | Risk scoring and recommendations |
+| `/api/v1/etl/process` | `POST` | Data normalization and quality processing |
+
+### Data Sources
+
+| Source | Scope | Usage |
+|---|---|---|
+| DisasterAware | Active hazard and type APIs | Primary authenticated provider |
+| USGS | Earthquake GeoJSON feeds | Earthquake fallback and aggregation source |
+| NASA EONET | Environmental event tracking | Wildfire, volcano, flood, storm, drought, landslide events |
+| GDACS | Global disaster alerts | Global alert and coordination data |
+
+### Operational Notes
+
+- The Python analytics service must be available at `VITE_PYTHON_API_URL` for workflows that call FastAPI endpoints.
+- When the Python service is offline, map and public hazard workflows can still run, while analytics panels may show offline or error states.
+- `npm start` serves the built app through Express and enables the backend `/api/hazards` aggregation endpoint.
+- `npm run dev` uses Vite for frontend development; `/api` requests are handled by the Vite proxy in development.
+- Mapbox rendering requires a valid `VITE_MAPBOX_TOKEN`.
+- `dist/` is generated output and should be rebuilt for production releases.
+
+### Security Notes
+
+- `.env` is ignored by git and must not be committed.
+- Variables prefixed with `VITE_` are exposed to browser assets; do not place production-only secrets there.
+- For production AI usage, prefer a server-side proxy for Volcengine Ark or other model providers.
+- Review proxy logging in `server.js` before production deployment; current logs are useful for diagnostics but may expose sensitive headers or payloads.
+- DisasterAware credentials and model provider keys should be managed through deployment secret storage.
+
+### Project Structure
+
+```text
+prometheus-global-guardian/
+├── public/
+│   └── assets/
+├── python-analytics-service/
+│   ├── analytics/
+│   │   ├── etl_processor.py
+│   │   ├── pivot_table_analyzer.py
+│   │   ├── prediction_models.py
+│   │   ├── quality_monitor.py
+│   │   ├── risk_assessment.py
+│   │   ├── statistical_algorithms.py
+│   │   └── unified_model.py
+│   ├── main.py
+│   ├── requirements.txt
+│   └── start.sh
+├── src/
+│   ├── api/
+│   │   ├── aiAssistant.ts
+│   │   ├── aiProviderConfig.ts
+│   │   ├── auth.ts
+│   │   ├── disasteraware.ts
+│   │   ├── hazards.ts
+│   │   └── pythonAnalytics.ts
+│   ├── components/
+│   ├── config/
+│   ├── types/
+│   ├── utils/
+│   ├── workers/
+│   ├── App.tsx
+│   ├── index.css
+│   └── index.tsx
+├── hazards-source.js
+├── server.js
+├── start-python-service.sh
+├── Dockerfile
+├── package.json
+└── vite.config.ts
+```
+
+### License
+
+MIT
 
 ---
 
@@ -389,387 +775,3 @@ prometheus-global-guardian/
 MIT
 
 ---
-
-## English
-
-Prometheus Global Guardian is an operational platform for global hazard monitoring, geospatial visualization, analytics, and AI-assisted incident assessment.
-
-The system consolidates live hazard feeds, normalizes event data, renders global situational awareness on an interactive map, and provides analytical workflows for risk review, reporting, and decision support.
-
-### Table of Contents
-
-- [Platform Overview](#platform-overview)
-- [Core Capabilities](#core-capabilities)
-- [System Architecture](#system-architecture)
-- [Service Topology](#service-topology)
-- [Technology Stack](#technology-stack)
-- [Runtime Requirements](#runtime-requirements)
-- [Configuration](#configuration)
-- [Local Development](#local-development)
-- [Python Analytics Service](#python-analytics-service)
-- [AI Assistant Provider](#ai-assistant-provider)
-- [Production Build](#production-build)
-- [API Surface](#api-surface)
-- [Data Sources](#data-sources)
-- [Operational Notes](#operational-notes)
-- [Security Notes](#security-notes)
-- [Project Structure](#project-structure)
-
-### Platform Overview
-
-The platform is organized around four operational domains:
-
-- **Hazard ingestion**: integrates DisasterAware, USGS, NASA EONET, and GDACS feeds.
-- **Geospatial operations**: presents active events through Mapbox GL, markers, heatmap mode, clustering, and 3D building layers.
-- **Analytics and reporting**: provides statistical summaries, charting, risk assessment, data quality checks, and exportable reports.
-- **AI-assisted analysis**: injects live hazard context into an LLM assistant for structured situation summaries and response recommendations.
-
-The platform consists of a React frontend, a lightweight Express API layer, a Python FastAPI analytics service, and external data/model providers.
-
-### Core Capabilities
-
-#### Global Hazard Monitoring
-
-- Visualizes active disaster events across multiple authoritative sources.
-- Supports hazard filtering by earthquake, volcano, flood, wildfire, storm, drought, tsunami, and landslide.
-- Uses a unified `Hazard` data model across mapping, analytics, AI context, and reporting.
-- Cleans hazard data through a Web Worker to reduce UI thread pressure.
-
-#### Geospatial Visualization
-
-- Interactive global map powered by Mapbox GL.
-- Supports event markers, contextual popups, and heatmap mode.
-- Uses LOD clustering for mid and low zoom levels.
-- Provides optional 3D Tiles overlays through deck.gl and loaders.gl.
-- Supports configurable Mapbox base map styles.
-
-#### Analytics Workspace
-
-- Presents statistical summaries of active hazard records.
-- Renders type, severity, timeline, and source distribution charts with Recharts.
-- Uses the Python service for statistics, predictions, risk assessment, ETL, and data quality checks.
-- Includes service health, loading, error, retry, and cached-analysis states.
-
-#### AI-Assisted Incident Analysis
-
-- Provides a streaming LLM chat interface.
-- Injects current hazard context into the system prompt.
-- Offers quick prompts for global situation review, flood risk, seismic activity, wildfire threat, forecasting, and emergency response.
-- Falls back to local demo responses when no model key is configured.
-- Prioritizes Volcengine Ark through an OpenAI-compatible Chat Completions endpoint.
-- Retains compatibility with generic OpenAI-format providers.
-
-#### Reporting and Notifications
-
-- Generates HTML reports from filtered hazard data.
-- Uses an in-memory singleton notification manager with a subscription API.
-- Integrates browser notifications when permission is granted.
-- Provides modal workflows for settings, reporting, analytics, and AI assistance.
-
-### System Architecture
-
-```mermaid
-flowchart LR
-  Browser["React Client"]
-  Express["Express API Layer"]
-  Python["Python Analytics Service"]
-  DisasterAware["DisasterAware API"]
-  PublicFeeds["USGS / NASA EONET / GDACS"]
-  LLM["Volcengine Ark / OpenAI-Compatible LLM"]
-
-  Browser -->|/api/authorize, /api/hazards/active| Express
-  Express --> DisasterAware
-  Express -->|/api/hazards aggregation| PublicFeeds
-  Browser -->|analytics requests| Python
-  Browser -->|streaming chat completions| LLM
-```
-
-The Express layer currently handles production static hosting, DisasterAware API proxying, and multi-source hazard aggregation under `/api/hazards`.
-
-The Python analytics service runs as an independent FastAPI process on port `8001` by default.
-
-### Service Topology
-
-| Service | Runtime | Default Port | Responsibility |
-|---|---:|---:|---|
-| React / Vite client | Node.js | 5173 | Frontend development server |
-| Express server | Node.js | 8080 | Static hosting, API proxying, hazard aggregation |
-| Python analytics service | Python 3.13 | 8001 | Statistics, prediction, ETL, risk, quality APIs |
-| External LLM provider | SaaS | HTTPS | Chat completion and streaming response |
-
-### Technology Stack
-
-#### Frontend
-
-| Technology | Purpose |
-|---|---|
-| React 19 | Component model and UI rendering |
-| TypeScript 5.9 | Static typing and application contracts |
-| Vite 7 | Development server and production build |
-| Mapbox GL | Interactive map rendering |
-| deck.gl / loaders.gl | Optional 3D Tiles integration |
-| Recharts | Analytics visualizations |
-| DOMPurify | Sanitization for rendered assistant output |
-
-#### Backend and Analytics
-
-| Technology | Purpose |
-|---|---|
-| Express 5 | API proxy layer and production app server |
-| node-fetch | Server-side requests to external providers |
-| raw-body | Request body forwarding for proxied API calls |
-| FastAPI | Python analytics API service |
-| Pandas / NumPy | Data processing and numerical computation |
-| SciPy / Statsmodels | Statistical analysis |
-| Scikit-learn | Prediction and modeling workflows |
-
-### Runtime Requirements
-
-| Runtime | Version |
-|---|---|
-| Node.js | 18.x |
-| npm | Compatible with Node 18 |
-| Python | 3.13 recommended for analytics |
-
-The repository includes `.nvmrc`; use the following command to switch Node versions:
-
-```bash
-nvm use
-```
-
-### Configuration
-
-Create a local environment file:
-
-```bash
-cp .env.example .env
-```
-
-#### Required Frontend Configuration
-
-```dotenv
-VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
-```
-
-#### Optional DisasterAware Credentials
-
-```dotenv
-VITE_USERNAME=your_username_here
-VITE_PASSWORD=your_password_here
-```
-
-When DisasterAware credentials are unavailable, the application can still use public feed fallbacks where supported.
-
-#### Optional Python Analytics Endpoint
-
-```dotenv
-VITE_PYTHON_API_URL=http://localhost:8001
-```
-
-#### Optional AI Provider Configuration
-
-```dotenv
-VITE_VOLCENGINE_ARK_API_KEY=your_volcengine_ark_api_key_here
-VITE_VOLCENGINE_ARK_MODEL=auto
-VITE_VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
-```
-
-`VITE_VOLCENGINE_ARK_MODEL` may be set to `auto` or to a concrete model / endpoint ID from the Volcengine Ark console.
-
-The AI client also supports generic OpenAI-format configuration:
-
-```dotenv
-VITE_OPENAI_API_KEY=sk-your-key
-VITE_OPENAI_MODEL=your-model
-VITE_OPENAI_API_URL=https://provider.example.com/v1/chat/completions
-```
-
-### Local Development
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start the frontend development server:
-
-```bash
-npm run dev
-```
-
-Open:
-
-```text
-http://localhost:5173
-```
-
-Run linting:
-
-```bash
-npm run lint
-```
-
-Build the frontend:
-
-```bash
-npm run build
-```
-
-### Python Analytics Service
-
-The analytics service runs independently from the React application and must be started separately when analytics features are required.
-
-Recommended command from the repository root:
-
-```bash
-chmod +x start-python-service.sh && ./start-python-service.sh
-```
-
-Manual startup:
-
-```bash
-cd python-analytics-service
-python3.13 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
-```
-
-Service endpoints:
-
-| URL | Purpose |
-|---|---|
-| `http://localhost:8001/health` | Health check |
-| `http://localhost:8001/docs` | Swagger API documentation |
-| `http://localhost:8001/redoc` | ReDoc API documentation |
-
-### AI Assistant Provider
-
-The AI assistant selects providers in this order:
-
-1. Uses ai-flow when `VITE_AI_FLOW_API_URL` + `VITE_AI_FLOW_API_KEY` are configured.
-2. Uses Volcengine Ark when Ark variables are configured.
-3. Uses a generic OpenAI-compatible provider when configured.
-4. Falls back to local demo responses when no model key is configured.
-
-Direct browser-based model configuration is convenient for local development and demos. For production usage, route model calls through a server-side endpoint so provider keys are not exposed in browser assets.
-
-### Production Build
-
-Build the client:
-
-```bash
-npm run build
-```
-
-Start the production Express server:
-
-```bash
-npm start
-```
-
-Default server URL:
-
-```text
-http://localhost:8080
-```
-
-Static-only hosting:
-
-```bash
-npm run start:static
-```
-
-### API Surface
-
-#### Express API Layer
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/hazards` | `GET` | Aggregates public hazard feeds from USGS, NASA EONET, and GDACS |
-| `/api/hazards?source=USGS,NASA` | `GET` | Filters aggregation by source |
-| `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET` | Filters aggregation by hazard type |
-| `/api/*` | Any | Proxies remaining API calls to DisasterAware |
-
-#### Python Analytics API
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/health` | `GET` | Service health check |
-| `/api/v1/statistics` | `POST` | Statistical analysis |
-| `/api/v1/predictions` | `POST` | Predictive analysis |
-| `/api/v1/risk-assessment` | `POST` | Risk scoring and recommendations |
-| `/api/v1/etl/process` | `POST` | Data normalization and quality processing |
-
-### Data Sources
-
-| Source | Scope | Usage |
-|---|---|---|
-| DisasterAware | Active hazard and type APIs | Primary authenticated provider |
-| USGS | Earthquake GeoJSON feeds | Earthquake fallback and aggregation source |
-| NASA EONET | Environmental event tracking | Wildfire, volcano, flood, storm, drought, landslide events |
-| GDACS | Global disaster alerts | Global alert and coordination data |
-
-### Operational Notes
-
-- The Python analytics service must be available at `VITE_PYTHON_API_URL` for workflows that call FastAPI endpoints.
-- When the Python service is offline, map and public hazard workflows can still run, while analytics panels may show offline or error states.
-- `npm start` serves the built app through Express and enables the backend `/api/hazards` aggregation endpoint.
-- `npm run dev` uses Vite for frontend development; `/api` requests are handled by the Vite proxy in development.
-- Mapbox rendering requires a valid `VITE_MAPBOX_TOKEN`.
-- `dist/` is generated output and should be rebuilt for production releases.
-
-### Security Notes
-
-- `.env` is ignored by git and must not be committed.
-- Variables prefixed with `VITE_` are exposed to browser assets; do not place production-only secrets there.
-- For production AI usage, prefer a server-side proxy for Volcengine Ark or other model providers.
-- Review proxy logging in `server.js` before production deployment; current logs are useful for diagnostics but may expose sensitive headers or payloads.
-- DisasterAware credentials and model provider keys should be managed through deployment secret storage.
-
-### Project Structure
-
-```text
-prometheus-global-guardian/
-├── public/
-│   └── assets/
-├── python-analytics-service/
-│   ├── analytics/
-│   │   ├── etl_processor.py
-│   │   ├── pivot_table_analyzer.py
-│   │   ├── prediction_models.py
-│   │   ├── quality_monitor.py
-│   │   ├── risk_assessment.py
-│   │   ├── statistical_algorithms.py
-│   │   └── unified_model.py
-│   ├── main.py
-│   ├── requirements.txt
-│   └── start.sh
-├── src/
-│   ├── api/
-│   │   ├── aiAssistant.ts
-│   │   ├── aiProviderConfig.ts
-│   │   ├── auth.ts
-│   │   ├── disasteraware.ts
-│   │   ├── hazards.ts
-│   │   └── pythonAnalytics.ts
-│   ├── components/
-│   ├── config/
-│   ├── types/
-│   ├── utils/
-│   ├── workers/
-│   ├── App.tsx
-│   ├── index.css
-│   └── index.tsx
-├── hazards-source.js
-├── server.js
-├── start-python-service.sh
-├── Dockerfile
-├── package.json
-└── vite.config.ts
-```
-
-### License
-
-MIT

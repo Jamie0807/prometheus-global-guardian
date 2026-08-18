@@ -27,6 +27,7 @@
 | P1 | 前端状态归属梳理 | 降低耦合和无效重渲染 | 第二批 |
 | P1 | Python 服务结构整理 | 提升后端服务可维护性 | 第二批 |
 | P1 | 测试基线建设 | 提升交付信心 | 第二批 |
+| P1 | Docker 一键启动前后端 | 提升本地开发和交付一致性 | 第二批 |
 | P2 | 仓库 / 包结构调整 | 长期可扩展性 | 后续 |
 | P2 | 依赖清理 | 构建和依赖治理 | 后续 |
 | P2 | 可观测性和错误上报 | 生产可用性 | 后续 |
@@ -309,6 +310,71 @@ Python：
 - 本地或 CI 验证包含 lint、build、前端测试、Python 测试。
 - 核心转换逻辑不依赖浏览器或 Mapbox 就能测试。
 
+## P1：支持 Docker 一键启动前后端
+
+### 当前状态
+
+项目目前包含前端 Vite / Express 服务和 Python 分析服务，但本地启动仍依赖多条命令和本机运行时环境：
+
+- 前端开发服务需要 Node.js 和 npm。
+- Express BFF / 生产服务需要单独执行 Node 命令。
+- Python 分析服务需要 Python 版本、虚拟环境和依赖安装。
+- 新开发者需要分别理解前端、BFF、Python 服务和环境变量配置。
+
+这会增加本地环境配置成本，也容易出现“我这里能跑、你那里跑不起来”的问题。
+
+### 建议结构
+
+```text
+docker-compose.yml
+Dockerfile
+python-analytics-service/
+  Dockerfile
+.env.example
+```
+
+推荐用 Docker Compose 编排至少两个服务：
+
+- `web`：构建前端并启动 Express 服务，对外暴露 `8080`。
+- `analytics`：启动 Python FastAPI 分析服务，对外暴露 `8001`。
+
+本地开发阶段也可以增加可选的 `web-dev` 服务，用于暴露 Vite 开发端口 `5173`。
+
+### 目标效果
+
+- 一条命令启动前端、BFF 和 Python 分析服务。
+- Node / Python 版本由镜像固定，减少本机环境差异。
+- `.env` 仍由本地提供，不写入镜像。
+- 服务之间通过 Compose service name 通信，例如 `http://analytics:8001`。
+- README 中提供明确的 Docker 启动、停止、查看日志命令。
+
+### 建议命令
+
+```bash
+docker compose up --build
+```
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+查看日志：
+
+```bash
+docker compose logs -f
+```
+
+### 验收标准
+
+- 新开发者只需要安装 Docker，就能通过 `docker compose up --build` 启动主要服务。
+- 前端页面可以通过 `http://localhost:8080` 访问。
+- Python 分析服务可以通过 `http://localhost:8001/health` 访问。
+- 前端容器能够正确访问 Python 分析服务。
+- `.env.example` 包含 Docker 场景下需要的环境变量说明。
+- README 增加 Docker 启动方式和常见问题说明。
+
 ## P2：优化仓库结构
 
 ### 当前状态
@@ -383,8 +449,9 @@ scripts/
 5. 统一前端 service 层。
 6. 使用自定义 Hook 梳理 app 级状态归属。
 7. 整理 Python 服务结构。
-8. 补齐本地和 CI 质量验证命令。
-9. 最后再考虑仓库结构迁移。
+8. 增加 Docker Compose 一键启动前端、BFF 和 Python 服务。
+9. 补齐本地和 CI 质量验证命令。
+10. 最后再考虑仓库结构迁移。
 
 ## 第一轮优化的非目标
 
@@ -403,4 +470,5 @@ scripts/
 - 地图渲染架构不仅写在文档里，也体现在代码结构上。
 - 分析逻辑可以在不加载完整页面的情况下测试。
 - 外部服务调用拥有统一错误处理方式。
+- 前端、BFF 和 Python 分析服务可以通过 Docker 一键启动。
 - 新开发者不需要通读整个项目，也能定位对应模块。
