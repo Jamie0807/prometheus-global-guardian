@@ -2,7 +2,7 @@
  * AI Disaster Analysis Assistant — LLM Streaming API Client
  *
  * 核心功能：
- * - 基于火山方舟 / OpenAI-compatible Chat Completions API
+ * - 通过 Express BFF 调用火山方舟 / OpenAI-compatible Chat Completions API
  * - 流式输出（SSE / ReadableStream）实现逐字打印效果
  * - 自动注入灾害实时上下文，提供 Demo 降级模式（无 API Key 时）
  */
@@ -31,116 +31,12 @@ export interface DisasterContext {
   }>;
 }
 
-import { resolveAIProviderConfig } from './aiProviderConfig';
+const AI_CHAT_ENDPOINT = '/api/ai/chat';
 
-// ─── 环境配置 ────────────────────────────────────────────────────────────────
-
-const AI_PROVIDER = resolveAIProviderConfig((import.meta as any).env ?? {});
-
-// ─── Miaoma AI Flow 工作流引擎配置 ──────────────────────────────────────────
-// 优先级：ai-flow 工作流引擎 > 直连 OpenAI > Demo 降级模式
-const AI_FLOW_API_URL      = (import.meta as any).env?.VITE_AI_FLOW_API_URL      ?? '';   // e.g. http://localhost:3001
-const AI_FLOW_API_KEY      = (import.meta as any).env?.VITE_AI_FLOW_API_KEY      ?? '';   // NestJS API Key 守卫鉴权
-const AI_FLOW_WORKFLOW_ID  = (import.meta as any).env?.VITE_AI_FLOW_WORKFLOW_ID  ?? '';   // 已发布的灾害分析工作流 ID
-
-// ─── System Prompt 构建 ──────────────────────────────────────────────────────
-
-function buildSystemPrompt(ctx?: DisasterContext): string {
-  let prompt = `你是 Prometheus Global Guardian 平台的 AI 灾害分析助手（Powered by LLM）。
-你的专业领域：全球灾害监控、风险评估、应急响应分析与减灾策略。
-
-职责范围：
-• 解读平台实时灾害监控数据，提供专业态势研判
-• 对地震、火山、洪水、风暴、野火、干旱、海啸等灾害进行深度分析
-• 基于历史数据与当前态势，研判灾害发展趋势
-• 提供具体、可操作的应急响应建议与减灾策略
-• 解答灾害科学相关专业问题
-
-输出规范：使用结构化 Markdown 格式（标题、要点列表），语言简洁专业，关键数据加粗。`;
-
-  if (ctx && ctx.total > 0) {
-    const topTypes = Object.entries(ctx.byType)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 6)
-      .map(([t, n]) => `${t}(${n})`)
-      .join('、');
-
-    const recentStr = ctx.recent
-      .slice(0, 4)
-      .map(h => `「${h.title}」${h.type}${h.severity ? ' ' + h.severity : ''}${h.magnitude ? ' M' + h.magnitude : ''}`)
-      .join('；');
-
-    prompt += `
-
----
-📡 **平台实时数据上下文（${new Date().toLocaleString('zh-CN')}）**
-- 活跃监控事件总数：**${ctx.total} 条**
-- 灾害类型分布：${topTypes}
-- 近期代表事件：${recentStr || '暂无'}
-
-请在分析时优先结合以上实时数据，提供具有针对性的研判。`;
-  }
-
-  return prompt;
-}
-
-// ─── AI Flow 工作流引擎调用 ──────────────────────────────────────────
-/**
- * 调用 ai-flow 的 NestJS API Server（POST /workflow/run）
- * 由 ai-engine 基于 LangGraph DAG 执行工作流，支持 LLM / RAG / Condition 节点编排
- * 返回完整执行结果后，前端模拟流式逐字输出
- */
-async function streamViaAIFlow(
-  messages: ChatMessage[],
-  context: DisasterContext | undefined,
-  onChunk: (chunk: string) => void,
-  onDone: () => void,
-  onError: (err: string) => void
-): Promise<void> {
-  const lastUserMessage = messages.filter(m => m.role === 'user').slice(-1)[0]?.content ?? '';
-  const chatHistory = messages
-    .filter(m => m.role !== 'system')
-    .slice(-6)
-    .map(m => ({ role: m.role, content: m.content }));
-
-  try {
-    const resp = await fetch(`${AI_FLOW_API_URL}/workflow/run`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': AI_FLOW_API_KEY,          // NestJS api-key.guard.ts 鉴权
-      },
-      body: JSON.stringify({
-        workflowId: AI_FLOW_WORKFLOW_ID,        // 已发布的灾害分析工作流 ID
-        input: {
-          userMessage: lastUserMessage,         // 用户当前输入
-          disasterContext: context ?? null,     // 平台实时灾害上下文（注入 System Prompt）
-          chatHistory,                          // 多轮对话历史（最近 6 条）
-        },
-      }),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      onError(`ai-flow API 请求失败 (${resp.status}): ${text}`);
-      return;
-    }
-
-    const data = await resp.json();
-    // ai-flow 返回统一格式 { data: { output: string } }（transform.interceptor.ts）
-    const output: string = data?.data?.output ?? data?.output ?? JSON.stringify(data);
-
-    // 工作流返回完整文本，前端模拟流式逐字输出（每 4 字符延迟 8ms，还原打字机体验）
-    const chars = output.split('');
-    for (let i = 0; i < chars.length; i++) {
-      onChunk(chars[i]);
-      if (i % 4 === 0) await new Promise(r => setTimeout(r, 8));
-    }
-    onDone();
-  } catch (err) {
-    onError(err instanceof Error ? err.message : 'ai-flow 工作流引擎连接失败，请检查服务状态');
-  }
-}
+const DEMO_FALLBACK_CODES = new Set([
+  'AI_PROVIDER_NOT_CONFIGURED',
+  'AI_MODEL_MISSING',
+]);
 
 // ─── 主流式请求函数 ──────────────────────────────────────────────────────────
 
@@ -151,74 +47,49 @@ export async function streamChatMessage(
   onDone: () => void,
   onError: (err: string) => void
 ): Promise<void> {
-  /**
-   * 备注：
-   * 1) 直连模型时，采用 fetch + ReadableStream 手写 SSE 解析：
-   *    - stream: true 发起流式请求
-   *    - resp.body.getReader() 持续 read() 读取分片
-   *    - 按 "data: ...\n\n" 协议行解析，提取 delta.content 增量渲染
-   * 2) 走 ai-flow 工作流时，不是后端 SSE 推流，而是拿到完整文本后前端模拟打字机流。
-   */
-  // 优先级 1：ai-flow 工作流引擎（LangGraph DAG 编排，支持 RAG + 条件分支）
-  if (AI_FLOW_API_URL && AI_FLOW_API_KEY) {
-    await streamViaAIFlow(messages, context, onChunk, onDone, onError);
-    return;
-  }
-
-  // 优先级 2：无 ai-flow 时直连火山方舟 / OpenAI-compatible 服务，无 API Key 时进入 Demo 演示模式
-  if (!AI_PROVIDER.apiKey) {
-    await runDemoMode(messages, context, onChunk, onDone);
-    return;
-  }
-
-  if (AI_PROVIDER.missingModel) {
-    onError('火山方舟模型未配置，请在 .env 中设置 VITE_VOLCENGINE_ARK_MODEL');
-    return;
-  }
-
-  const payload = {
-    model: AI_PROVIDER.model,
-    stream: true,
-    temperature: 0.7,
-    max_tokens: 1500,
-    messages: [
-      { role: 'system', content: buildSystemPrompt(context) },
-      ...messages.map(m => ({ role: m.role, content: m.content })),
-    ],
-  };
-
   try {
-    const resp = await fetch(AI_PROVIDER.apiUrl, {
+    const resp = await fetch(AI_CHAT_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${AI_PROVIDER.apiKey}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        messages,
+        disasterContext: context ?? null,
+      }),
     });
 
     if (!resp.ok) {
       const text = await resp.text();
-      onError(`${AI_PROVIDER.providerName} API 请求失败 (${resp.status}): ${text}`);
+      let code = '';
+      let message = text;
+
+      try {
+        const parsed = JSON.parse(text);
+        code = parsed.code ?? '';
+        message = parsed.message ?? text;
+      } catch {
+        // Keep the raw response text for non-JSON errors.
+      }
+
+      if (resp.status === 503 && DEMO_FALLBACK_CODES.has(code)) {
+        await runDemoMode(messages, context, onChunk, onDone);
+        return;
+      }
+
+      onError(`AI BFF 请求失败 (${resp.status}): ${message}`);
       return;
     }
 
-    // OpenAI 的流式响应是一个 SSE（Server-Sent Events）格式的 ReadableStream，需要逐行解析
-    // reader是 ReadableStreamDefaultReader 类型，提供 read() 方法读取流式数据块
     const reader = resp.body?.getReader();
-    // 如果没有响应体或无法获取 reader，直接报错
     if (!reader) { onError('无法读取响应流'); return; }
 
-    // SSE 格式解析，逐行处理流式输出
     const decoder = new TextDecoder();
     let buf = '';
 
-    // OpenAI SSE 格式：data: {json}\n\n，最后以 data: [DONE] 结尾
     while (true) {
       const { done, value } = await reader.read();
-      //reader.read 返回一个 Promise，解析为 { done: boolean, value: Uint8Array }，done=true 代表流结束
       if (done) break;
-      //buf 是上一次残留的字符串，decoder.decode(value, { stream: true }) 是本次新读取的字符串，两者拼接后再按行分割处理
       buf += decoder.decode(value, { stream: true });
       const lines = buf.split('\n');
       buf = lines.pop() ?? '';
@@ -406,7 +277,7 @@ ${ctx ? `📡 当前平台正在监控 **${ctx.total} 条**活跃灾害事件。
 
 > 💡 **提示**：你可以点击下方快捷问题，或直接输入想了解的内容。
 > 
-> ⚙️ **配置真实 LLM**：在 \`.env\` 中设置 \`VITE_VOLCENGINE_ARK_API_KEY\` 和 \`VITE_VOLCENGINE_ARK_MODEL\` 即可启用火山方舟模型服务（当前为 Demo 演示模式）。`;
+> ⚙️ **配置真实 LLM**：在 \`.env\` 中设置 \`VOLCENGINE_ARK_API_KEY\` 和 \`VOLCENGINE_ARK_MODEL\`，由 Express BFF 调用火山方舟模型服务（当前为 Demo 演示模式）。`;
   }
 
   // 逐字流式输出，模拟打字效果

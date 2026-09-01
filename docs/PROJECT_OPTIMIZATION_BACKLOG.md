@@ -36,6 +36,7 @@
 | 优化项 | 状态 | 结果 |
 | --- | --- | --- |
 | Docker 一键启动前后端 | 已完成 | 通过 Docker Compose 同时启动 Web / Express BFF 和 Python FastAPI 分析服务 |
+| AI 助手 BFF 化改造 | 已完成 | 通过 Express BFF 统一封装 ai-workflow 与火山方舟模型调用，前端只消费 `/api/ai/chat` |
 
 ### Docker 一键启动前后端
 
@@ -56,6 +57,44 @@
 - `http://localhost:8001/health` 返回 Python 服务健康状态。
 - `npm run build` 通过。
 - `npm run lint` 退出码为 0，但仍保留既有 warning。
+
+### AI 助手 BFF 化改造
+
+已将 AI 助手从“前端直连模型服务”调整为“前端调用项目 BFF，再由 BFF 按 `AI_PROVIDER` 调用 ai-workflow 或火山方舟”：
+
+```text
+AIChatAssistant
+  -> POST /api/ai/chat
+  -> Express BFF
+  -> ai-workflow / Volcengine Ark Responses / Chat Completions API
+```
+
+已落地内容：
+
+- `server/ai/ai-provider.js` 统一读取服务端环境变量 `AI_PROVIDER`、`VOLCENGINE_WORKFLOW_API_URL`、`VOLCENGINE_WORKFLOW_API_KEY`、`VOLCENGINE_ARK_API_KEY`、`VOLCENGINE_ARK_MODEL`、`VOLCENGINE_ARK_API_URL`、`VOLCENGINE_ARK_TIMEOUT_MS`。
+- `server/ai/ai-chat-route.js` 新增 `POST /api/ai/chat`，负责请求校验、provider 调度、错误脱敏和 SSE 流式转发。
+- `AI_PROVIDER=workflow` 时，BFF 调用已发布 ai-workflow 应用，请求体为 `{"inputs":{"user_input":"..."}}`，并发送 `stream: true` Header。
+- Workflow provider 同时兼容 SSE 和普通 JSON：SSE 会被转换成前端聊天流格式，普通 JSON 从 `data.outputs.result` 提取回答。
+- 当 `VOLCENGINE_ARK_API_URL` 为 `https://ark.cn-beijing.volces.com/api/plan/v3` 时，BFF 自动拼接 `/responses` 并使用 Responses API 请求格式。
+- BFF 将 Responses API 的流式增量转换成前端现有 Chat Completions 风格流，前端接口保持不变。
+- System Prompt 构建逻辑迁移到 BFF，前端不再承担 provider 请求细节。
+- `src/api/aiAssistant.ts` 默认请求 `/api/ai/chat`，未配置模型服务时继续保留 Demo 模式。
+- 已删除前端 provider 配置文件 `src/api/aiProviderConfig.ts`，浏览器端不再读取模型服务 Key。
+- BFF 增加模型服务响应超时保护，避免上游无响应时前端无限等待。
+- Docker Compose 只在 `web` 服务运行时注入服务端 AI 环境变量，不作为前端 build args 注入。
+- `.env.example` 和 README 已更新为服务端 AI 配置方式。
+- 已新增 `npm test`、`tests/ai-provider.test.js` 和 `tests/ai-stream.test.js`，覆盖 provider 配置、请求体构造、Responses SSE 转换、Workflow SSE/JSON 结果转换。
+
+验证结果：
+
+- `npm test` 通过，18 个 AI provider / stream 适配测试均通过。
+- `npm run build` 通过，前端构建产物中未发现已配置的前端旧 Key。
+- `npm run lint` 退出码为 0，但仍保留既有 warning。
+- `docker compose up -d --build` 可以启动 Web / Express BFF 和 Python 分析服务。
+- `http://localhost:8080` 返回 Web 首页。
+- `http://localhost:8001/health` 返回 Python 服务健康状态。
+- `AI_PROVIDER=workflow` 时，Docker 容器内确认 provider 为 workflow，协议为 workflow，并会发送 `stream: true` Header。
+- 未配置所选 provider 必要参数时，`POST /api/ai/chat` 返回 503 配置缺失状态，前端会降级到 Demo 模式。
 
 ## P0：拆分地图模块
 
@@ -188,7 +227,6 @@ src/services/
     analyticsTypes.ts
   ai/
     aiAssistantService.ts
-    aiProviderConfig.ts
   auth/
     authService.ts
 ```
@@ -430,4 +468,5 @@ scripts/
 - 分析逻辑可以在不加载完整页面的情况下测试。
 - 外部服务调用拥有统一错误处理方式。
 - 前端、BFF 和 Python 分析服务可以通过 Docker 一键启动。
+- AI 模型服务 Key 不进入浏览器构建产物，真实模型调用通过 BFF 完成。
 - 新开发者不需要通读整个项目，也能定位对应模块。

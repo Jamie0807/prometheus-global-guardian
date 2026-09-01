@@ -184,20 +184,21 @@ VITE_PYTHON_API_URL=http://localhost:8001
 #### Optional AI Provider Configuration
 
 ```dotenv
-VITE_VOLCENGINE_ARK_API_KEY=your_volcengine_ark_api_key_here
-VITE_VOLCENGINE_ARK_MODEL=auto
-VITE_VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
+AI_PROVIDER=ark
+
+VOLCENGINE_WORKFLOW_API_URL=http://localhost:3100/api/v1/apps/run
+VOLCENGINE_WORKFLOW_API_KEY=
+
+VOLCENGINE_ARK_API_KEY=your_volcengine_ark_api_key_here
+VOLCENGINE_ARK_MODEL=ark-code-latest
+VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/plan/v3
+VOLCENGINE_ARK_TIMEOUT_MS=30000
 ```
 
-`VITE_VOLCENGINE_ARK_MODEL` may be set to `auto` or to a concrete model / endpoint ID from the Volcengine Ark console.
+Set `AI_PROVIDER=workflow` to call a published ai-workflow app. The workflow request body is sent as `{"inputs":{"user_input":"..."}}`, the BFF sends the `stream: true` request header, and the response may be either SSE or regular JSON. For JSON responses, the BFF reads `data.outputs.result`; for SSE responses, it converts workflow stream events back to the frontend chat stream format.
+If the BFF runs in Docker while the workflow app runs on your host machine, use `http://host.docker.internal:3100/api/v1/apps/run` instead of `http://localhost:3100/api/v1/apps/run`.
 
-The AI client also supports generic OpenAI-format configuration:
-
-```dotenv
-VITE_OPENAI_API_KEY=sk-your-key
-VITE_OPENAI_MODEL=your-model
-VITE_OPENAI_API_URL=https://provider.example.com/v1/chat/completions
-```
+`VOLCENGINE_ARK_API_URL` may be the Volcengine Ark OpenAI-compatible Responses API base URL, such as `https://ark.cn-beijing.volces.com/api/plan/v3`; the BFF appends `/responses` internally when needed. `VOLCENGINE_ARK_TIMEOUT_MS` controls how long the BFF waits for the provider to start responding. These variables are read by the Express BFF at runtime and are not exposed to browser assets.
 
 ### Local Development
 
@@ -230,6 +231,8 @@ Build the frontend:
 ```bash
 npm run build
 ```
+
+For real AI assistant calls during local Vite development, keep the Express BFF available on `http://localhost:8080` because `/api/ai/*` is proxied there. Docker Compose is the simplest way to run the full stack.
 
 ### Docker Compose
 
@@ -307,12 +310,14 @@ Service endpoints:
 
 The AI assistant selects providers in this order:
 
-1. Uses ai-flow when `VITE_AI_FLOW_API_URL` + `VITE_AI_FLOW_API_KEY` are configured.
-2. Uses Volcengine Ark when Ark variables are configured.
-3. Uses a generic OpenAI-compatible provider when configured.
-4. Falls back to local demo responses when no model key is configured.
+1. Calls the project BFF endpoint `POST /api/ai/chat`.
+2. `AI_PROVIDER=workflow` calls the published ai-workflow app configured by `VOLCENGINE_WORKFLOW_API_URL`.
+3. `AI_PROVIDER=ark` calls Volcengine Ark when `VOLCENGINE_ARK_API_KEY` and `VOLCENGINE_ARK_MODEL` are configured.
+4. For `https://ark.cn-beijing.volces.com/api/plan/v3`, the BFF adapts the request to the Responses API and converts streamed deltas back to the frontend chat stream format.
+5. The frontend falls back to local demo responses when the BFF reports that the selected provider is not configured.
 
-Direct browser-based model configuration is convenient for local development and demos. For production usage, route model calls through a server-side endpoint so provider keys are not exposed in browser assets.
+The browser no longer reads model provider keys directly. Keep model credentials server-side and pass them to the Express runtime through `.env`, Docker Compose, or deployment secrets.
+If the provider does not start responding before `VOLCENGINE_ARK_TIMEOUT_MS`, the BFF returns a sanitized timeout error instead of leaving the chat request open indefinitely.
 
 ### Production Build
 
@@ -349,6 +354,7 @@ npm run start:static
 | `/api/hazards` | `GET` | Aggregates public hazard feeds from USGS, NASA EONET, and GDACS |
 | `/api/hazards?source=USGS,NASA` | `GET` | Filters aggregation by source |
 | `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET` | Filters aggregation by hazard type |
+| `/api/ai/chat` | `POST` | Streams AI assistant responses through the Express BFF |
 | `/api/*` | Any | Proxies remaining API calls to DisasterAware |
 
 #### Python Analytics API
@@ -409,7 +415,6 @@ prometheus-global-guardian/
 ├── src/
 │   ├── api/
 │   │   ├── aiAssistant.ts
-│   │   ├── aiProviderConfig.ts
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
 │   │   ├── hazards.ts
@@ -422,6 +427,11 @@ prometheus-global-guardian/
 │   ├── App.tsx
 │   ├── index.css
 │   └── index.tsx
+├── server/
+│   ├── ai/
+│   │   ├── ai-chat-route.js
+│   │   └── ai-provider.js
+│   └── env.js
 ├── hazards-source.js
 ├── server.js
 ├── start-python-service.sh
@@ -618,20 +628,21 @@ VITE_PYTHON_API_URL=http://localhost:8001
 #### 可选 AI 模型服务配置
 
 ```dotenv
-VITE_VOLCENGINE_ARK_API_KEY=your_volcengine_ark_api_key_here
-VITE_VOLCENGINE_ARK_MODEL=auto
-VITE_VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/v3/chat/completions
+AI_PROVIDER=ark
+
+VOLCENGINE_WORKFLOW_API_URL=http://localhost:3100/api/v1/apps/run
+VOLCENGINE_WORKFLOW_API_KEY=
+
+VOLCENGINE_ARK_API_KEY=your_volcengine_ark_api_key_here
+VOLCENGINE_ARK_MODEL=ark-code-latest
+VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/plan/v3
+VOLCENGINE_ARK_TIMEOUT_MS=30000
 ```
 
-`VITE_VOLCENGINE_ARK_MODEL` 可以设置为 `auto`，也可以设置为火山方舟控制台中的具体模型或 Endpoint ID。
+设置 `AI_PROVIDER=workflow` 时，BFF 会调用已发布的 ai-workflow 应用。工作流请求体会按 `{"inputs":{"user_input":"..."}}` 发送，同时 BFF 会发送 `stream: true` 请求 Header。工作流可以返回 SSE 或普通 JSON；普通 JSON 从 `data.outputs.result` 读取结果，SSE 会被 BFF 转换回前端聊天流格式。
+如果 BFF 运行在 Docker 容器中，而工作流应用运行在宿主机，请将工作流地址改为 `http://host.docker.internal:3100/api/v1/apps/run`，不要使用 `http://localhost:3100/api/v1/apps/run`。
 
-AI 客户端也兼容通用 OpenAI-format 配置：
-
-```dotenv
-VITE_OPENAI_API_KEY=sk-your-key
-VITE_OPENAI_MODEL=your-model
-VITE_OPENAI_API_URL=https://provider.example.com/v1/chat/completions
-```
+`VOLCENGINE_ARK_API_URL` 可以使用火山方舟 OpenAI-compatible Responses API 的 Base URL，例如 `https://ark.cn-beijing.volces.com/api/plan/v3`；BFF 会在需要时内部拼接 `/responses`。`VOLCENGINE_ARK_TIMEOUT_MS` 控制 BFF 等待模型服务开始响应的时间。这些变量由 Express BFF 在运行时读取，不会暴露到浏览器构建产物中。
 
 ### 本地开发
 
@@ -664,6 +675,8 @@ npm run lint
 ```bash
 npm run build
 ```
+
+本地 Vite 开发环境如需调用真实 AI 助手，需要让 Express BFF 运行在 `http://localhost:8080`，因为 `/api/ai/*` 会代理到这里。最简单的全栈启动方式是 Docker Compose。
 
 ### Docker Compose
 
@@ -741,12 +754,14 @@ python main.py
 
 AI 助手按以下优先级选择模型服务：
 
-1. 配置了 `VITE_AI_FLOW_API_URL` + `VITE_AI_FLOW_API_KEY` 时，优先使用 ai-flow 工作流。
-2. 配置火山方舟变量时，使用 Volcengine Ark。
-3. 配置通用 OpenAI-compatible 变量时，使用对应模型服务。
-4. 未配置模型 Key 时，使用本地 Demo 响应。
+1. 前端调用项目 BFF 接口 `POST /api/ai/chat`。
+2. `AI_PROVIDER=workflow` 时，BFF 调用 `VOLCENGINE_WORKFLOW_API_URL` 指向的已发布 ai-workflow 应用。
+3. `AI_PROVIDER=ark` 时，BFF 在配置 `VOLCENGINE_ARK_API_KEY` 和 `VOLCENGINE_ARK_MODEL` 后调用火山方舟。
+4. 当 `VOLCENGINE_ARK_API_URL` 为 `https://ark.cn-beijing.volces.com/api/plan/v3` 时，BFF 自动适配 Responses API，并把流式增量转换回前端聊天流格式。
+5. BFF 返回所选 provider 未配置时，前端进入本地 Demo 响应。
 
-前端直连模型服务适合本地开发和演示。生产环境建议通过服务端代理模型请求，避免模型服务 Key 暴露在浏览器资源中。
+浏览器不再直接读取模型服务 Key。模型凭据应保留在服务端，通过 `.env`、Docker Compose 或部署平台密钥注入 Express 运行时。
+BFF 会在 `VOLCENGINE_ARK_TIMEOUT_MS` 超时后返回脱敏的超时错误，避免聊天请求无限等待。
 
 ### 生产构建
 
@@ -783,6 +798,7 @@ npm run start:static
 | `/api/hazards` | `GET` | 聚合 USGS、NASA EONET 和 GDACS 公共灾害数据 |
 | `/api/hazards?source=USGS,NASA` | `GET` | 按数据源筛选聚合结果 |
 | `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET` | 按灾害类型筛选聚合结果 |
+| `/api/ai/chat` | `POST` | 通过 Express BFF 流式返回 AI 助手响应 |
 | `/api/*` | Any | 代理其余 API 到 DisasterAware |
 
 #### Python 分析 API
@@ -843,7 +859,6 @@ prometheus-global-guardian/
 ├── src/
 │   ├── api/
 │   │   ├── aiAssistant.ts
-│   │   ├── aiProviderConfig.ts
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
 │   │   ├── hazards.ts
@@ -856,6 +871,11 @@ prometheus-global-guardian/
 │   ├── App.tsx
 │   ├── index.css
 │   └── index.tsx
+├── server/
+│   ├── ai/
+│   │   ├── ai-chat-route.js
+│   │   └── ai-provider.js
+│   └── env.js
 ├── hazards-source.js
 ├── server.js
 ├── start-python-service.sh

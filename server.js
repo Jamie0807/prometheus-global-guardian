@@ -4,9 +4,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import getRawBody from "raw-body";
 import { fetchAllHazards } from "./hazards-source.js";
+import { loadLocalEnv } from "./server/env.js";
+import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+loadLocalEnv();
 
 const app = express();
 
@@ -21,6 +25,8 @@ app.use(async (req, res, next) => {
   }
   next();
 });
+
+registerAIChatRoute(app);
 
 // Aggregated multi-source hazards endpoint (USGS / NASA EONET / GDACS).
 // Register before the generic /api proxy so this route is handled locally.

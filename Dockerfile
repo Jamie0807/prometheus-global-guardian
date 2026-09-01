@@ -25,6 +25,7 @@ RUN npm ci --omit=dev
 
 COPY server.js ./server.js
 COPY hazards-source.js ./hazards-source.js
+COPY server ./server
 COPY --from=build /app/dist ./dist
 
 EXPOSE 8080
