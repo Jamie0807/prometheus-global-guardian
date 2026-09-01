@@ -20,6 +20,7 @@ The system consolidates live hazard feeds, normalizes event data, renders global
 - [Runtime Requirements](#runtime-requirements)
 - [Configuration](#configuration)
 - [Local Development](#local-development)
+- [Docker Compose](#docker-compose)
 - [Python Analytics Service](#python-analytics-service)
 - [AI Assistant Provider](#ai-assistant-provider)
 - [Production Build](#production-build)
@@ -141,8 +142,8 @@ The Python analytics service runs as an independent FastAPI process on port `800
 
 | Runtime | Version |
 |---|---|
-| Node.js | 18.x |
-| npm | Compatible with Node 18 |
+| Node.js | 20.19.x |
+| npm | Compatible with Node 20.19 |
 | Python | 3.13 recommended for analytics |
 
 The repository includes `.nvmrc`; use the following command to switch Node versions:
@@ -228,6 +229,50 @@ Build the frontend:
 
 ```bash
 npm run build
+```
+
+### Docker Compose
+
+Docker Compose is the recommended one-command startup path for running the production web server, Express BFF, and Python analytics service together.
+
+Start all services:
+
+```bash
+docker compose up --build
+```
+
+Open the application:
+
+```text
+http://localhost:8080
+```
+
+Check the analytics service:
+
+```text
+http://localhost:8001/health
+```
+
+Stop the services:
+
+```bash
+docker compose down
+```
+
+Follow logs:
+
+```bash
+docker compose logs -f
+```
+
+Docker reads safe build-time frontend variables from `.env`. By default, the Compose build only passes `VITE_MAPBOX_TOKEN` and `VITE_PYTHON_API_URL` into the frontend image. Do not bake DisasterAware credentials or model provider keys into browser assets; route those through a server-side proxy for production.
+
+Keep `VITE_PYTHON_API_URL=http://localhost:8001` for the Docker setup because analytics requests are made by the browser through the host-published port.
+
+Check running containers:
+
+```bash
+docker compose ps
 ```
 
 ### Python Analytics Service
@@ -330,6 +375,7 @@ npm run start:static
 - The Python analytics service must be available at `VITE_PYTHON_API_URL` for workflows that call FastAPI endpoints.
 - When the Python service is offline, map and public hazard workflows can still run, while analytics panels may show offline or error states.
 - `npm start` serves the built app through Express and enables the backend `/api/hazards` aggregation endpoint.
+- `docker compose up --build` is the recommended way to run the production Web / Express BFF and Python analytics service together.
 - `npm run dev` uses Vite for frontend development; `/api` requests are handled by the Vite proxy in development.
 - Mapbox rendering requires a valid `VITE_MAPBOX_TOKEN`.
 - `dist/` is generated output and should be rebuilt for production releases.
@@ -379,6 +425,8 @@ prometheus-global-guardian/
 ├── hazards-source.js
 ├── server.js
 ├── start-python-service.sh
+├── docker-compose.yml
+├── .dockerignore
 ├── Dockerfile
 ├── package.json
 └── vite.config.ts
@@ -406,6 +454,7 @@ Prometheus Global Guardian 是一套面向灾害监测、地理态势可视化�
 - [运行环境](#运行环境)
 - [配置](#配置)
 - [本地开发](#本地开发)
+- [Docker Compose](#docker-compose-1)
 - [Python 分析服务](#python-分析服务)
 - [AI 助手模型服务](#ai-助手模型服务)
 - [生产构建](#生产构建)
@@ -527,8 +576,8 @@ Python 分析服务作为独立 FastAPI 进程运行，默认端口为 `8001`。
 
 | 运行时 | 版本 |
 |---|---|
-| Node.js | 18.x |
-| npm | 与 Node 18 兼容 |
+| Node.js | 20.19.x |
+| npm | 与 Node 20.19 兼容 |
 | Python | 推荐 3.13，用于分析服务 |
 
 仓库包含 `.nvmrc`，可用以下命令切换 Node 版本：
@@ -614,6 +663,50 @@ npm run lint
 
 ```bash
 npm run build
+```
+
+### Docker Compose
+
+Docker Compose 是推荐的一键启动方式，可以同时运行生产 Web 服务、Express BFF 和 Python 分析服务。
+
+启动所有服务：
+
+```bash
+docker compose up --build
+```
+
+访问应用：
+
+```text
+http://localhost:8080
+```
+
+检查分析服务：
+
+```text
+http://localhost:8001/health
+```
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+查看日志：
+
+```bash
+docker compose logs -f
+```
+
+Docker 会从 `.env` 读取安全的前端构建期变量。默认 Compose 构建只会把 `VITE_MAPBOX_TOKEN` 和 `VITE_PYTHON_API_URL` 注入前端镜像。不要把 DisasterAware 凭据或模型服务 Key 打进浏览器产物；生产环境建议通过服务端代理承接这些请求。
+
+Docker 场景建议保持 `VITE_PYTHON_API_URL=http://localhost:8001`，因为分析请求由浏览器通过宿主机暴露端口发起。
+
+查看容器状态：
+
+```bash
+docker compose ps
 ```
 
 ### Python 分析服务
@@ -716,6 +809,7 @@ npm run start:static
 - Python 分析服务需要在 `VITE_PYTHON_API_URL` 指定地址可用，相关分析流程才可调用 FastAPI 接口。
 - Python 服务离线时，前端地图和公共灾害数据流程仍可运行，但分析面板可能显示离线或错误状态。
 - `npm start` 通过 Express 托管构建产物，并启用后端 `/api/hazards` 聚合接口。
+- `docker compose up --build` 是推荐的一键启动方式，用于同时运行生产 Web / Express BFF 和 Python 分析服务。
 - `npm run dev` 使用 Vite 开发服务；开发环境下 `/api` 请求由 Vite proxy 处理。
 - Mapbox 地图渲染需要有效的 `VITE_MAPBOX_TOKEN`。
 - `dist/` 是构建产物，生产发布前应重新构建。
@@ -765,6 +859,8 @@ prometheus-global-guardian/
 ├── hazards-source.js
 ├── server.js
 ├── start-python-service.sh
+├── docker-compose.yml
+├── .dockerignore
 ├── Dockerfile
 ├── package.json
 └── vite.config.ts

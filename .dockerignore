@@ -1,0 +1,15 @@
+.git
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+.pytest_cache
+__pycache__
+*.log
+python-analytics-service/venv
+python-analytics-service/.venv
+python-analytics-service/env
+python-analytics-service/ENV

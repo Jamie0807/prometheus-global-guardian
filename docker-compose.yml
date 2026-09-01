@@ -1,0 +1,34 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN:-}
+        VITE_PYTHON_API_URL: ${VITE_PYTHON_API_URL:-http://localhost:8001}
+    environment:
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      analytics:
+        condition: service_healthy
+
+  analytics:
+    build:
+      context: ./python-analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
