@@ -3,7 +3,7 @@ import fetch, { type RequestInit, type Response as FetchResponse } from "node-fe
 import path from "path";
 import { fileURLToPath } from "url";
 import getRawBody from "raw-body";
-import { fetchAllHazards } from "./hazards-source.js";
+import { fetchAllHazards } from "./server/hazards/hazard-source.js";
 import { loadLocalEnv } from "./server/env.js";
 import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
 

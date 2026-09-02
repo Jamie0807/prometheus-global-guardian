@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # 快速启动Python数据分析服务脚本
 
 echo "=========================================="
@@ -17,7 +23,7 @@ echo "✅ Found: $PYTHON_VERSION"
 echo ""
 
 # 进入服务目录
-cd python-analytics-service
+cd "$PROJECT_ROOT/python-analytics-service"
 
 # 检查虚拟环境
 if [ ! -d "venv" ]; then

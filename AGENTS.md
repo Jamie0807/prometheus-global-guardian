@@ -64,7 +64,7 @@ git diff --check
 ## 项目约定
 
 - 本项目是 Vite + React + TypeScript 前端、Express BFF 和 FastAPI 分析服务组合项目。
-- `src/services/` 是业务请求和外部服务的主要实现边界；`src/api/` 仅在兼容迁移期间保留 facade/re-export。
+- `src/services/` 是业务请求和外部服务的主要实现边界。
 - `tests/` 包含自动化测试；修改公开行为时同步添加或更新测试。
 - 前端构建产物不得包含模型 Key、DisasterAware 凭据、Python 服务凭据等服务端秘密。
 - 用户要求的回复、计划、进度和开发说明默认使用中文。

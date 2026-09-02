@@ -13,11 +13,6 @@
     "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": [
-    "server.ts",
-    "hazards-source.ts",
-    "server/**/*.ts",
-    "server/**/*.d.ts"
-  ],
+  "include": ["server.ts", "server/**/*.ts", "server/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "dist-server"]
 }

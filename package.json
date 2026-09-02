@@ -14,7 +14,7 @@
     "build:server": "./scripts/with-node-version.sh tsc -p tsconfig.server.json",
     "build:server:test": "./scripts/with-node-version.sh tsc -p tsconfig.server.test.json",
     "commit": "git-cz",
-    "format:check": "./scripts/with-node-version.sh prettier --check README.md package.json src/services src/api/auth.ts src/api/disasteraware.ts src/api/hazards.ts src/api/pythonAnalytics.ts src/api/aiAssistant.ts src/utils/aiAssistant.ts tests/service-*.test.ts tests/server-auth.test.ts vitest.config.ts vite.config.ts server.ts AGENTS.md commitlint.config.cjs .prettierrc.json",
+    "format:check": "./scripts/with-node-version.sh prettier --check README.md package.json src/services src/utils/aiAssistant.ts tests/service-*.test.ts tests/server-auth.test.ts vitest.config.ts vite.config.ts server.ts AGENTS.md commitlint.config.cjs .prettierrc.json",
     "lint": "./scripts/with-node-version.sh eslint .",
     "lint:staged": "lint-staged",
     "prepare": "husky",

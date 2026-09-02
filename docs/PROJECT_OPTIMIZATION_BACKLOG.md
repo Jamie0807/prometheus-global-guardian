@@ -12,7 +12,7 @@
 
 - 前端 UI、Express BFF、Python 分析服务都放在仓库根目录，包边界不够清晰。
 - 大组件同时承担渲染、数据请求、数据转换、状态协调和副作用。
-- API 已开始收敛到 `src/services`，但 `src/api` 兼容入口和部分旧组件仍需继续迁移。
+- API 已统一收敛到 `src/services`，组件不再依赖旧的 API facade。
 - 地图渲染逻辑是项目亮点，但目前集中在一个组件里，后续维护和讲解成本较高。
 - TypeScript 前端和 Python 分析服务都有分析逻辑，但服务边界还不够明确。
 - 前端、BFF 和 Python 服务之间仍存在两套灾害数据字段约定，部分 Analytics/4D 请求当前不能按前端意图执行。
@@ -106,8 +106,8 @@ AIChatAssistant
 - 当 `VOLCENGINE_ARK_API_URL` 为 `https://ark.cn-beijing.volces.com/api/plan/v3` 时，BFF 自动拼接 `/responses` 并使用 Responses API 请求格式。
 - BFF 将 Responses API 的流式增量转换成前端现有 Chat Completions 风格流，前端接口保持不变。
 - System Prompt 构建逻辑迁移到 BFF，前端不再承担 provider 请求细节。
-- `src/api/aiAssistant.ts` 默认请求 `/api/ai/chat`，未配置模型服务时继续保留 Demo 模式。
-- 已删除前端 provider 配置文件 `src/api/aiProviderConfig.ts`，浏览器端不再读取模型服务 Key。
+- `src/services/ai/aiAssistantService.ts` 默认请求 `/api/ai/chat`，未配置模型服务时继续保留 Demo 模式。
+- 已删除前端 provider 配置模块，浏览器端不再读取模型服务 Key。
 - BFF 增加模型服务响应超时保护，避免上游无响应时前端无限等待。
 - Docker Compose 只在 `web` 服务运行时注入服务端 AI 环境变量，不作为前端 build args 注入。
 - `.env.example` 和 README 已更新为服务端 AI 配置方式。
@@ -128,7 +128,7 @@ AIChatAssistant
 
 已完成 AI BFF 及其运行时依赖的 TypeScript 迁移：
 
-- `server.ts`、`hazards-source.ts`、`server/env.ts` 和 `server/ai/*.ts` 替代原有服务端 JavaScript 文件。
+- `server.ts`、`server/hazards/hazard-source.ts`、`server/env.ts` 和 `server/ai/*.ts` 替代原有服务端 JavaScript 文件。
 - 新增 `tsconfig.server.json` 和 `tsconfig.server.test.json`，服务端使用 NodeNext ESM 和严格类型检查，输出到 `dist-server/`。
 - Node 测试迁移为 TypeScript 源码，先编译再由 Node 执行编译产物。
 - `pnpm run build` 同时完成前端和 BFF 构建，`pnpm start` 启动 `dist-server/server.js`。
@@ -258,7 +258,7 @@ AIChatAssistant
 
 ## P1：外部数据源时效性与韧性
 
-`hazards-source.ts` 的 USGS、NASA、GDACS 请求没有独立 timeout、重试、缓存或 stale 数据策略；前端遇到 DisasterAware 为空时会并行请求公共源，但没有展示各源失败、最后成功时间和数据是否过期。建议增加按数据源的超时/重试/缓存、来源状态和新鲜度元数据，并验证单源故障、部分成功、重复事件和刷新竞态。
+`server/hazards/hazard-source.ts` 的 USGS、NASA、GDACS 请求没有独立 timeout、重试、缓存或 stale 数据策略；前端遇到 DisasterAware 为空时会并行请求公共源，但没有展示各源失败、最后成功时间和数据是否过期。建议增加按数据源的超时/重试/缓存、来源状态和新鲜度元数据，并验证单源故障、部分成功、重复事件和刷新竞态。
 
 ## P1：AI 流式会话生命周期治理
 
@@ -421,7 +421,7 @@ src/features/analytics/
 - `src/services/hazards` 集中处理 USGS、NASA、GDACS 和 DisasterAware 请求及数据适配。
 - `src/services/analytics` 接管 Python Analytics 请求，并保留原有导出能力。
 - `src/services/ai` 接管 AI SSE 请求和 Demo 降级；纯 UI 辅助函数放在 `src/utils/aiAssistant.ts`。
-- `src/api` 保留兼容 facade，旧调用方可以渐进迁移到 Service 层。
+- 已移除 `src/api` 兼容 facade，项目内部统一直接使用 Service 层。
 - `tests/service-*.test.ts` 使用 Vitest 覆盖 HTTP、适配器、Analytics 和 AI Service；BFF 继续使用 Node 原生测试。
 
 验证命令为 `pnpm test`、`pnpm run lint`、`pnpm run format:check`、`pnpm run typecheck:client`、`pnpm run typecheck:server` 和 `pnpm run build`。
@@ -432,7 +432,7 @@ src/features/analytics/
 
 前端 API 曾分布在多个文件中，返回结构、错误处理和 provider 适配方式不完全一致，导致 UI 组件需要知道过多外部服务细节。
 
-本轮已完成迁移，当前 `src/api` 仅作为兼容入口保留，业务请求由 `src/services` 负责。
+本轮已完成迁移，业务请求由 `src/services` 统一负责。
 
 ### 已落地结构
 

@@ -332,7 +332,7 @@ The analytics service runs independently from the React application and must be 
 Recommended command from the repository root:
 
 ```bash
-chmod +x start-python-service.sh && ./start-python-service.sh
+chmod +x scripts/start-python-service.sh && ./scripts/start-python-service.sh
 ```
 
 Manual startup:
@@ -472,6 +472,7 @@ prometheus-global-guardian/
 ├── public/
 │   └── assets/                  # Logo and static assets
 ├── scripts/
+│   ├── start-python-service.sh   # Start the local Python analytics service
 │   └── with-node-version.sh      # Run commands with the Node.js version from .nvmrc
 ├── python-analytics-service/
 │   ├── analytics/
@@ -489,12 +490,6 @@ prometheus-global-guardian/
 │   ├── test_pivot_table.py
 │   └── test_service.py
 ├── src/
-│   ├── api/                     # Backward-compatible API facades
-│   │   ├── aiAssistant.ts
-│   │   ├── auth.ts
-│   │   ├── disasteraware.ts
-│   │   ├── hazards.ts
-│   │   └── pythonAnalytics.ts
 │   ├── services/                # Frontend business and network services
 │   │   ├── ai/aiAssistantService.ts
 │   │   ├── analytics/
@@ -520,6 +515,8 @@ prometheus-global-guardian/
 │   │   ├── ai-chat-route.ts
 │   │   ├── ai-provider.ts
 │   │   └── ai-stream.ts
+│   ├── hazards/
+│   │   └── hazard-source.ts     # USGS, NASA EONET, and GDACS aggregation
 │   ├── env.ts
 │   └── express.d.ts
 ├── tests/
@@ -538,7 +535,6 @@ prometheus-global-guardian/
 ├── .prettierrc.json
 ├── cspell.json
 ├── commitlint.config.cjs
-├── hazards-source.ts
 ├── server.ts
 ├── eslint.config.js
 ├── package-lock.json
@@ -549,7 +545,6 @@ prometheus-global-guardian/
 ├── tsconfig.node.json
 ├── tsconfig.server.json
 ├── tsconfig.server.test.json
-├── start-python-service.sh
 ├── docker-compose.yml
 ├── .dockerignore
 ├── Dockerfile
@@ -894,7 +889,7 @@ docker compose ps
 推荐从仓库根目录执行：
 
 ```bash
-chmod +x start-python-service.sh && ./start-python-service.sh
+chmod +x scripts/start-python-service.sh && ./scripts/start-python-service.sh
 ```
 
 手动启动：
@@ -1032,6 +1027,7 @@ prometheus-global-guardian/
 ├── public/
 │   └── assets/                  # Logo 和静态资源
 ├── scripts/
+│   ├── start-python-service.sh   # 启动本地 Python 分析服务
 │   └── with-node-version.sh      # 读取 .nvmrc 并使用项目 Node.js 版本执行命令
 ├── python-analytics-service/
 │   ├── analytics/
@@ -1049,12 +1045,6 @@ prometheus-global-guardian/
 │   ├── test_pivot_table.py
 │   └── test_service.py
 ├── src/
-│   ├── api/                     # 兼容旧调用方的 API facade
-│   │   ├── aiAssistant.ts
-│   │   ├── auth.ts
-│   │   ├── disasteraware.ts
-│   │   ├── hazards.ts
-│   │   └── pythonAnalytics.ts
 │   ├── services/                # 前端业务和网络 Service 层
 │   │   ├── ai/aiAssistantService.ts
 │   │   ├── analytics/
@@ -1083,6 +1073,8 @@ prometheus-global-guardian/
 │   │   ├── ai-chat-route.ts
 │   │   ├── ai-provider.ts
 │   │   └── ai-stream.ts
+│   ├── hazards/
+│   │   └── hazard-source.ts     # USGS、NASA EONET、GDACS 数据聚合
 │   ├── env.ts
 │   └── express.d.ts
 ├── tests/
@@ -1101,13 +1093,11 @@ prometheus-global-guardian/
 ├── .prettierrc.json
 ├── cspell.json
 ├── commitlint.config.cjs
-├── hazards-source.ts
 ├── eslint.config.js
 ├── server.ts
 ├── package-lock.json
 ├── package.json
 ├── pnpm-lock.yaml
-├── start-python-service.sh
 ├── docker-compose.yml
 ├── .dockerignore
 ├── Dockerfile

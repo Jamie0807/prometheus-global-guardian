@@ -3,11 +3,9 @@
 
 import fetch from "node-fetch";
 
-const USGS_URL =
-  "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
+const USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
 const NASA_URL = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300";
-const GDACS_URL =
-  "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH";
+const GDACS_URL = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH";
 
 interface Geometry {
   type: string;
@@ -113,10 +111,7 @@ export async function fetchUSGSEarthquakes(): Promise<ServerHazard[]> {
       const magnitude = feature.properties.mag;
       return {
         id: feature.id,
-        title:
-          feature.properties.title ||
-          feature.properties.place ||
-          "Unknown Event",
+        title: feature.properties.title || feature.properties.place || "Unknown Event",
         type: "EARTHQUAKE",
         severity:
           magnitude && magnitude >= 6.0
@@ -151,9 +146,7 @@ export async function fetchNASAEONET(): Promise<ServerHazard[]> {
       .map((event): ServerHazard | null => {
         const category = event.categories?.[0]?.title || "UNKNOWN";
         const hazardType = mapNASACategoryToType(category);
-        const geom = event.geometry?.length
-          ? event.geometry[event.geometry.length - 1]
-          : undefined;
+        const geom = event.geometry?.length ? event.geometry[event.geometry.length - 1] : undefined;
         if (!geom) return null;
         return {
           id: event.id,
@@ -190,15 +183,9 @@ export async function fetchGDACS(): Promise<ServerHazard[]> {
       if (!geometry?.coordinates || !properties) continue;
 
       const title = properties.name || properties.eventname || "Unknown Event";
-      const description =
-        properties.description || properties.htmldescription || "";
+      const description = properties.description || properties.htmldescription || "";
       const hazardType = detectHazardTypeFromTitle(
-        title.concat(
-          " ",
-          description,
-          " ",
-          properties.severitydata?.severitytext || "",
-        ),
+        title.concat(" ", description, " ", properties.severitydata?.severitytext || ""),
       );
       const severity =
         properties.alertlevel === "Red"
