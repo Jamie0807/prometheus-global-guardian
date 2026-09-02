@@ -119,18 +119,26 @@ test('buildAIProviderRequest chooses Responses API for plan base URLs', () => {
   assert.equal(request.payload.input[0].content, 'hello');
 });
 
-test('buildWorkflowPayload sends workflow input as inputs.user_input', () => {
+test('buildWorkflowPayload sends the latest user input and workflow context', () => {
   const payload = buildWorkflowPayload({
     messages: [
       { role: 'assistant', content: 'Previous answer' },
       { role: 'user', content: '灾害种类地震12次,海啸10次' },
     ],
     disasterContext: { total: 22, byType: { EARTHQUAKE: 12, TSUNAMI: 10 }, recent: [] },
+    location: '全球',
+    language: 'zh',
   });
 
   assert.deepEqual(Object.keys(payload), ['inputs']);
-  assert.match(payload.inputs.user_input, /灾害种类地震12次,海啸10次/);
-  assert.match(payload.inputs.user_input, /活跃监控事件总数：\*\*22 条\*\*/);
+  assert.equal(payload.inputs.user_input, '用户：灾害种类地震12次,海啸10次');
+  assert.deepEqual(payload.inputs.hazard_context, {
+    total: 22,
+    byType: { EARTHQUAKE: 12, TSUNAMI: 10 },
+    recent: [],
+  });
+  assert.equal(payload.inputs.location, '全球');
+  assert.equal(payload.inputs.language, 'zh');
 });
 
 test('buildAIProviderRequest chooses workflow protocol for workflow provider', () => {
@@ -140,12 +148,22 @@ test('buildAIProviderRequest chooses workflow protocol for workflow provider', (
       apiUrl: 'http://localhost:3100/api/v1/apps/run',
     },
     messages: [{ role: 'user', content: 'hello workflow' }],
-    disasterContext: null,
+    disasterContext: { total: 0, byType: {}, recent: [] },
+    location: '全球',
+    language: 'zh',
   });
 
   assert.equal(request.protocol, 'workflow');
   assert.equal(request.apiUrl, 'http://localhost:3100/api/v1/apps/run');
-  assert.deepEqual(request.headers, { stream: 'true' });
+  assert.equal(request.headers, undefined);
+  assert.equal(request.payload.stream, true);
+  assert.equal(request.payload.inputs.location, '全球');
+  assert.equal(request.payload.inputs.language, 'zh');
+  assert.deepEqual(request.payload.inputs.hazard_context, {
+    total: 0,
+    byType: {},
+    recent: [],
+  });
   assert.equal(request.payload.inputs.user_input.includes('hello workflow'), true);
 });
 

@@ -17,6 +17,15 @@
 - TypeScript 前端和 Python 分析服务都有分析逻辑，但服务边界还不够明确。
 - 质量门禁还不完整：有 lint 和 build，但核心业务逻辑缺少系统化测试。
 
+## 开发与交付约束
+
+后续每个需求都遵循以下项目级约束：
+
+- 新增或重构的前端、BFF 代码统一使用 TypeScript；Python 分析服务继续使用 Python，不新增同职责 JavaScript 文件。
+- 开始实现 AI Router 前，先将现有 AI BFF 相关 JavaScript 文件迁移为 TypeScript，并补齐类型、测试和构建配置。
+- 每个需求开始前使用 Superpowers 流程完成上下文探索、方案设计、测试策略和验证；涉及新功能或行为变化时遵循测试驱动开发。
+- 每个需求完成后同步更新本文档，记录状态、实现内容、验证结果和遗留风险。
+
 ## 优先级矩阵
 
 | 优先级 | 优化领域 | 影响 | 建议时机 |
@@ -24,6 +33,8 @@
 | P0 | 地图模块拆分 | 提升核心模块可维护性和性能可信度 | 第一批 |
 | P0 | 分析页面拆分 | 降低最大组件维护成本 | 第一批 |
 | P0 | API / Service 层统一 | 提升稳定性和排查效率 | 第一批 |
+| P0 | AI 助手智能路由 | 由 LLM 判断普通模型与 RAG 工作流调用边界 | 第一批 |
+| P0 | BFF TypeScript 化 | 统一项目技术栈，降低 JavaScript 与 TypeScript 混用成本 | 第一批 |
 | P1 | 前端状态归属梳理 | 降低耦合和无效重渲染 | 第二批 |
 | P1 | Python 服务结构整理 | 提升后端服务可维护性 | 第二批 |
 | P1 | 测试基线建设 | 提升交付信心 | 第二批 |
@@ -37,6 +48,7 @@
 | --- | --- | --- |
 | Docker 一键启动前后端 | 已完成 | 通过 Docker Compose 同时启动 Web / Express BFF 和 Python FastAPI 分析服务 |
 | AI 助手 BFF 化改造 | 已完成 | 通过 Express BFF 统一封装 ai-workflow 与火山方舟模型调用，前端只消费 `/api/ai/chat` |
+| AI BFF TypeScript 化 | 已完成 | 服务端源码统一为 TypeScript，编译到 `dist-server` 后由生产环境启动 |
 
 ### Docker 一键启动前后端
 
@@ -48,6 +60,7 @@
 - `.dockerignore` 排除本地依赖、构建产物和环境变量文件。
 - `.env.example` 增加 Docker 场景下 `VITE_PYTHON_API_URL` 的说明。
 - README 已补充 Docker 启动、停止、日志查看和健康检查说明。
+- README 英文和中文的“本地开发”章节已集中说明前端开发模式和 Docker 全栈一键启动方式，避免启动命令分散。
 
 验证结果：
 
@@ -71,10 +84,10 @@ AIChatAssistant
 
 已落地内容：
 
-- `server/ai/ai-provider.js` 统一读取服务端环境变量 `AI_PROVIDER`、`VOLCENGINE_WORKFLOW_API_URL`、`VOLCENGINE_WORKFLOW_API_KEY`、`VOLCENGINE_ARK_API_KEY`、`VOLCENGINE_ARK_MODEL`、`VOLCENGINE_ARK_API_URL`、`VOLCENGINE_ARK_TIMEOUT_MS`。
-- `server/ai/ai-chat-route.js` 新增 `POST /api/ai/chat`，负责请求校验、provider 调度、错误脱敏和 SSE 流式转发。
-- `AI_PROVIDER=workflow` 时，BFF 调用已发布 ai-workflow 应用，请求体为 `{"inputs":{"user_input":"..."}}`，并发送 `stream: true` Header。
-- Workflow provider 同时兼容 SSE 和普通 JSON：SSE 会被转换成前端聊天流格式，普通 JSON 从 `data.outputs.result` 提取回答。
+- `server/ai/ai-provider.ts` 统一读取服务端环境变量 `AI_PROVIDER`、`VOLCENGINE_WORKFLOW_API_URL`、`VOLCENGINE_WORKFLOW_API_KEY`、`VOLCENGINE_ARK_API_KEY`、`VOLCENGINE_ARK_MODEL`、`VOLCENGINE_ARK_API_URL`、`VOLCENGINE_ARK_TIMEOUT_MS`。
+- `server/ai/ai-chat-route.ts` 新增 `POST /api/ai/chat`，负责请求校验、provider 调度、错误脱敏和 SSE 流式转发。
+- `AI_PROVIDER=workflow` 时，BFF 调用已发布 ai-workflow 应用，按开始节点契约发送 `user_input`、`hazard_context`、`location` 和 `language`，并在 JSON Body 中发送 `stream: true`。
+- Workflow provider 同时兼容 SSE 和普通 JSON：SSE 的 `complete.data.outputs.result` 会被转换成前端聊天流格式，普通 JSON 从 `data.outputs.result` 提取回答。
 - 当 `VOLCENGINE_ARK_API_URL` 为 `https://ark.cn-beijing.volces.com/api/plan/v3` 时，BFF 自动拼接 `/responses` 并使用 Responses API 请求格式。
 - BFF 将 Responses API 的流式增量转换成前端现有 Chat Completions 风格流，前端接口保持不变。
 - System Prompt 构建逻辑迁移到 BFF，前端不再承担 provider 请求细节。
@@ -83,18 +96,51 @@ AIChatAssistant
 - BFF 增加模型服务响应超时保护，避免上游无响应时前端无限等待。
 - Docker Compose 只在 `web` 服务运行时注入服务端 AI 环境变量，不作为前端 build args 注入。
 - `.env.example` 和 README 已更新为服务端 AI 配置方式。
-- 已新增 `npm test`、`tests/ai-provider.test.js` 和 `tests/ai-stream.test.js`，覆盖 provider 配置、请求体构造、Responses SSE 转换、Workflow SSE/JSON 结果转换。
+- 已新增 `npm test`、`tests/ai-provider.test.ts` 和 `tests/ai-stream.test.ts`，覆盖 provider 配置、请求体构造、Responses SSE 转换、Workflow SSE/JSON 结果转换。
 
 验证结果：
 
-- `npm test` 通过，18 个 AI provider / stream 适配测试均通过。
+- `npm test` 通过，19 个 AI provider / stream 适配测试均通过。
 - `npm run build` 通过，前端构建产物中未发现已配置的前端旧 Key。
 - `npm run lint` 退出码为 0，但仍保留既有 warning。
 - `docker compose up -d --build` 可以启动 Web / Express BFF 和 Python 分析服务。
 - `http://localhost:8080` 返回 Web 首页。
 - `http://localhost:8001/health` 返回 Python 服务健康状态。
-- `AI_PROVIDER=workflow` 时，Docker 容器内确认 provider 为 workflow，协议为 workflow，并会发送 `stream: true` Header。
+- `AI_PROVIDER=workflow` 时，Docker 容器内确认 provider 为 workflow，协议为 workflow，并会在请求 Body 中发送 `stream: true`。
 - 未配置所选 provider 必要参数时，`POST /api/ai/chat` 返回 503 配置缺失状态，前端会降级到 Demo 模式。
+
+### AI BFF TypeScript 化
+
+已完成 AI BFF 及其运行时依赖的 TypeScript 迁移：
+
+- `server.ts`、`hazards-source.ts`、`server/env.ts` 和 `server/ai/*.ts` 替代原有服务端 JavaScript 文件。
+- 新增 `tsconfig.server.json` 和 `tsconfig.server.test.json`，服务端使用 NodeNext ESM 和严格类型检查，输出到 `dist-server/`。
+- Node 测试迁移为 TypeScript 源码，先编译再由 Node 执行编译产物。
+- `npm run build` 同时完成前端和 BFF 构建，`npm start` 启动 `dist-server/server.js`。
+- Docker runtime 镜像只复制 `dist/` 和 `dist-server/`，不在生产容器内运行未编译源码。
+- 新增 `@types/express`，为 Express 请求、响应和 `rawBody` 中间件补充类型声明。
+
+验证结果：
+
+- `npm run typecheck:server` 通过。
+- `npm test` 通过，19 个测试全部通过。
+- `npm run lint` 通过，保留既有 warning，无新增 error。
+- `npm run build` 和 Docker Web 镜像构建通过。
+
+遗留风险：
+
+- 仓库其他历史 JavaScript 配置文件仍保留；本次只迁移服务端运行时和 AI BFF，避免扩大改动范围。
+- 本机 Node 版本应遵循项目声明的 `>=20.19 <21`，以保持和 Docker runtime 一致。
+
+## AI 助手智能路由计划
+
+当前 AI 助手通过 `AI_PROVIDER=workflow` 固定调用 ai-workflow。下一阶段调整为由 BFF 中的 LLM Router 判断请求路径：
+
+- 普通闲聊、通用解释和不需要知识库的问题调用火山方舟模型。
+- 灾害专业知识、Guardian 规则、历史案例、应急预案和需要 RAG 检索的问题调用已发布 ai-workflow。
+- 前端继续只请求 `/api/ai/chat`，不感知具体 provider。
+- Router、火山方舟和 ai-workflow 统一由 BFF 编排，API Key 不进入浏览器。
+- 需要记录路由结果、失败降级策略和每条路径的耗时，避免出现回答成功但没有使用预期知识库的问题。
 
 ## P0：拆分地图模块
 

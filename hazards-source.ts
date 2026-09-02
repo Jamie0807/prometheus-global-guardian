@@ -1,5 +1,4 @@
 // Multi-source hazard aggregation for the backend /api/hazards endpoint.
-// Ported from src/api/hazards.ts to keep the backend response aligned with the frontend Hazard shape.
 // Sources: USGS earthquakes, NASA EONET events, and GDACS disaster alerts.
 
 import fetch from "node-fetch";
@@ -10,7 +9,73 @@ const NASA_URL = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=30
 const GDACS_URL =
   "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH";
 
-export function mapNASACategoryToType(category) {
+interface Geometry {
+  type: string;
+  coordinates: unknown;
+}
+
+export interface ServerHazard {
+  id: string;
+  title: string;
+  type: string;
+  severity?: string;
+  description: string;
+  geometry: Geometry;
+  magnitude?: number;
+  timestamp?: string;
+  source: string;
+  url?: string;
+}
+
+interface USGSFeature {
+  id: string;
+  properties: {
+    title?: string;
+    place?: string;
+    mag?: number;
+    time?: number;
+  };
+  geometry: Geometry;
+}
+
+interface NASAEvent {
+  id: string;
+  title: string;
+  categories?: Array<{ title?: string }>;
+  geometry?: Array<{
+    type: string;
+    coordinates: unknown;
+    date?: string;
+  }>;
+}
+
+interface GDACSFeature {
+  geometry?: Geometry;
+  properties?: {
+    eventid?: string | number;
+    name?: string;
+    eventname?: string;
+    description?: string;
+    htmldescription?: string;
+    alertlevel?: "Red" | "Orange" | string;
+    severitydata?: { severitytext?: string };
+    url?: { report?: string };
+  };
+}
+
+interface USGSResponse {
+  features?: USGSFeature[];
+}
+
+interface NASAResponse {
+  events?: NASAEvent[];
+}
+
+interface GDACSResponse {
+  features?: GDACSFeature[];
+}
+
+export function mapNASACategoryToType(category: string): string {
   if (category.includes("Wildfires")) return "WILDFIRE";
   if (category.includes("Volcanoes")) return "VOLCANO";
   if (category.includes("Floods")) return "FLOOD";
@@ -20,25 +85,30 @@ export function mapNASACategoryToType(category) {
   return "UNKNOWN";
 }
 
-export function detectHazardTypeFromTitle(title) {
-  const t = title.toLowerCase();
-  if (t.includes("earthquake")) return "EARTHQUAKE";
-  if (t.includes("flood")) return "FLOOD";
-  if (t.includes("cyclone") || t.includes("hurricane") || t.includes("typhoon"))
+export function detectHazardTypeFromTitle(title: string): string {
+  const normalizedTitle = title.toLowerCase();
+  if (normalizedTitle.includes("earthquake")) return "EARTHQUAKE";
+  if (normalizedTitle.includes("flood")) return "FLOOD";
+  if (
+    normalizedTitle.includes("cyclone") ||
+    normalizedTitle.includes("hurricane") ||
+    normalizedTitle.includes("typhoon")
+  ) {
     return "TROPICAL_CYCLONE";
-  if (t.includes("volcano")) return "VOLCANO";
-  if (t.includes("drought")) return "DROUGHT";
-  if (t.includes("tsunami")) return "TSUNAMI";
-  if (t.includes("storm")) return "STORM";
+  }
+  if (normalizedTitle.includes("volcano")) return "VOLCANO";
+  if (normalizedTitle.includes("drought")) return "DROUGHT";
+  if (normalizedTitle.includes("tsunami")) return "TSUNAMI";
+  if (normalizedTitle.includes("storm")) return "STORM";
   return "UNKNOWN";
 }
 
-export async function fetchUSGSEarthquakes() {
+export async function fetchUSGSEarthquakes(): Promise<ServerHazard[]> {
   try {
     const response = await fetch(USGS_URL);
     if (!response.ok) return [];
 
-    const data = await response.json();
+    const data = (await response.json()) as USGSResponse;
     return (data.features ?? []).map((feature) => {
       const magnitude = feature.properties.mag;
       return {
@@ -63,7 +133,7 @@ export async function fetchUSGSEarthquakes() {
           ? new Date(feature.properties.time).toISOString()
           : undefined,
         source: "USGS",
-      };
+      } satisfies ServerHazard;
     });
   } catch (error) {
     console.error("USGS fetch error:", error);
@@ -71,15 +141,15 @@ export async function fetchUSGSEarthquakes() {
   }
 }
 
-export async function fetchNASAEONET() {
+export async function fetchNASAEONET(): Promise<ServerHazard[]> {
   try {
     const response = await fetch(NASA_URL);
     if (!response.ok) return [];
 
-    const data = await response.json();
+    const data = (await response.json()) as NASAResponse;
     return (data.events ?? [])
-      .map((event) => {
-        const category = event.categories[0]?.title || "UNKNOWN";
+      .map((event): ServerHazard | null => {
+        const category = event.categories?.[0]?.title || "UNKNOWN";
         const hazardType = mapNASACategoryToType(category);
         const geom = event.geometry?.length
           ? event.geometry[event.geometry.length - 1]
@@ -99,26 +169,25 @@ export async function fetchNASAEONET() {
           source: "NASA EONET",
         };
       })
-      .filter(Boolean);
+      .filter((hazard): hazard is ServerHazard => Boolean(hazard));
   } catch (error) {
     console.error("NASA EONET fetch error:", error);
     return [];
   }
 }
 
-export async function fetchGDACS() {
+export async function fetchGDACS(): Promise<ServerHazard[]> {
   try {
     const response = await fetch(GDACS_URL);
     if (!response.ok) return [];
 
-    const geojson = await response.json();
-    const features = geojson.features ?? [];
-    const results = [];
+    const geojson = (await response.json()) as GDACSResponse;
+    const results: ServerHazard[] = [];
 
-    features.forEach((feature) => {
+    for (const feature of geojson.features ?? []) {
       const geometry = feature.geometry;
       const properties = feature.properties;
-      if (!geometry?.coordinates || !properties) return;
+      if (!geometry?.coordinates || !properties) continue;
 
       const title = properties.name || properties.eventname || "Unknown Event";
       const description =
@@ -128,8 +197,8 @@ export async function fetchGDACS() {
           " ",
           description,
           " ",
-          properties.severitydata?.severitytext || ""
-        )
+          properties.severitydata?.severitytext || "",
+        ),
       );
       const severity =
         properties.alertlevel === "Red"
@@ -148,7 +217,7 @@ export async function fetchGDACS() {
         source: "GDACS",
         url: properties.url?.report || undefined,
       });
-    });
+    }
 
     return results;
   } catch (error) {
@@ -157,30 +226,39 @@ export async function fetchGDACS() {
   }
 }
 
-/**
- * Aggregate all enabled data sources and return normalized Hazard records.
- * @param {Object} [options]
- * @param {string[]} [options.sources] Optional source filter: USGS / NASA / GDACS.
- * @returns {Promise<{ hazards: Array, meta: Object }>}
- */
-export async function fetchAllHazards(options = {}) {
-  const requested = (options.sources ?? ["USGS", "NASA", "GDACS"]).map((s) =>
-    String(s).toUpperCase()
+export interface FetchAllHazardsOptions {
+  sources?: string[];
+}
+
+export interface FetchAllHazardsResult {
+  hazards: ServerHazard[];
+  meta: {
+    total: number;
+    perSource: Record<string, number>;
+    errors: Array<{ source: string; message: string }>;
+    generatedAt: string;
+  };
+}
+
+export async function fetchAllHazards(
+  options: FetchAllHazardsOptions = {},
+): Promise<FetchAllHazardsResult> {
+  const requested = (options.sources ?? ["USGS", "NASA", "GDACS"]).map((source) =>
+    source.toUpperCase(),
   );
 
-  const tasks = [];
+  const tasks: Array<[string, Promise<ServerHazard[]>]> = [];
   if (requested.includes("USGS")) tasks.push(["USGS", fetchUSGSEarthquakes()]);
   if (requested.includes("NASA")) tasks.push(["NASA", fetchNASAEONET()]);
   if (requested.includes("GDACS")) tasks.push(["GDACS", fetchGDACS()]);
 
-  const settled = await Promise.allSettled(tasks.map(([, p]) => p));
-
-  const hazards = [];
-  const perSource = {};
-  const errors = [];
+  const settled = await Promise.allSettled(tasks.map(([, promise]) => promise));
+  const hazards: ServerHazard[] = [];
+  const perSource: Record<string, number> = {};
+  const errors: Array<{ source: string; message: string }> = [];
 
   settled.forEach((result, index) => {
-    const sourceName = tasks[index][0];
+    const sourceName = tasks[index]?.[0] ?? "UNKNOWN";
     if (result.status === "fulfilled") {
       perSource[sourceName] = result.value.length;
       hazards.push(...result.value);

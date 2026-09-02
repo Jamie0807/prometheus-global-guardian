@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -9,18 +9,19 @@ import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const clientDistPath = path.resolve(__dirname, "../dist");
 
 loadLocalEnv();
 
 const app = express();
 
 // Capture raw request body for POST, PUT, and PATCH requests
-app.use(async (req, res, next) => {
+app.use(async (req: Request, _res: Response, next: NextFunction) => {
   try {
     if (req.method !== "GET" && req.method !== "HEAD") {
       req.rawBody = await getRawBody(req);
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Raw body error:", err);
   }
   next();
@@ -30,7 +31,7 @@ registerAIChatRoute(app);
 
 // Aggregated multi-source hazards endpoint (USGS / NASA EONET / GDACS).
 // Register before the generic /api proxy so this route is handled locally.
-app.get("/api/hazards", async (req, res) => {
+app.get("/api/hazards", async (req: Request, res: Response) => {
   try {
     const sourcesParam = req.query.source ?? req.query.sources;
     const sources =
@@ -54,7 +55,7 @@ app.get("/api/hazards", async (req, res) => {
       data: filtered,
       meta: { ...meta, returned: filtered.length },
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("/api/hazards error:", err);
     res
       .status(500)
@@ -63,7 +64,7 @@ app.get("/api/hazards", async (req, res) => {
 });
 
 // Proxy all /api requests to the DisasterAware API
-app.use("/api", async (req, res) => {
+app.use("/api", async (req: Request, res: Response) => {
   const targetUrl = "https://api.disasteraware.com" + req.url;
 
   console.log("===== Incoming Proxy Request =====");
@@ -85,7 +86,10 @@ app.use("/api", async (req, res) => {
 
   try {
     // Prepare headers for forwarding (remove host to avoid rejection)
-    const headers = { ...req.headers };
+    const headers: Record<string, string> = Object.fromEntries(
+      Object.entries(req.headers)
+        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    );
     delete headers.host;
 
     const fetchOptions = {
@@ -107,7 +111,7 @@ app.use("/api", async (req, res) => {
     console.log("===== Proxy Response =====");
     console.log("Status:", response.status, response.statusText);
 
-    const resHeadersObj = {};
+    const resHeadersObj: Record<string, string> = {};
     response.headers.forEach((v, k) => (resHeadersObj[k] = v));
     console.log("Response Headers:", JSON.stringify(resHeadersObj, null, 2));
 
@@ -117,23 +121,23 @@ app.use("/api", async (req, res) => {
     console.log("Response Body Preview:", preview);
 
     res.status(response.status).send(text);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("===== Proxy Error =====");
     console.error(err);
     if (err instanceof Error) {
       console.error("Message:", err.message);
       console.error("Stack:", err.stack);
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });
 
 // Serve static files generated in /dist
-app.use(express.static(path.join(__dirname, "dist")));
+app.use(express.static(clientDistPath));
 
 // Fallback for SPA routing: always return index.html
 app.use((req, res) => {
-  res.sendFile(path.join(__dirname, "dist", "index.html"));
+  res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 const PORT = process.env.PORT || 8080;

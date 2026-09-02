@@ -195,7 +195,7 @@ VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/plan/v3
 VOLCENGINE_ARK_TIMEOUT_MS=30000
 ```
 
-Set `AI_PROVIDER=workflow` to call a published ai-workflow app. The workflow request body is sent as `{"inputs":{"user_input":"..."}}`, the BFF sends the `stream: true` request header, and the response may be either SSE or regular JSON. For JSON responses, the BFF reads `data.outputs.result`; for SSE responses, it converts workflow stream events back to the frontend chat stream format.
+Set `AI_PROVIDER=workflow` to call a published ai-workflow app. The BFF sends the workflow-specific start-node inputs: `user_input` (string), `hazard_context` (object), `location` (string), and `language` (string). It sends `stream: true` in the JSON request body, then converts the workflow's SSE `complete` event or regular JSON response into the frontend chat stream format. The workflow API key remains server-side.
 If the BFF runs in Docker while the workflow app runs on your host machine, use `http://host.docker.internal:3100/api/v1/apps/run` instead of `http://localhost:3100/api/v1/apps/run`.
 
 `VOLCENGINE_ARK_API_URL` may be the Volcengine Ark OpenAI-compatible Responses API base URL, such as `https://ark.cn-beijing.volces.com/api/plan/v3`; the BFF appends `/responses` internally when needed. `VOLCENGINE_ARK_TIMEOUT_MS` controls how long the BFF waits for the provider to start responding. These variables are read by the Express BFF at runtime and are not exposed to browser assets.
@@ -226,7 +226,7 @@ Run linting:
 npm run lint
 ```
 
-Build the frontend:
+Build the application:
 
 ```bash
 npm run build
@@ -234,7 +234,7 @@ npm run build
 
 For real AI assistant calls during local Vite development, keep the Express BFF available on `http://localhost:8080` because `/api/ai/*` is proxied there. Docker Compose is the simplest way to run the full stack.
 
-### Docker Compose
+#### Docker Compose
 
 Docker Compose is the recommended one-command startup path for running the production web server, Express BFF, and Python analytics service together.
 
@@ -327,6 +327,12 @@ Build the client:
 npm run build
 ```
 
+The build also compiles the Express BFF into `dist-server/`. To check server types without emitting files:
+
+```bash
+npm run typecheck:server
+```
+
 Start the production Express server:
 
 ```bash
@@ -391,7 +397,7 @@ npm run start:static
 - `.env` is ignored by git and must not be committed.
 - Variables prefixed with `VITE_` are exposed to browser assets; do not place production-only secrets there.
 - For production AI usage, prefer a server-side proxy for Volcengine Ark or other model providers.
-- Review proxy logging in `server.js` before production deployment; current logs are useful for diagnostics but may expose sensitive headers or payloads.
+- Review proxy logging in `server.ts` before production deployment; current logs are useful for diagnostics but may expose sensitive headers or payloads.
 - DisasterAware credentials and model provider keys should be managed through deployment secret storage.
 
 ### Project Structure
@@ -429,11 +435,14 @@ prometheus-global-guardian/
 │   └── index.tsx
 ├── server/
 │   ├── ai/
-│   │   ├── ai-chat-route.js
-│   │   └── ai-provider.js
-│   └── env.js
-├── hazards-source.js
-├── server.js
+│   │   ├── ai-chat-route.ts
+│   │   ├── ai-provider.ts
+│   │   └── ai-stream.ts
+│   ├── env.ts
+│   └── express.d.ts
+├── hazards-source.ts
+├── server.ts
+├── dist-server/          # Generated server output
 ├── start-python-service.sh
 ├── docker-compose.yml
 ├── .dockerignore
@@ -639,7 +648,7 @@ VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/plan/v3
 VOLCENGINE_ARK_TIMEOUT_MS=30000
 ```
 
-设置 `AI_PROVIDER=workflow` 时，BFF 会调用已发布的 ai-workflow 应用。工作流请求体会按 `{"inputs":{"user_input":"..."}}` 发送，同时 BFF 会发送 `stream: true` 请求 Header。工作流可以返回 SSE 或普通 JSON；普通 JSON 从 `data.outputs.result` 读取结果，SSE 会被 BFF 转换回前端聊天流格式。
+设置 `AI_PROVIDER=workflow` 时，BFF 会调用已发布的 ai-workflow 应用。BFF 会按照该工作流开始节点的参数发送 `user_input`（字符串）、`hazard_context`（对象）、`location`（字符串）和 `language`（字符串），并将 `stream: true` 放在 JSON 请求体中。工作流返回的 SSE `complete` 事件或普通 JSON 结果会被 BFF 转换成前端聊天流格式，工作流 API Key 始终只保留在服务端。
 如果 BFF 运行在 Docker 容器中，而工作流应用运行在宿主机，请将工作流地址改为 `http://host.docker.internal:3100/api/v1/apps/run`，不要使用 `http://localhost:3100/api/v1/apps/run`。
 
 `VOLCENGINE_ARK_API_URL` 可以使用火山方舟 OpenAI-compatible Responses API 的 Base URL，例如 `https://ark.cn-beijing.volces.com/api/plan/v3`；BFF 会在需要时内部拼接 `/responses`。`VOLCENGINE_ARK_TIMEOUT_MS` 控制 BFF 等待模型服务开始响应的时间。这些变量由 Express BFF 在运行时读取，不会暴露到浏览器构建产物中。
@@ -670,15 +679,21 @@ http://localhost:5173
 npm run lint
 ```
 
-构建前端：
+构建应用：
 
 ```bash
 npm run build
 ```
 
+构建命令也会将 Express BFF 编译到 `dist-server/`。只检查服务端类型而不生成文件：
+
+```bash
+npm run typecheck:server
+```
+
 本地 Vite 开发环境如需调用真实 AI 助手，需要让 Express BFF 运行在 `http://localhost:8080`，因为 `/api/ai/*` 会代理到这里。最简单的全栈启动方式是 Docker Compose。
 
-### Docker Compose
+#### Docker Compose
 
 Docker Compose 是推荐的一键启动方式，可以同时运行生产 Web 服务、Express BFF 和 Python 分析服务。
 
@@ -835,7 +850,7 @@ npm run start:static
 - `.env` 已被 git 忽略，不能提交。
 - 以 `VITE_` 开头的变量会暴露到浏览器构建产物中，不应放置生产级敏感密钥。
 - 生产环境使用 AI 服务时，建议通过服务端代理火山方舟或其他模型服务请求。
-- 生产部署前应审查 `server.js` 的代理日志；当前日志有助于诊断，但可能输出敏感请求头或请求体。
+- 生产部署前应审查 `server.ts` 的代理日志；当前日志有助于诊断，但可能输出敏感请求头或请求体。
 - DisasterAware 凭据和模型服务 Key 应由部署平台的密钥管理能力托管。
 
 ### 项目结构
@@ -873,11 +888,14 @@ prometheus-global-guardian/
 │   └── index.tsx
 ├── server/
 │   ├── ai/
-│   │   ├── ai-chat-route.js
-│   │   └── ai-provider.js
-│   └── env.js
-├── hazards-source.js
-├── server.js
+│   │   ├── ai-chat-route.ts
+│   │   ├── ai-provider.ts
+│   │   └── ai-stream.ts
+│   ├── env.ts
+│   └── express.d.ts
+├── hazards-source.ts
+├── server.ts
+├── dist-server/          # 构建生成的服务端产物
 ├── start-python-service.sh
 ├── docker-compose.yml
 ├── .dockerignore

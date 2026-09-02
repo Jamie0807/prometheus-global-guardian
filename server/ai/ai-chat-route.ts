@@ -1,3 +1,4 @@
+import type { Application, Request } from 'express';
 import fetch from 'node-fetch';
 import { buildAIProviderRequest, resolveServerAIProviderConfig } from './ai-provider.js';
 import {
@@ -7,14 +8,14 @@ import {
   workflowResultToChatCompletionsSSE,
 } from './ai-stream.js';
 
-const parseJsonBody = (req) => {
+const parseJsonBody = (req: Request): Record<string, unknown> => {
   if (!req.rawBody || req.rawBody.length === 0) {
     return {};
   }
   return JSON.parse(req.rawBody.toString('utf8'));
 };
 
-export function registerAIChatRoute(app) {
+export function registerAIChatRoute(app: Application): void {
   app.post('/api/ai/chat', async (req, res) => {
     const config = resolveServerAIProviderConfig();
 
@@ -30,7 +31,7 @@ export function registerAIChatRoute(app) {
       return;
     }
 
-    let body;
+    let body: Record<string, unknown>;
     try {
       body = parseJsonBody(req);
     } catch {
@@ -45,7 +46,12 @@ export function registerAIChatRoute(app) {
     const providerRequest = buildAIProviderRequest({
       config,
       messages: body.messages,
-      disasterContext: body.disasterContext,
+      disasterContext:
+        body.disasterContext && typeof body.disasterContext === 'object'
+          ? body.disasterContext as Record<string, unknown>
+          : undefined,
+      location: body.location,
+      language: body.language,
     });
 
     const hasUserInput =
@@ -80,7 +86,6 @@ export function registerAIChatRoute(app) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(providerRequest.headers ?? {}),
           ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
         },
         body: JSON.stringify(providerRequest.payload),
@@ -102,6 +107,15 @@ export function registerAIChatRoute(app) {
       if (providerRequest.protocol === 'workflow') {
         const contentType = upstream.headers.get('content-type') ?? '';
         if (contentType.includes('text/event-stream')) {
+          if (!upstream.body) {
+            res.status(502).json({
+              success: false,
+              code: 'AI_WORKFLOW_STREAM_MISSING',
+              message: 'AI workflow returned an empty stream.',
+            });
+            return;
+          }
+
           res.status(200);
           res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
           res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -156,6 +170,11 @@ export function registerAIChatRoute(app) {
       res.setHeader('Connection', 'keep-alive');
       res.flushHeaders?.();
 
+      if (!upstream.body) {
+        res.end();
+        return;
+      }
+
       upstream.body.on('error', () => {
         if (!res.writableEnded) {
           res.end();
@@ -169,9 +188,9 @@ export function registerAIChatRoute(app) {
       } else {
         upstream.body.pipe(res);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       clearTimeout(timeout);
-      if (err.name === 'AbortError') {
+      if (err instanceof Error && err.name === 'AbortError') {
         if (!res.headersSent) {
           res.status(504).json({
             success: false,

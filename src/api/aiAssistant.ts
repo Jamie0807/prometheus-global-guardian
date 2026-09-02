@@ -2,7 +2,7 @@
  * AI Disaster Analysis Assistant — LLM Streaming API Client
  *
  * 核心功能：
- * - 通过 Express BFF 调用火山方舟 / OpenAI-compatible Chat Completions API
+ * - 通过 Express BFF 调用已发布 ai-workflow 或火山方舟模型服务
  * - 流式输出（SSE / ReadableStream）实现逐字打印效果
  * - 自动注入灾害实时上下文，提供 Demo 降级模式（无 API Key 时）
  */

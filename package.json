@@ -8,11 +8,15 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:server:test": "tsc -p tsconfig.server.test.json",
     "lint": "eslint .",
-    "test": "node --test tests/*.test.js",
+    "test": "npm run build:server:test && node --test dist-server/tests/*.test.js",
+    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
     "preview": "vite preview",
-    "start": "node server.js",
+    "start": "node dist-server/server.js",
     "start:static": "serve -s dist -l $PORT"
   },
   "dependencies": {
@@ -33,17 +37,18 @@
     "lodash": "^4.17.21",
     "mapbox-gl": "^3.15.0",
     "node-fetch": "^3.3.2",
+    "raw-body": "^3.0.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-is": "^19.2.4",
     "recharts": "^3.5.0",
     "serve": "^14.2.0",
-    "typescript": "~5.9.3",
-    "raw-body": "^3.0.2"
+    "typescript": "~5.9.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@types/dompurify": "^3.0.5",
+    "@types/express": "^5.0.6",
     "@types/lodash": "^4.17.21",
     "@vitejs/plugin-react": "^5.0.4",
     "eslint": "^9.36.0",

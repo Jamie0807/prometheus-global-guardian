@@ -81,6 +81,21 @@ test('convertWorkflowSSEToChatCompletionsSSE converts cumulative workflow result
   assert.equal(second, 'data: {"choices":[{"delta":{"content":"：地震"}}]}\n\n');
 });
 
+test('convertWorkflowSSEToChatCompletionsSSE converts the workflow complete event', () => {
+  const converted = convertWorkflowSSEToChatCompletionsSSE(
+    [
+      'event: complete',
+      'data: {"executionId":"exec_123","status":"SUCCESS","outputs":{"result":"答案：地震风险可控。"}}',
+      '',
+    ].join('\n'),
+  );
+
+  assert.equal(
+    converted,
+    'data: {"choices":[{"delta":{"content":"答案：地震风险可控。"}}]}\n\ndata: [DONE]\n\n',
+  );
+});
+
 test('convertWorkflowSSEToChatCompletionsSSE forwards workflow done markers', () => {
   assert.equal(
     convertWorkflowSSEToChatCompletionsSSE('data: [DONE]\n\n'),
