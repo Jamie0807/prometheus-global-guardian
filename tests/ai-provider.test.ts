@@ -8,6 +8,7 @@ import {
   buildResponsesPayload,
   buildWorkflowPayload,
   normalizeAIProviderApiUrl,
+  resolveAIProviderMode,
   resolveAIRequestTimeoutMs,
   resolveServerAIProviderConfig,
 } from '../server/ai/ai-provider.js';
@@ -24,6 +25,25 @@ test('resolveServerAIProviderConfig reads server-side Volcengine Ark variables',
   assert.equal(config.model, 'doubao-seed');
   assert.equal(config.apiUrl, 'https://ark.example.com/chat');
   assert.equal(config.requestTimeoutMs, 30000);
+});
+
+test('resolveAIProviderMode defaults to smart routing and preserves forced modes', () => {
+  assert.equal(resolveAIProviderMode({}), 'router');
+  assert.equal(resolveAIProviderMode({ AI_PROVIDER: 'router' }), 'router');
+  assert.equal(resolveAIProviderMode({ AI_PROVIDER: 'ark' }), 'ark');
+  assert.equal(resolveAIProviderMode({ AI_PROVIDER: 'workflow' }), 'workflow');
+});
+
+test('resolveServerAIProviderConfig can resolve either provider for router mode', () => {
+  const env = {
+    AI_PROVIDER: 'router',
+    VOLCENGINE_WORKFLOW_API_URL: 'http://workflow.example/run',
+    VOLCENGINE_ARK_API_KEY: 'ark-key',
+    VOLCENGINE_ARK_MODEL: 'doubao-seed',
+  };
+
+  assert.equal(resolveServerAIProviderConfig(env, 'workflow').configured, true);
+  assert.equal(resolveServerAIProviderConfig(env, 'volcengine').configured, true);
 });
 
 test('resolveServerAIProviderConfig reports missing model separately from missing key', () => {

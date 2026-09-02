@@ -1,7 +1,8 @@
 const DEFAULT_ARK_API_URL = 'https://ark.cn-beijing.volces.com/api/plan/v3';
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
-type ProviderName = 'workflow' | 'volcengine';
+export type ProviderName = 'workflow' | 'volcengine';
+export type AIProviderMode = 'router' | 'workflow' | 'ark';
 type ProviderProtocol = 'workflow' | 'responses' | 'chat_completions';
 type ProviderConfigReason = '' | 'missing_workflow_url' | 'missing_key' | 'missing_model';
 
@@ -85,8 +86,21 @@ const firstValue = (...values: unknown[]): string =>
     return typeof value === 'string' ? value.trim() : '';
   })();
 
-export function resolveServerAIProviderConfig(env: ServerEnvironment = process.env): ServerAIProviderConfig {
-  const providerName = firstValue(env.AI_PROVIDER, env.VOLCENGINE_AI_PROVIDER).toLowerCase() || 'ark';
+export function resolveAIProviderMode(env: ServerEnvironment = process.env): AIProviderMode {
+  const configuredProvider = firstValue(env.AI_PROVIDER, env.VOLCENGINE_AI_PROVIDER).toLowerCase();
+
+  if (configuredProvider === 'workflow') return 'workflow';
+  if (configuredProvider === 'ark' || configuredProvider === 'volcengine') return 'ark';
+  return 'router';
+}
+
+export function resolveServerAIProviderConfig(
+  env: ServerEnvironment = process.env,
+  requestedProvider?: ProviderName,
+): ServerAIProviderConfig {
+  const providerName: ProviderName = requestedProvider ?? (
+    resolveAIProviderMode(env) === 'workflow' ? 'workflow' : 'volcengine'
+  );
 
   if (providerName === 'workflow') {
     const apiUrl = firstValue(

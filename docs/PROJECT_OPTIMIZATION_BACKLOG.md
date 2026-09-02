@@ -134,13 +134,34 @@ AIChatAssistant
 
 ## AI 助手智能路由计划
 
-当前 AI 助手通过 `AI_PROVIDER=workflow` 固定调用 ai-workflow。下一阶段调整为由 BFF 中的 LLM Router 判断请求路径：
+当前 AI 助手通过 BFF 中的 LLM Router 判断请求路径：
 
 - 普通闲聊、通用解释和不需要知识库的问题调用火山方舟模型。
 - 灾害专业知识、Guardian 规则、历史案例、应急预案和需要 RAG 检索的问题调用已发布 ai-workflow。
 - 前端继续只请求 `/api/ai/chat`，不感知具体 provider。
 - Router、火山方舟和 ai-workflow 统一由 BFF 编排，API Key 不进入浏览器。
 - 需要记录路由结果、失败降级策略和每条路径的耗时，避免出现回答成功但没有使用预期知识库的问题。
+
+### 实现状态
+
+已完成智能路由和 provider 降级：
+
+- `AI_PROVIDER=router` 为默认模式；`AI_PROVIDER=workflow` 和 `AI_PROVIDER=ark` 保留为强制单 provider 模式。
+- `server/ai/ai-router.ts` 根据最新用户消息和实时灾害上下文，将知识库、Guardian 规则、历史案例、应急预案、灾害专业问题和实时态势分析路由到 ai-workflow，其余普通对话路由到火山方舟。
+- router 模式下，目标 provider 在响应开始前发生配置缺失、超时、网络错误或非 2xx 响应时，BFF 会尝试另一个已配置 provider；已经开始流式输出后不拼接备用 provider 的结果。
+- 每次请求输出结构化路由日志，包含路由原因、最终 provider、是否降级、尝试次数、状态和耗时，不记录用户消息、API Key 或模型响应内容。
+- `.env.example`、Docker Compose 和 README 已统一为 router 默认配置，并保留单 provider 调试方式。
+
+验证结果：
+
+- `npm test` 通过，26 个测试全部通过，覆盖路由信号、实时上下文、强制 provider 和 fallback 顺序。
+- `npm run typecheck:server` 通过。
+- `npm run lint` 退出码为 0，仍保留项目既有 warning。
+
+遗留风险：
+
+- 当前 Router 使用 BFF 内的规则匹配，不额外消耗一次 LLM 请求；后续如需更复杂的语义分类，可替换为独立分类器，但需要重新评估延迟、成本和误路由风险。
+- provider 在已经返回流式响应头后才发生的错误只能结束当前流，无法无缝切换到另一个 provider。
 
 ## P0：拆分地图模块
 
