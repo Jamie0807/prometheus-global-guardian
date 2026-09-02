@@ -5,6 +5,9 @@
     "hazards-source.ts",
     "server/**/*.ts",
     "server/**/*.d.ts",
-    "tests/**/*.ts"
+    "tests/ai-provider.test.ts",
+    "tests/ai-router.test.ts",
+    "tests/ai-stream.test.ts",
+    "tests/server-auth.test.ts"
   ]
 }

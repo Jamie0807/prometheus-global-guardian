@@ -5,8 +5,12 @@ import { MapboxOverlay } from "@deck.gl/mapbox";
 import { Tile3DLayer } from "@deck.gl/geo-layers";
 import { CesiumIonLoader } from "@loaders.gl/3d-tiles";
 import type { Hazard, MapViewProps } from "../types";
-import { fetchHazardsActive } from "../api/disasteraware";
-import { fetchGDACS, fetchNASAEONET, fetchUSGSEarthquakes } from "../api/hazards";
+import { fetchHazardsActive } from "../services/hazards/hazardService";
+import {
+  fetchGDACS,
+  fetchNASAEONET,
+  fetchUSGSEarthquakes,
+} from "../services/hazards/hazardService";
 import { config } from "../config";
 import { HAZARD_COLORS, defaultColor } from "../config/hazardColors";
 
@@ -15,23 +19,18 @@ let _workerId = 0;
 /** 将原始灾害数组通过 Worker 清洗后返回 Promise<Hazard[]> */
 function cleanWithWorker(worker: Worker, hazards: Hazard[]): Promise<Hazard[]> {
   const id = ++_workerId;
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const handler = (e: MessageEvent<{ id: number; result: Hazard[] }>) => {
       if (e.data.id !== id) return;
-      worker.removeEventListener('message', handler);
+      worker.removeEventListener("message", handler);
       resolve(e.data.result);
     };
-    worker.addEventListener('message', handler);
+    worker.addEventListener("message", handler);
     worker.postMessage({ id, hazards });
   });
 }
 
-const MapView: React.FC<MapViewProps> = ({
-  filter,
-  mapStyle,
-  onDataUpdate,
-  onRefreshReady
-}) => {
+const MapView: React.FC<MapViewProps> = ({ filter, mapStyle, onDataUpdate, onRefreshReady }) => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -46,10 +45,10 @@ const MapView: React.FC<MapViewProps> = ({
 
   useEffect(() => {
     if (map.current && disasters.length > 0) {
-      addMarkersToMap(
-        filter === "ALL" ? disasters : disasters.filter(d => d.type === filter)
-      );
+      addMarkersToMap(filter === "ALL" ? disasters : disasters.filter((d) => d.type === filter));
     }
+    // This imperative map update intentionally uses the latest marker callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, disasters]);
 
   // 当 mapStyle 改变时更新地图样式，并重新初始化所有自定义图层
@@ -66,7 +65,7 @@ const MapView: React.FC<MapViewProps> = ({
         initializeHeatmapLayer();
         initializeLODLayers();
         initialize3DBuildings();
-        const filtered = filter === "ALL" ? disasters : disasters.filter(d => d.type === filter);
+        const filtered = filter === "ALL" ? disasters : disasters.filter((d) => d.type === filter);
         addMarkersToMap(filtered);
         if (disasters.length > 0) {
           updateHeatmapData(disasters);
@@ -75,31 +74,28 @@ const MapView: React.FC<MapViewProps> = ({
         applyLOD(map.current!.getZoom());
       });
     }
+    // Map style callbacks are bound to the imperative Mapbox instance above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapStyle]);
 
   const fetchDisasterAwareHazards = useCallback(async (): Promise<Hazard[]> => {
     try {
-      const data = await fetchHazardsActive(
-        filter === "ALL" ? "EVENT" : filter
-      );
-      return data.map(hazard => ({
-        id: hazard.hazard_ID || `da-${Date.now()}`,
+      const data = await fetchHazardsActive(filter === "ALL" ? "EVENT" : filter);
+      return data.map((hazard) => ({
+        id: String(hazard.hazard_ID || `da-${Date.now()}`),
         title: hazard.hazard_Name || "Unknown Hazard",
         type: hazard.type_ID || "UNKNOWN",
         geometry:
-          hazard.latitude && hazard.longitude
+          Number.isFinite(hazard.latitude) && Number.isFinite(hazard.longitude)
             ? {
                 type: "Point",
-                coordinates: [hazard.longitude, hazard.latitude]
+                coordinates: [hazard.longitude, hazard.latitude],
               }
             : { type: "Point", coordinates: [0, 0] },
-        description:
-          hazard.description ||
-          hazard.hazard_Name ||
-          "No description available",
+        description: hazard.description || hazard.hazard_Name || "No description available",
         source: hazard.creator || "DisasterAware",
         severity: hazard.severity_ID,
-        timestamp: hazard.create_Date
+        timestamp: hazard.create_Date,
       }));
     } catch (error) {
       console.warn("DisasterAware API failed", error);
@@ -120,13 +116,12 @@ const MapView: React.FC<MapViewProps> = ({
         const [usgs, nasa, gdacs] = await Promise.allSettled([
           fetchUSGSEarthquakes(),
           fetchNASAEONET(),
-          fetchGDACS()
+          fetchGDACS(),
         ]);
 
         const all: Hazard[] = [];
-        [usgs, nasa, gdacs].forEach(res => {
-          if (res.status === "fulfilled" && res.value.length > 0)
-            all.push(...res.value);
+        [usgs, nasa, gdacs].forEach((res) => {
+          if (res.status === "fulfilled" && res.value.length > 0) all.push(...res.value);
         });
         // 多源合并后统一清洗
         const cleaned = workerRef.current ? await cleanWithWorker(workerRef.current, all) : all;
@@ -140,17 +135,16 @@ const MapView: React.FC<MapViewProps> = ({
 
   useEffect(() => {
     if (map.current) return;
-    workerRef.current = new Worker(
-      new URL("../workers/hazard-worker.ts", import.meta.url),
-      { type: "module" }
-    );
+    workerRef.current = new Worker(new URL("../workers/hazard-worker.ts", import.meta.url), {
+      type: "module",
+    });
     mapboxgl.accessToken = config.mapbox.token;
     map.current = new mapboxgl.Map({
       container: mapContainer.current!,
       style: `mapbox://styles/mapbox/${mapStyle}`,
       projection: "globe",
       center: [0, 20],
-      zoom: 1.5
+      zoom: 1.5,
     });
 
     map.current.on("load", () => {
@@ -159,14 +153,14 @@ const MapView: React.FC<MapViewProps> = ({
         "high-color": "rgb(36, 92, 223)",
         "horizon-blend": 0.02,
         "space-color": "rgb(11, 11, 25)",
-        "star-intensity": 0.6
+        "star-intensity": 0.6,
       });
       fetchDisasters();
       initializeHeatmapLayer();
       initializeLODLayers();
       initialize3DBuildings();
       // 注册 zoom 事件，实现基于视距的 LOD 动态切换
-      map.current?.on('zoom', () => {
+      map.current?.on("zoom", () => {
         if (map.current) applyLOD(map.current.getZoom());
       });
       applyLOD(1.5);
@@ -175,12 +169,12 @@ const MapView: React.FC<MapViewProps> = ({
     // 初始化 deck.gl overlay（仅在配置了外部 3D Tiles URL 时）
     if (config.tiles3d.enabled) {
       deckOverlay.current = new MapboxOverlay({ layers: [] });
-      map.current.addControl(deckOverlay.current as any);
+      map.current.addControl(deckOverlay.current as unknown as mapboxgl.IControl);
     }
 
     return () => {
       if (deckOverlay.current) {
-        map.current?.removeControl(deckOverlay.current as any);
+        map.current?.removeControl(deckOverlay.current as unknown as mapboxgl.IControl);
         deckOverlay.current = null;
       }
       map.current?.remove();
@@ -199,57 +193,57 @@ const MapView: React.FC<MapViewProps> = ({
   const initializeLODLayers = () => {
     if (!map.current) return;
     // 防御性检查：避免 style 切换后重复添加
-    if (map.current.getSource('hazards-lod')) return;
-    map.current.addSource('hazards-lod', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: [] },
+    if (map.current.getSource("hazards-lod")) return;
+    map.current.addSource("hazards-lod", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
       cluster: true,
       clusterMaxZoom: LOD_THRESHOLDS.CLUSTER_MAX,
-      clusterRadius: 50
+      clusterRadius: 50,
     });
     // 聚合气泡圆
     map.current.addLayer({
-      id: 'lod-clusters',
-      type: 'circle',
-      source: 'hazards-lod',
-      filter: ['has', 'point_count'],
+      id: "lod-clusters",
+      type: "circle",
+      source: "hazards-lod",
+      filter: ["has", "point_count"],
       paint: {
-        'circle-color': ['step', ['get', 'point_count'], '#3b82f6', 20, '#f59e0b', 50, '#ef4444'],
-        'circle-radius': ['step', ['get', 'point_count'], 18, 20, 28, 50, 38],
-        'circle-stroke-width': 2,
-        'circle-stroke-color': 'rgba(255,255,255,0.8)',
-        'circle-opacity': 0.85
-      }
+        "circle-color": ["step", ["get", "point_count"], "#3b82f6", 20, "#f59e0b", 50, "#ef4444"],
+        "circle-radius": ["step", ["get", "point_count"], 18, 20, 28, 50, 38],
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "rgba(255,255,255,0.8)",
+        "circle-opacity": 0.85,
+      },
     });
     // 聚合数量标签
     map.current.addLayer({
-      id: 'lod-cluster-count',
-      type: 'symbol',
-      source: 'hazards-lod',
-      filter: ['has', 'point_count'],
+      id: "lod-cluster-count",
+      type: "symbol",
+      source: "hazards-lod",
+      filter: ["has", "point_count"],
       layout: {
-        'text-field': '{point_count_abbreviated}',
-        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-        'text-size': 12
+        "text-field": "{point_count_abbreviated}",
+        "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+        "text-size": 12,
       },
-      paint: { 'text-color': '#fff' }
+      paint: { "text-color": "#fff" },
     });
     // 未聚合的散点（中等缩放级别的单点）
     map.current.addLayer({
-      id: 'lod-unclustered',
-      type: 'circle',
-      source: 'hazards-lod',
-      filter: ['!', ['has', 'point_count']],
+      id: "lod-unclustered",
+      type: "circle",
+      source: "hazards-lod",
+      filter: ["!", ["has", "point_count"]],
       paint: {
-        'circle-color': ['coalesce', ['get', 'color'], '#888888'],
-        'circle-radius': 6,
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#fff',
-        'circle-opacity': 0.9
-      }
+        "circle-color": ["coalesce", ["get", "color"], "#888888"],
+        "circle-radius": 6,
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#fff",
+        "circle-opacity": 0.9,
+      },
     });
-    ['lod-clusters', 'lod-cluster-count', 'lod-unclustered'].forEach(id => {
-      map.current!.setLayoutProperty(id, 'visibility', 'none');
+    ["lod-clusters", "lod-cluster-count", "lod-unclustered"].forEach((id) => {
+      map.current!.setLayoutProperty(id, "visibility", "none");
     });
   };
 
@@ -262,20 +256,23 @@ const MapView: React.FC<MapViewProps> = ({
     if (config.tiles3d.enabled && config.tiles3d.url) {
       // deck.gl Tile3DLayer 支持标准 3D Tiles tileset.json
       // 支持 Cesium ion Bearer token 认证
-      const loadOptions: Record<string, any> = {};
+      const loadOptions: Record<string, unknown> = {};
       if (config.tiles3d.cesiumIonToken) {
-        loadOptions['cesium-ion'] = { accessToken: config.tiles3d.cesiumIonToken };
+        loadOptions["cesium-ion"] = { accessToken: config.tiles3d.cesiumIonToken };
       }
 
       const tile3DLayer = new Tile3DLayer({
-        id: 'deck-3d-tiles',
+        id: "deck-3d-tiles",
         data: config.tiles3d.url,
         // 使用 loaders 数组传入 CesiumIonLoader 支持 Cesium ion 认证格式
         loaders: [CesiumIonLoader],
         loadOptions,
         opacity: 0.9,
-        onTilesetLoad: (tileset: any) => {
-          console.info('[deck.gl 3D Tiles] tileset 加载成功，建筑数量:', tileset.gpuMemoryUsageInBytes);
+        onTilesetLoad: (tileset: { gpuMemoryUsageInBytes?: number }) => {
+          console.info(
+            "[deck.gl 3D Tiles] tileset 加载成功，建筑数量:",
+            tileset.gpuMemoryUsageInBytes,
+          );
         },
         onTileLoad: () => {
           // 瓦片加载后刷新 overlay
@@ -287,59 +284,75 @@ const MapView: React.FC<MapViewProps> = ({
 
       if (deckOverlay.current) {
         deckOverlay.current.setProps({ layers: [tile3DLayer] });
-        console.info('[deck.gl 3D Tiles] Tile3DLayer 已挂载到 Mapbox overlay');
+        console.info("[deck.gl 3D Tiles] Tile3DLayer 已挂载到 Mapbox overlay");
       }
     } else {
       // 回退模式：fill-extrusion（无需外部数据源）
-      if (map.current.getLayer('3d-buildings')) return;
+      if (map.current.getLayer("3d-buildings")) return;
       try {
         map.current.addLayer(
           {
-            id: '3d-buildings',
-            source: 'composite',
-            'source-layer': 'building',
-            filter: ['==', 'extrude', 'true'],
-            type: 'fill-extrusion',
+            id: "3d-buildings",
+            source: "composite",
+            "source-layer": "building",
+            filter: ["==", "extrude", "true"],
+            type: "fill-extrusion",
             minzoom: LOD_THRESHOLDS.BUILDINGS_MIN,
             paint: {
-              'fill-extrusion-color': '#aab5c0',
-              'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'height']],
-              'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'min_height']],
-              'fill-extrusion-opacity': 0.65
-            }
+              "fill-extrusion-color": "#aab5c0",
+              "fill-extrusion-height": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                14,
+                0,
+                14.5,
+                ["get", "height"],
+              ],
+              "fill-extrusion-base": [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                14,
+                0,
+                14.5,
+                ["get", "min_height"],
+              ],
+              "fill-extrusion-opacity": 0.65,
+            },
           },
-          'waterway-label'
+          "waterway-label",
         );
-        map.current.setLayoutProperty('3d-buildings', 'visibility', 'none');
-        console.info('[3D Buildings] 回退到 fill-extrusion 模式');
+        map.current.setLayoutProperty("3d-buildings", "visibility", "none");
+        console.info("[3D Buildings] 回退到 fill-extrusion 模式");
       } catch (e) {
-        console.warn('[3D Buildings] fill-extrusion 加载失败（样式不支持）:', e);
+        console.warn("[3D Buildings] fill-extrusion 加载失败（样式不支持）:", e);
       }
     }
   };
 
   // 更新 LOD GeoJSON 数据源
   const updateLODSource = (hazards: Hazard[]) => {
-    if (!map.current || !map.current.getSource('hazards-lod')) return;
+    if (!map.current || !map.current.getSource("hazards-lod")) return;
     const features = hazards
-      .filter(h => h.geometry?.coordinates)
-      .map(h => ({
-        type: 'Feature' as const,
+      .filter((h) => h.geometry?.coordinates)
+      .map((h) => ({
+        type: "Feature" as const,
         properties: {
           id: h.id,
           title: h.title,
           type: h.type,
           severity: h.severity,
-          color: HAZARD_COLORS[h.type] || defaultColor
+          color: HAZARD_COLORS[h.type] || defaultColor,
         },
         geometry: {
-          type: 'Point' as const,
-          coordinates: h.geometry.coordinates as [number, number]
-        }
+          type: "Point" as const,
+          coordinates: h.geometry.coordinates as [number, number],
+        },
       }));
-    (map.current.getSource('hazards-lod') as mapboxgl.GeoJSONSource).setData({
-      type: 'FeatureCollection',
-      features
+    (map.current.getSource("hazards-lod") as mapboxgl.GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features,
     });
   };
 
@@ -348,121 +361,107 @@ const MapView: React.FC<MapViewProps> = ({
     if (!map.current) return;
     const isHeatmapMode = showHeatmapRef.current;
     // 动态查找实际存在的建筑图层（model 加载失败时回退到 fill-extrusion）
-    const buildingLayerId = map.current.getLayer('city-3d-model')
-      ? 'city-3d-model'
-      : map.current.getLayer('3d-buildings')
-        ? '3d-buildings'
+    const buildingLayerId = map.current.getLayer("city-3d-model")
+      ? "city-3d-model"
+      : map.current.getLayer("3d-buildings")
+        ? "3d-buildings"
         : null;
     if (buildingLayerId) {
       map.current.setLayoutProperty(
-        buildingLayerId, 'visibility',
-        !isHeatmapMode && zoom >= LOD_THRESHOLDS.BUILDINGS_MIN ? 'visible' : 'none'
+        buildingLayerId,
+        "visibility",
+        !isHeatmapMode && zoom >= LOD_THRESHOLDS.BUILDINGS_MIN ? "visible" : "none",
       );
     }
     if (isHeatmapMode) return;
     const useCluster = zoom < LOD_THRESHOLDS.CLUSTER_MAX;
-    ['lod-clusters', 'lod-cluster-count', 'lod-unclustered'].forEach(id => {
+    ["lod-clusters", "lod-cluster-count", "lod-unclustered"].forEach((id) => {
       if (map.current!.getLayer(id)) {
-        map.current!.setLayoutProperty(id, 'visibility', useCluster ? 'visible' : 'none');
+        map.current!.setLayoutProperty(id, "visibility", useCluster ? "visible" : "none");
       }
     });
-    markers.current.forEach(marker => {
-      marker.getElement().style.display = useCluster ? 'none' : 'block';
+    markers.current.forEach((marker) => {
+      marker.getElement().style.display = useCluster ? "none" : "block";
     });
   };
 
   const initializeHeatmapLayer = () => {
     if (!map.current) return;
     // 防御性检查：避免重复添加
-    if (map.current.getSource('hazards-heat')) return;
-    
+    if (map.current.getSource("hazards-heat")) return;
+
     // Add heatmap source
-    map.current.addSource('hazards-heat', {
-      type: 'geojson',
+    map.current.addSource("hazards-heat", {
+      type: "geojson",
       data: {
-        type: 'FeatureCollection',
-        features: []
-      }
+        type: "FeatureCollection",
+        features: [],
+      },
     });
 
     // Add heatmap layer
-    map.current.addLayer({
-      id: 'hazards-heatmap',
-      type: 'heatmap',
-      source: 'hazards-heat',
-      maxzoom: 15,
-      paint: {
-        // Increase the heatmap weight based on severity
-        'heatmap-weight': [
-          'interpolate',
-          ['linear'],
-          ['get', 'magnitude'],
-          0, 0,
-          6, 1
-        ],
-        // Increase the heatmap color intensity by zoom level
-        'heatmap-intensity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          0, 1,
-          15, 3
-        ],
-        // Color ramp for heatmap
-        'heatmap-color': [
-          'interpolate',
-          ['linear'],
-          ['heatmap-density'],
-          0, 'rgba(33,102,172,0)',
-          0.2, 'rgb(103,169,207)',
-          0.4, 'rgb(209,229,240)',
-          0.6, 'rgb(253,219,199)',
-          0.8, 'rgb(239,138,98)',
-          1, 'rgb(178,24,43)'
-        ],
-        // Adjust the heatmap radius by zoom level
-        'heatmap-radius': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          0, 2,
-          15, 20
-        ],
-        // Transition from heatmap to circle layer by zoom level
-        'heatmap-opacity': [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          7, 1,
-          15, 0
-        ]
-      }
-    }, 'waterway-label');
+    map.current.addLayer(
+      {
+        id: "hazards-heatmap",
+        type: "heatmap",
+        source: "hazards-heat",
+        maxzoom: 15,
+        paint: {
+          // Increase the heatmap weight based on severity
+          "heatmap-weight": ["interpolate", ["linear"], ["get", "magnitude"], 0, 0, 6, 1],
+          // Increase the heatmap color intensity by zoom level
+          "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 15, 3],
+          // Color ramp for heatmap
+          "heatmap-color": [
+            "interpolate",
+            ["linear"],
+            ["heatmap-density"],
+            0,
+            "rgba(33,102,172,0)",
+            0.2,
+            "rgb(103,169,207)",
+            0.4,
+            "rgb(209,229,240)",
+            0.6,
+            "rgb(253,219,199)",
+            0.8,
+            "rgb(239,138,98)",
+            1,
+            "rgb(178,24,43)",
+          ],
+          // Adjust the heatmap radius by zoom level
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 2, 15, 20],
+          // Transition from heatmap to circle layer by zoom level
+          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 7, 1, 15, 0],
+        },
+      },
+      "waterway-label",
+    );
 
-    map.current.setLayoutProperty('hazards-heatmap', 'visibility', 'none');
+    map.current.setLayoutProperty("hazards-heatmap", "visibility", "none");
   };
 
   const updateHeatmapData = (hazards: Hazard[]) => {
-    if (!map.current || !map.current.getSource('hazards-heat')) return;
+    if (!map.current || !map.current.getSource("hazards-heat")) return;
 
     const features = hazards
-      .filter(h => h.geometry?.coordinates)
-      .map(h => ({
-        type: 'Feature' as const,
+      .filter((h) => h.geometry?.coordinates)
+      .map((h) => ({
+        type: "Feature" as const,
         properties: {
           magnitude: h.magnitude || 3,
-          type: h.type
+          type: h.type,
         },
         geometry: {
-          type: 'Point' as const,
-          coordinates: h.geometry.coordinates
-        }
+          type: "Point" as const,
+          coordinates: h.geometry.coordinates,
+        },
       }));
 
-    const source = map.current.getSource('hazards-heat') as mapboxgl.GeoJSONSource;
+    const source = map.current.getSource("hazards-heat") as mapboxgl.GeoJSONSource;
     source.setData({
-      type: 'FeatureCollection',
-      features
+      type: "FeatureCollection",
+      features,
     });
   };
 
@@ -473,20 +472,20 @@ const MapView: React.FC<MapViewProps> = ({
     setShowHeatmap(newVisibility);
 
     map.current.setLayoutProperty(
-      'hazards-heatmap',
-      'visibility',
-      newVisibility ? 'visible' : 'none'
+      "hazards-heatmap",
+      "visibility",
+      newVisibility ? "visible" : "none",
     );
 
     if (newVisibility) {
       // 进入热力图模式：隐藏 LOD 聚合图层和 Marker
-      ['lod-clusters', 'lod-cluster-count', 'lod-unclustered'].forEach(id => {
+      ["lod-clusters", "lod-cluster-count", "lod-unclustered"].forEach((id) => {
         if (map.current!.getLayer(id)) {
-          map.current!.setLayoutProperty(id, 'visibility', 'none');
+          map.current!.setLayoutProperty(id, "visibility", "none");
         }
       });
-      markers.current.forEach(marker => {
-        marker.getElement().style.display = 'none';
+      markers.current.forEach((marker) => {
+        marker.getElement().style.display = "none";
       });
     } else {
       // 退出热力图模式：交由 LOD 恢复对应层级渲染
@@ -501,12 +500,13 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [disasters]);
 
-  const addMarkersToMap = (hazards: any[]) => {
-    markers.current.forEach(m => m.remove());
+  const addMarkersToMap = (hazards: Hazard[]) => {
+    markers.current.forEach((m) => m.remove());
     markers.current = [];
-    hazards.forEach(h => {
+    hazards.forEach((h) => {
       const coords = h.geometry?.coordinates;
-      if (!coords) return;
+      if (!coords || coords.length < 2) return;
+      const lngLat: [number, number] = [coords[0], coords[1]];
       const color = HAZARD_COLORS[h.type] || defaultColor;
       const el = document.createElement("div");
       el.className = "disaster-marker";
@@ -516,7 +516,7 @@ const MapView: React.FC<MapViewProps> = ({
       el.style.backgroundColor = color;
       el.style.border = "2px solid white";
       // 使用 ref 避免 stale closure 问题
-      el.style.display = showHeatmapRef.current ? 'none' : 'block';
+      el.style.display = showHeatmapRef.current ? "none" : "block";
       const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
         <div class="popup-title">${h.title}</div>
         <div class="popup-info">
@@ -526,10 +526,7 @@ const MapView: React.FC<MapViewProps> = ({
             <strong>Platform:</strong> Prometheus Global Guardian
         </div>
       `);
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(coords)
-        .setPopup(popup)
-        .addTo(map.current!);
+      const marker = new mapboxgl.Marker(el).setLngLat(lngLat).setPopup(popup).addTo(map.current!);
       markers.current.push(marker);
     });
     // 添加完所有 Marker 后，依据当前 zoom 应用 LOD 可见性
@@ -542,14 +539,24 @@ const MapView: React.FC<MapViewProps> = ({
       <div className="heatmap-toggle">
         <button
           onClick={toggleHeatmap}
-          className={`toggle-button ${showHeatmap ? 'active' : ''}`}
-          title={showHeatmap ? 'Show Markers' : 'Show Heatmap'}
+          className={`toggle-button ${showHeatmap ? "active" : ""}`}
+          title={showHeatmap ? "Show Markers" : "Show Heatmap"}
         >
           <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"
+            />
           </svg>
-          <span>{showHeatmap ? 'Markers' : 'Heatmap'}</span>
+          <span>{showHeatmap ? "Markers" : "Heatmap"}</span>
         </button>
       </div>
     </>

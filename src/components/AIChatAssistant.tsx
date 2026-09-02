@@ -9,23 +9,15 @@
  * - Demo 模式降级（无 API Key 时）
  */
 
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from 'react';
-import DOMPurify from 'dompurify';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import DOMPurify from "dompurify";
 import {
   streamChatMessage,
-  generateMessageId,
-  formatTime,
-  QUICK_PROMPTS,
   type ChatMessage,
   type DisasterContext,
-} from '../api/aiAssistant';
-import type { Hazard } from '../types';
+} from "../services/ai/aiAssistantService";
+import { generateMessageId, formatTime, QUICK_PROMPTS } from "../utils/aiAssistant";
+import type { Hazard } from "../types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -42,50 +34,86 @@ interface BubbleProps {
 }
 
 const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
-  const isUser = msg.role === 'user';
+  const isUser = msg.role === "user";
 
   // 简单 Markdown 渲染：粗体、标题、列表、表格行
   const renderMarkdown = (text: string) => {
-    const lines = text.split('\n');
+    const lines = text.split("\n");
     return lines.map((line, i) => {
       // 标题 **text**
-      const boldLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      const boldLine = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
-      if (line.startsWith('### ')) return (
-        <h4 key={i} className="ai-md-h4" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^### /, '')) }} />
-      );
-      if (line.startsWith('## ')) return (
-        <h3 key={i} className="ai-md-h3" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^## /, '')) }} />
-      );
-      if (line.startsWith('**') && line.endsWith('**') && !line.slice(2, -2).includes('**')) return (
-        <p key={i} className="ai-md-bold-line" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }} />
-      );
-      if (line.startsWith('- ') || line.startsWith('• ')) return (
-        <li key={i} className="ai-md-li" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^[-•] /, '')) }} />
-      );
-      if (line.match(/^\d+\. /)) return (
-        <li key={i} className="ai-md-li ai-md-ol" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^\d+\. /, '')) }} />
-      );
-      if (line.startsWith('|') && line.endsWith('|')) return (
-        <div key={i} className="ai-md-table-row" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }} />
-      );
-      if (line === '---') return <hr key={i} className="ai-md-hr" />;
-      if (line.trim() === '') return <div key={i} className="ai-md-spacer" />;
+      if (line.startsWith("### "))
+        return (
+          <h4
+            key={i}
+            className="ai-md-h4"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^### /, "")) }}
+          />
+        );
+      if (line.startsWith("## "))
+        return (
+          <h3
+            key={i}
+            className="ai-md-h3"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^## /, "")) }}
+          />
+        );
+      if (line.startsWith("**") && line.endsWith("**") && !line.slice(2, -2).includes("**"))
+        return (
+          <p
+            key={i}
+            className="ai-md-bold-line"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
+          />
+        );
+      if (line.startsWith("- ") || line.startsWith("• "))
+        return (
+          <li
+            key={i}
+            className="ai-md-li"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^[-•] /, "")) }}
+          />
+        );
+      if (line.match(/^\d+\. /))
+        return (
+          <li
+            key={i}
+            className="ai-md-li ai-md-ol"
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(boldLine.replace(/^\d+\. /, "")),
+            }}
+          />
+        );
+      if (line.startsWith("|") && line.endsWith("|"))
+        return (
+          <div
+            key={i}
+            className="ai-md-table-row"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
+          />
+        );
+      if (line === "---") return <hr key={i} className="ai-md-hr" />;
+      if (line.trim() === "") return <div key={i} className="ai-md-spacer" />;
       return (
-        <p key={i} className="ai-md-p" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }} />
+        <p
+          key={i}
+          className="ai-md-p"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
+        />
       );
     });
   };
 
   return (
-    <div className={`ai-bubble-wrap ${isUser ? 'ai-bubble-user' : 'ai-bubble-ai'}`}>
+    <div className={`ai-bubble-wrap ${isUser ? "ai-bubble-user" : "ai-bubble-ai"}`}>
       {/* 头像 */}
-      <div className={`ai-avatar ${isUser ? 'ai-avatar-user' : 'ai-avatar-ai'}`}>
-        {isUser ? '👤' : '🤖'}
+      <div className={`ai-avatar ${isUser ? "ai-avatar-user" : "ai-avatar-ai"}`}>
+        {isUser ? "👤" : "🤖"}
       </div>
 
       <div className="ai-bubble-inner">
-        <div className={`ai-bubble ${isUser ? 'ai-bubble-user-body' : 'ai-bubble-ai-body'}`}>
+        <div className={`ai-bubble ${isUser ? "ai-bubble-user-body" : "ai-bubble-ai-body"}`}>
           {isUser ? (
             <p className="ai-md-p">{msg.content}</p>
           ) : (
@@ -105,11 +133,11 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
 
 const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, hazards }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [showQuickPrompts, setShowQuickPrompts] = useState(true);
   const [contextEnabled, setContextEnabled] = useState(true);
-  const [errorText, setErrorText] = useState('');
+  const [errorText, setErrorText] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -118,14 +146,14 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
   // 构建灾害上下文
   const disasterContext = useMemo<DisasterContext>(() => {
     const byType: Record<string, number> = {};
-    hazards.forEach(h => {
-      const t = h.type || 'OTHER';
+    hazards.forEach((h) => {
+      const t = h.type || "OTHER";
       byType[t] = (byType[t] || 0) + 1;
     });
     return {
       total: hazards.length,
       byType,
-      recent: hazards.slice(0, 8).map(h => ({
+      recent: hazards.slice(0, 8).map((h) => ({
         title: h.title,
         type: h.type,
         severity: h.severity,
@@ -137,7 +165,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
 
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => {
@@ -154,80 +182,75 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
   // ESC 关闭
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
+      if (e.key === "Escape" && isOpen) onClose();
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [isOpen, onClose]);
 
   // ─── 发送消息核心逻辑 ───────────────────────────────────────────────────────
 
-  const sendMessage = useCallback(async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || isStreaming) return;
+  const sendMessage = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || isStreaming) return;
 
-    setErrorText('');
-    setShowQuickPrompts(false);
+      setErrorText("");
+      setShowQuickPrompts(false);
 
-    const userMsg: ChatMessage = {
-      id: generateMessageId(),
-      role: 'user',
-      content: trimmed,
-      timestamp: new Date().toISOString(),
-    };
+      const userMsg: ChatMessage = {
+        id: generateMessageId(),
+        role: "user",
+        content: trimmed,
+        timestamp: new Date().toISOString(),
+      };
 
-    const assistantId = generateMessageId();
-    streamingIdRef.current = assistantId;
+      const assistantId = generateMessageId();
+      streamingIdRef.current = assistantId;
 
-    const assistantMsg: ChatMessage = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
-      isStreaming: true,
-    };
+      const assistantMsg: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        timestamp: new Date().toISOString(),
+        isStreaming: true,
+      };
 
-    setMessages(prev => [...prev, userMsg, assistantMsg]);
-    setInput('');
-    setIsStreaming(true);
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      setInput("");
+      setIsStreaming(true);
 
-    // 取历史消息（不含当前流式助手消息，不含 system 消息）
-    const history = [...messages, userMsg].filter(m => m.role !== 'system');
+      // 取历史消息（不含当前流式助手消息，不含 system 消息）
+      const history = [...messages, userMsg].filter((m) => m.role !== "system");
 
-    await streamChatMessage(
-      history,
-      contextEnabled ? disasterContext : undefined,
-      // onChunk: 追加字符到流式消息
-      (chunk) => {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantId
-              ? { ...m, content: m.content + chunk }
-              : m
-          )
-        );
-      },
-      // onDone: 结束流式状态
-      () => {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantId
-              ? { ...m, isStreaming: false }
-              : m
-          )
-        );
-        setIsStreaming(false);
-        streamingIdRef.current = null;
-      },
-      // onError
-      (err) => {
-        setErrorText(err);
-        setMessages(prev => prev.filter(m => m.id !== assistantId));
-        setIsStreaming(false);
-        streamingIdRef.current = null;
-      }
-    );
-  }, [messages, isStreaming, contextEnabled, disasterContext]);
+      await streamChatMessage(
+        history,
+        contextEnabled ? disasterContext : undefined,
+        // onChunk: 追加字符到流式消息
+        (chunk) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
+          );
+        },
+        // onDone: 结束流式状态
+        () => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)),
+          );
+          setIsStreaming(false);
+          streamingIdRef.current = null;
+        },
+        // onError
+        (err) => {
+          setErrorText(err);
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          setIsStreaming(false);
+          streamingIdRef.current = null;
+        },
+      );
+    },
+    [messages, isStreaming, contextEnabled, disasterContext],
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,7 +258,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input);
     }
@@ -244,7 +267,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
   const clearChat = () => {
     setMessages([]);
     setShowQuickPrompts(true);
-    setErrorText('');
+    setErrorText("");
   };
 
   if (!isOpen) return null;
@@ -263,18 +286,19 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
             <div>
               <h2>AI 灾害分析助手</h2>
               <p className="ai-subtitle">
-                Powered by LLM · {hazards.length > 0 ? `监控 ${hazards.length} 条事件` : '加载数据中...'}
+                Powered by LLM ·{" "}
+                {hazards.length > 0 ? `监控 ${hazards.length} 条事件` : "加载数据中..."}
               </p>
             </div>
           </div>
           <div className="ai-header-actions">
             {/* 上下文开关 */}
             <button
-              className={`ai-ctx-btn ${contextEnabled ? 'active' : ''}`}
-              onClick={() => setContextEnabled(v => !v)}
-              title={contextEnabled ? '已注入灾害实时上下文' : '点击注入实时上下文'}
+              className={`ai-ctx-btn ${contextEnabled ? "active" : ""}`}
+              onClick={() => setContextEnabled((v) => !v)}
+              title={contextEnabled ? "已注入灾害实时上下文" : "点击注入实时上下文"}
             >
-              {contextEnabled ? '📡 上下文已开' : '📡 上下文已关'}
+              {contextEnabled ? "📡 上下文已开" : "📡 上下文已关"}
             </button>
 
             {/* 清空 */}
@@ -287,7 +311,12 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
             {/* 关闭 */}
             <button className="ai-close-btn" onClick={onClose}>
               <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -303,7 +332,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
             </div>
           )}
 
-          {messages.map(msg => (
+          {messages.map((msg) => (
             <MessageBubble key={msg.id} msg={msg} />
           ))}
 
@@ -311,7 +340,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
           {errorText && (
             <div className="ai-error">
               <span>⚠️ {errorText}</span>
-              <button onClick={() => setErrorText('')}>✕</button>
+              <button onClick={() => setErrorText("")}>✕</button>
             </div>
           )}
 
@@ -344,7 +373,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
               ref={inputRef}
               className="ai-textarea"
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="输入灾害分析问题... (Enter 发送，Shift+Enter 换行)"
               rows={2}
@@ -352,7 +381,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
             />
             <button
               type="submit"
-              className={`ai-send-btn ${isStreaming ? 'loading' : ''}`}
+              className={`ai-send-btn ${isStreaming ? "loading" : ""}`}
               disabled={!input.trim() || isStreaming}
               title="发送"
             >
@@ -364,16 +393,18 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
                 </span>
               ) : (
                 <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
                 </svg>
               )}
             </button>
           </div>
           <p className="ai-hint">
-            {isStreaming
-              ? '🔄 AI 正在生成分析结果...'
-              : 'Enter 发送 · Shift+Enter 换行 · ESC 关闭'}
+            {isStreaming ? "🔄 AI 正在生成分析结果..." : "Enter 发送 · Shift+Enter 换行 · ESC 关闭"}
           </p>
         </form>
       </div>

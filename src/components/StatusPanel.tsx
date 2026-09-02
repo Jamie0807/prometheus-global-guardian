@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { fetchHazardTypes } from "../api/disasteraware";
-import { checkHealth } from "../api/pythonAnalytics";
+import { fetchHazardTypes } from "../services/hazards/hazardService";
+import { checkHealth } from "../services/analytics/analyticsService";
 import type { HazardType } from "../types";
 import DISPLAYED_TYPES from "../config/displayedTypes";
 
@@ -15,7 +15,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
   filter,
   onFilterChange,
   onRefresh,
-  totalCount = 0
+  totalCount = 0,
 }) => {
   const [hazardTypes, setHazardTypes] = useState<HazardType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,8 +26,8 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       const data = await fetchHazardTypes();
       setHazardTypes(
         data.filter((item: HazardType) =>
-          DISPLAYED_TYPES.map(item => item.type_id).includes(item.type_id)
-        )
+          DISPLAYED_TYPES.map((item) => item.type_id).includes(item.type_id),
+        ),
       );
     } catch (error) {
       console.error("Failed to fetch hazard types:", error);
@@ -50,13 +50,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
   return (
     <div className="status-panel">
       <div className="status-header">
-        <svg
-          width="24"
-          height="24"
-          fill="none"
-          stroke="#ef4444"
-          viewBox="0 0 24 24"
-        >
+        <svg width="24" height="24" fill="none" stroke="#ef4444" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -81,12 +75,12 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
         <select
           id="hazard-filter"
           value={filter}
-          onChange={e => onFilterChange(e.target.value)}
+          onChange={(e) => onFilterChange(e.target.value)}
           className="form-input"
           disabled={isLoading}
         >
           <option value="ALL">All Hazards</option>
-          {hazardTypes.map(type => (
+          {hazardTypes.map((type) => (
             <option key={type.type_id} value={type.type_id}>
               {type.type_name}
             </option>

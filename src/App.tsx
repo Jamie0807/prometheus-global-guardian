@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense, useCallback, useRef } from "react";
-import { authorize } from "./api/auth";
+import { authorize } from "./services/auth/authService";
 import { notify } from "./utils/notifications";
 import Header from "./components/Header";
 import StatusPanel from "./components/StatusPanel";
@@ -16,14 +16,16 @@ const AIChatAssistant = lazy(() => import("./components/AIChatAssistant"));
 
 // 加载指示器组件
 const LoadingFallback = () => (
-  <div style={{ 
-    display: 'flex', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    height: '100vh',
-    fontSize: '18px',
-    color: '#666'
-  }}>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: "100vh",
+      fontSize: "18px",
+      color: "#666",
+    }}
+  >
     加载中...
   </div>
 );
@@ -55,13 +57,13 @@ const App: React.FC = () => {
   const handleDisastersUpdate = useCallback((data: Hazard[]) => {
     const previousCount = disastersRef.current.length;
     setDisasters(data);
-    
+
     // 发送通知
     if (data.length > previousCount) {
       const newCount = data.length - previousCount;
-      notify.info('数据更新', `检测到 ${newCount} 条新灾害记录`);
+      notify.info("数据更新", `检测到 ${newCount} 条新灾害记录`);
     } else if (data.length > 0 && previousCount === 0) {
-      notify.success('数据加载完成', `成功加载 ${data.length} 条灾害记录`);
+      notify.success("数据加载完成", `成功加载 ${data.length} 条灾害记录`);
     }
   }, []);
 
@@ -99,8 +101,8 @@ const App: React.FC = () => {
         {isAnalyticsOpen ? (
           <ErrorBoundary>
             <Suspense fallback={<LoadingFallback />}>
-              <AnalyticsPage 
-                hazards={disasters} 
+              <AnalyticsPage
+                hazards={disasters}
                 onClose={() => setIsAnalyticsOpen(false)}
                 onRefresh={handleDisastersUpdate}
               />
@@ -108,20 +110,20 @@ const App: React.FC = () => {
           </ErrorBoundary>
         ) : (
           <>
-              <MapView
-                mapStyle={selectedStyle}
-                onDataUpdate={handleDisastersUpdate}
-                filter={filter}
-                onRefreshReady={(refreshFn) => {
-                  refreshDataRef.current = refreshFn;
-                }}
-              />
-              <StatusPanel
-                filter={filter}
-                onFilterChange={newFilter => setFilter(newFilter)}
-                onRefresh={() => refreshDataRef.current()}
-                totalCount={disasters.length}
-              />
+            <MapView
+              mapStyle={selectedStyle}
+              onDataUpdate={handleDisastersUpdate}
+              filter={filter}
+              onRefreshReady={(refreshFn) => {
+                refreshDataRef.current = refreshFn;
+              }}
+            />
+            <StatusPanel
+              filter={filter}
+              onFilterChange={(newFilter) => setFilter(newFilter)}
+              onRefresh={() => refreshDataRef.current()}
+              totalCount={disasters.length}
+            />
             <LegendPanel />
           </>
         )}

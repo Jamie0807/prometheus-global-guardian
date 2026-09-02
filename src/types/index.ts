@@ -51,7 +51,7 @@ export interface ActiveHazard {
   in_Dashboard: string;
   areabrief_url: string | null;
   description: string;
-  roles: any[];
+  roles: unknown[];
 }
 
 export interface DisasterAwareAuthResponse {
@@ -76,26 +76,26 @@ export interface SaveReportPayload {
 }
 
 export const HAZARD_TYPES = {
-  DROUGHT: 'DROUGHT',
-  EARTHQUAKE: 'EARTHQUAKE',
-  FLOOD: 'FLOOD',
-  VOLCANO: 'VOLCANO',
-  WILDFIRE: 'WILDFIRE',
-  TROPICAL_CYCLONE: 'TROPICAL_CYCLONE',
-  TSUNAMI: 'TSUNAMI',
-  STORM: 'STORM',
-  LANDSLIDE: 'LANDSLIDE',
-  UNKNOWN: 'UNKNOWN'
+  DROUGHT: "DROUGHT",
+  EARTHQUAKE: "EARTHQUAKE",
+  FLOOD: "FLOOD",
+  VOLCANO: "VOLCANO",
+  WILDFIRE: "WILDFIRE",
+  TROPICAL_CYCLONE: "TROPICAL_CYCLONE",
+  TSUNAMI: "TSUNAMI",
+  STORM: "STORM",
+  LANDSLIDE: "LANDSLIDE",
+  UNKNOWN: "UNKNOWN",
 } as const;
 
 export const HAZARD_CATEGORIES = {
-  EVENT: 'EVENT',
-  NATURAL: 'NATURAL',
-  WEATHER: 'WEATHER',
-  GEOLOGICAL: 'GEOLOGICAL',
-  BIOLOGICAL: 'BIOLOGICAL',
-  TECHNOLOGICAL: 'TECHNOLOGICAL',
-  ENVIRONMENTAL: 'ENVIRONMENTAL'
+  EVENT: "EVENT",
+  NATURAL: "NATURAL",
+  WEATHER: "WEATHER",
+  GEOLOGICAL: "GEOLOGICAL",
+  BIOLOGICAL: "BIOLOGICAL",
+  TECHNOLOGICAL: "TECHNOLOGICAL",
+  ENVIRONMENTAL: "ENVIRONMENTAL",
 } as const;
 
 export type HazardTypeKeys = keyof typeof HAZARD_TYPES;

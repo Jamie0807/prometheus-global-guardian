@@ -3,21 +3,30 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.15.1",
   "engines": {
     "node": ">=20.19 <21"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "npm run build:client && npm run build:server",
-    "build:client": "vite build",
-    "build:server": "tsc -p tsconfig.server.json",
-    "build:server:test": "tsc -p tsconfig.server.test.json",
-    "lint": "eslint .",
-    "test": "npm run build:server:test && node --test dist-server/tests/*.test.js",
-    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
-    "preview": "vite preview",
-    "start": "node dist-server/server.js",
-    "start:static": "serve -s dist -l $PORT"
+    "dev": "./scripts/with-node-version.sh vite",
+    "build": "pnpm run build:client && pnpm run build:server",
+    "build:client": "./scripts/with-node-version.sh vite build",
+    "build:server": "./scripts/with-node-version.sh tsc -p tsconfig.server.json",
+    "build:server:test": "./scripts/with-node-version.sh tsc -p tsconfig.server.test.json",
+    "commit": "git-cz",
+    "format:check": "./scripts/with-node-version.sh prettier --check README.md package.json src/services src/api/auth.ts src/api/disasteraware.ts src/api/hazards.ts src/api/pythonAnalytics.ts src/api/aiAssistant.ts src/utils/aiAssistant.ts tests/service-*.test.ts tests/server-auth.test.ts vitest.config.ts vite.config.ts server.ts AGENTS.md commitlint.config.cjs .prettierrc.json",
+    "lint": "./scripts/with-node-version.sh eslint .",
+    "lint:staged": "lint-staged",
+    "prepare": "husky",
+    "test": "pnpm run test:bff && pnpm run test:services",
+    "test:bff": "pnpm run build:server:test && ./scripts/with-node-version.sh node --test dist-server/tests/ai-provider.test.js dist-server/tests/ai-router.test.js dist-server/tests/ai-stream.test.js dist-server/tests/server-auth.test.js",
+    "test:services": "./scripts/with-node-version.sh vitest run",
+    "typecheck:client": "./scripts/with-node-version.sh tsc --noEmit -p tsconfig.app.json",
+    "typecheck:server": "./scripts/with-node-version.sh tsc --noEmit -p tsconfig.server.json",
+    "preview": "./scripts/with-node-version.sh vite preview",
+    "start": "./scripts/with-node-version.sh node dist-server/server.js",
+    "start:static": "./scripts/with-node-version.sh serve -s dist -l $PORT",
+    "node:version": "./scripts/with-node-version.sh node --version"
   },
   "dependencies": {
     "@deck.gl/core": "^9.2.10",
@@ -47,15 +56,35 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@commitlint/cli": "20.1.0",
+    "@commitlint/config-conventional": "20.0.0",
     "@types/dompurify": "^3.0.5",
     "@types/express": "^5.0.6",
     "@types/lodash": "^4.17.21",
     "@vitejs/plugin-react": "^5.0.4",
+    "commitizen": "4.3.1",
+    "cz-git": "1.10.1",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
     "globals": "^16.4.0",
+    "husky": "9.1.7",
+    "lint-staged": "16.2.7",
+    "prettier": "3.7.3",
     "typescript-eslint": "^8.45.0",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  },
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-git"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,html,js,cjs,mjs,json,md,yaml,yml}": "prettier --write"
   }
 }

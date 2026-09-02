@@ -1,17 +1,11 @@
 import React, { useState } from "react";
+import type { Hazard, SaveReportPayload } from "../types";
 
 interface SaveReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDownload: (payload: {
-    reportName: string;
-    organization: string;
-    email: string;
-    notes: string;
-    disasters: any[];
-    filter: string;
-  }) => void;
-  disasters: any[];
+  onDownload: (payload: SaveReportPayload) => void;
+  disasters: Hazard[];
   filter: string;
 }
 
@@ -20,7 +14,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
   onClose,
   onDownload,
   disasters,
-  filter
+  filter,
 }) => {
   const [reportName, setReportName] = useState("");
   const [organization, setOrganization] = useState("");
@@ -31,7 +25,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // 简化版报告生成 - Python微服务处理复杂分析
     const reportData = {
       reportName,
@@ -40,19 +34,19 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
       notes,
       disasters,
       filter,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     // 下载JSON格式报告
     const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const dataBlob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = `${reportName.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    
+
     onDownload(reportData);
     onClose();
   };
@@ -62,13 +56,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
       <div className="modal-content">
         <div className="modal-header">
           <div className="modal-title">
-            <svg
-              width="24"
-              height="24"
-              fill="none"
-              stroke="#60a5fa"
-              viewBox="0 0 24 24"
-            >
+            <svg width="24" height="24" fill="none" stroke="#60a5fa" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -79,13 +67,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
             <span>Save Disaster Report</span>
           </div>
           <button className="close-btn" onClick={onClose}>
-            <svg
-              width="24"
-              height="24"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -104,7 +86,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
               className="form-input"
               required
               value={reportName}
-              onChange={e => setReportName(e.target.value)}
+              onChange={(e) => setReportName(e.target.value)}
               placeholder="e.g., October 2025 Global Assessment"
             />
           </div>
@@ -115,7 +97,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
               type="text"
               className="form-input"
               value={organization}
-              onChange={e => setOrganization(e.target.value)}
+              onChange={(e) => setOrganization(e.target.value)}
               placeholder="Your organization name"
             />
           </div>
@@ -126,7 +108,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
               type="email"
               className="form-input"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="contact@example.com"
             />
           </div>
@@ -136,26 +118,17 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
             <textarea
               className="form-input"
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Any additional observations or comments..."
             />
           </div>
 
           <div className="form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-            >
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">
-              <svg
-                className="icon"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

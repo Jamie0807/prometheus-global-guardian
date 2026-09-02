@@ -1,48 +1,83 @@
-import React, { useState, useEffect } from 'react';
-import { getStatistics } from '../api/pythonAnalytics';
-import { 
-  PieChart, Pie, Cell, 
-  BarChart, Bar, 
-  LineChart, Line, 
-  AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import ChartDrilldownModal from './ChartDrilldownModal';
+import React, { useState, useEffect, useCallback } from "react";
+import { getStatistics } from "../services/analytics/analyticsService";
+import type { Hazard } from "../types";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import ChartDrilldownModal from "./ChartDrilldownModal";
 
-const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
-  const [pythonStats, setPythonStats] = useState<any>(null);
+type ChartHazard = Hazard & {
+  properties?: {
+    type?: string;
+    severity?: string;
+    timestamp?: string;
+  };
+};
+
+interface PythonStats {
+  basicStats?: {
+    mean?: number;
+    std?: number;
+  };
+}
+
+interface ChartClickData {
+  name?: string;
+}
+
+const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
+  const [pythonStats, setPythonStats] = useState<PythonStats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeChart, setActiveChart] = useState<'pie' | 'bar' | 'line' | 'area'>('pie');
-  const [chartError, setChartError] = useState<string>('');
+  const [activeChart, setActiveChart] = useState<"pie" | "bar" | "line" | "area">("pie");
+  const [chartError, setChartError] = useState<string>("");
   const [autoRefresh, setAutoRefresh] = useState(false);
-  
+
   // 钻取功能状态
   const [isDrilldownOpen, setIsDrilldownOpen] = useState(false);
   const [drilldownData, setDrilldownData] = useState<{
     title: string;
-    filteredHazards: any[];
-    drilldownType: 'type' | 'severity' | 'source' | 'date';
+    filteredHazards: ChartHazard[];
+    drilldownType: "type" | "severity" | "source" | "date";
     drilldownValue: string;
   } | null>(null);
 
-  const hazardsByType = hazards.reduce((acc, h) => {
-    const type = h.type || h.properties?.type || '未分类';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const hazardsByType = hazards.reduce(
+    (acc, h) => {
+      const type = h.type || h.properties?.type || "未分类";
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   // 为图表准备数据
   const chartData = Object.entries(hazardsByType).map(([name, value]) => ({
     name,
     value,
-    count: value
+    count: value,
   }));
 
   // 时间线数据（按日期统计）
   const timelineData = React.useMemo(() => {
     const dateCount: Record<string, number> = {};
-    hazards.forEach(h => {
-      const date = h.properties?.timestamp ? new Date(h.properties.timestamp).toLocaleDateString('zh-CN') : '未知日期';
+    hazards.forEach((h) => {
+      const date = h.properties?.timestamp
+        ? new Date(h.properties.timestamp).toLocaleDateString("zh-CN")
+        : "未知日期";
       dateCount[date] = (dateCount[date] || 0) + 1;
     });
     return Object.entries(dateCount)
@@ -54,45 +89,50 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
   // 严重性分布数据
   const severityData = React.useMemo(() => {
     const severityCount: Record<string, number> = {};
-    hazards.forEach(h => {
-      const severity = h.properties?.severity || '未知';
+    hazards.forEach((h) => {
+      const severity = h.properties?.severity || "未知";
       severityCount[severity] = (severityCount[severity] || 0) + 1;
     });
     return Object.entries(severityCount).map(([name, value]) => ({ name, value }));
   }, [hazards]);
 
-  const COLORS = ['#4CAF50', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#00BCD4', '#FFEB3B'];
+  const COLORS = ["#4CAF50", "#FF9800", "#2196F3", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B"];
 
   // 处理图表点击事件（钻取功能）
-  const handleChartClick = (data: any, drilldownType: 'type' | 'severity' | 'source' | 'date') => {
-    console.log('Chart clicked:', data, drilldownType);
+  const handleChartClick = (
+    data: ChartClickData,
+    drilldownType: "type" | "severity" | "source" | "date",
+  ) => {
+    console.log("Chart clicked:", data, drilldownType);
     if (!data || !data.name) {
-      console.warn('Invalid data for drilldown:', data);
+      console.warn("Invalid data for drilldown:", data);
       return;
     }
-    
+
     const value = data.name;
-    let filtered: any[] = [];
-    let title = '';
-    
+    let filtered: ChartHazard[] = [];
+    let title = "";
+
     switch (drilldownType) {
-      case 'type':
-        filtered = hazards.filter(h => {
-          const type = h.type || h.properties?.type || '未分类';
+      case "type":
+        filtered = hazards.filter((h) => {
+          const type = h.type || h.properties?.type || "未分类";
           return type === value;
         });
         title = `灾害类型：${value} (${filtered.length}条)`;
         break;
-      case 'severity':
-        filtered = hazards.filter(h => {
-          const severity = h.properties?.severity || '未知';
+      case "severity":
+        filtered = hazards.filter((h) => {
+          const severity = h.properties?.severity || "未知";
           return severity === value;
         });
         title = `严重性级别：${value} (${filtered.length}条)`;
         break;
-      case 'date':
-        filtered = hazards.filter(h => {
-          const date = h.properties?.timestamp ? new Date(h.properties.timestamp).toLocaleDateString('zh-CN') : '未知日期';
+      case "date":
+        filtered = hazards.filter((h) => {
+          const date = h.properties?.timestamp
+            ? new Date(h.properties.timestamp).toLocaleDateString("zh-CN")
+            : "未知日期";
           return date === value;
         });
         title = `日期：${value} (${filtered.length}条)`;
@@ -101,68 +141,89 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
         filtered = hazards;
         title = `全部数据 (${filtered.length}条)`;
     }
-    
-    console.log('Setting drilldown data:', { title, filtered: filtered.length, drilldownType, value });
+
+    console.log("Setting drilldown data:", {
+      title,
+      filtered: filtered.length,
+      drilldownType,
+      value,
+    });
     setDrilldownData({
       title,
       filteredHazards: filtered,
       drilldownType,
-      drilldownValue: value
+      drilldownValue: value,
     });
     setIsDrilldownOpen(true);
   };
 
-  useEffect(() => {
-    if (hazards.length > 0) {
-      loadPythonStats();
-    }
-  }, [hazards.length]);
-
-  const loadPythonStats = async () => {
+  const loadPythonStats = useCallback(async () => {
     if (hazards.length === 0) return;
-    
+
     setLoading(true);
-    setChartError('');
+    setChartError("");
     try {
       const result = await getStatistics(hazards.slice(0, 100));
       if (result.success) {
-        setPythonStats(result.data);
+        setPythonStats((result.data as PythonStats | undefined) ?? null);
       } else {
-        setChartError('统计数据加载失败');
+        setChartError("统计数据加载失败");
       }
     } catch (error) {
-      console.error('Failed to load Python statistics:', error);
-      setChartError((error as Error).message || '加载统计数据时出错');
+      console.error("Failed to load Python statistics:", error);
+      setChartError((error as Error).message || "加载统计数据时出错");
     } finally {
       setLoading(false);
     }
-  };
-  
+  }, [hazards]);
+
+  useEffect(() => {
+    if (hazards.length > 0) {
+      void loadPythonStats();
+    }
+  }, [hazards.length, loadPythonStats]);
+
   // 自动刷新功能
   useEffect(() => {
     if (autoRefresh && hazards.length > 0) {
       const interval = setInterval(() => {
-        loadPythonStats();
+        void loadPythonStats();
       }, 30000); // 每30秒刷新一次
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, hazards.length]);
+  }, [autoRefresh, hazards.length, loadPythonStats]);
 
   return (
-    <div style={{ backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ color: '#4CAF50', margin: 0 }}>
-          📊 4类交互式分析图表
-        </h3>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {loading && <span style={{ color: '#888', fontSize: '12px' }}>加载中...</span>}
-          {chartError && <span style={{ color: '#ff6b6b', fontSize: '12px' }}>⚠️ {chartError}</span>}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#888', cursor: 'pointer' }}>
-            <input 
-              type="checkbox" 
-              checked={autoRefresh} 
+    <div style={{ backgroundColor: "#1a1a1a", padding: "20px", borderRadius: "8px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <h3 style={{ color: "#4CAF50", margin: 0 }}>📊 4类交互式分析图表</h3>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {loading && <span style={{ color: "#888", fontSize: "12px" }}>加载中...</span>}
+          {chartError && (
+            <span style={{ color: "#ff6b6b", fontSize: "12px" }}>⚠️ {chartError}</span>
+          )}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              fontSize: "12px",
+              color: "#888",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: "pointer" }}
             />
             自动刷新
           </label>
@@ -170,67 +231,75 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
       </div>
 
       {/* 图表切换按钮 */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginBottom: "20px",
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <button
-          onClick={() => setActiveChart('pie')}
+          onClick={() => setActiveChart("pie")}
           style={{
-            padding: '8px 16px',
-            backgroundColor: activeChart === 'pie' ? '#4CAF50' : '#333',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s'
+            padding: "8px 16px",
+            backgroundColor: activeChart === "pie" ? "#4CAF50" : "#333",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            transition: "all 0.3s",
           }}
         >
           🥧 饼图
         </button>
         <button
-          onClick={() => setActiveChart('bar')}
+          onClick={() => setActiveChart("bar")}
           style={{
-            padding: '8px 16px',
-            backgroundColor: activeChart === 'bar' ? '#FF9800' : '#333',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s'
+            padding: "8px 16px",
+            backgroundColor: activeChart === "bar" ? "#FF9800" : "#333",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            transition: "all 0.3s",
           }}
         >
           📊 柱状图
         </button>
         <button
-          onClick={() => setActiveChart('line')}
+          onClick={() => setActiveChart("line")}
           style={{
-            padding: '8px 16px',
-            backgroundColor: activeChart === 'line' ? '#2196F3' : '#333',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s'
+            padding: "8px 16px",
+            backgroundColor: activeChart === "line" ? "#2196F3" : "#333",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            transition: "all 0.3s",
           }}
         >
           📈 时间线
         </button>
         <button
-          onClick={() => setActiveChart('area')}
+          onClick={() => setActiveChart("area")}
           style={{
-            padding: '8px 16px',
-            backgroundColor: activeChart === 'area' ? '#9C27B0' : '#333',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            transition: 'all 0.3s'
+            padding: "8px 16px",
+            backgroundColor: activeChart === "area" ? "#9C27B0" : "#333",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            transition: "all 0.3s",
           }}
         >
           📉 分布图
@@ -238,80 +307,86 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
       </div>
 
       {/* 图表显示区域 */}
-      <div style={{ height: '400px', marginBottom: '20px' }}>
-        {activeChart === 'pie' && (
+      <div style={{ height: "400px", marginBottom: "20px" }}>
+        {activeChart === "pie" && (
           <div>
-            <h4 style={{ color: '#4CAF50', fontSize: '14px', marginBottom: '10px' }}>
-              🥧 灾害类型分布（饼图）<span style={{ color: '#888', fontSize: '12px', marginLeft: '10px' }}>💡 点击扇区查看详情</span>
+            <h4 style={{ color: "#4CAF50", fontSize: "14px", marginBottom: "10px" }}>
+              🥧 灾害类型分布（饼图）
+              <span style={{ color: "#888", fontSize: "12px", marginLeft: "10px" }}>
+                💡 点击扇区查看详情
+              </span>
             </h4>
             <ResponsiveContainer width="100%" height={350}>
-              <PieChart onClick={(e) => {
-                console.log('PieChart clicked:', e);
-              }}>
+              <PieChart
+                onClick={(e) => {
+                  console.log("PieChart clicked:", e);
+                }}
+              >
                 <Pie
                   data={chartData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                  label={({ name, percent }) =>
+                    `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
+                  }
                   outerRadius={120}
                   fill="#8884d8"
                   dataKey="value"
                   onClick={(data, index, e) => {
-                    console.log('Pie segment clicked:', { data, index, e });
-                    handleChartClick(data, 'type');
+                    console.log("Pie segment clicked:", { data, index, e });
+                    handleChartClick(data, "type");
                   }}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: "pointer" }}
                 >
                   {chartData.map((_entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={COLORS[index % COLORS.length]}
-                    />
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#2a2a2a', border: '1px solid #444', borderRadius: '6px' }}
-                  itemStyle={{ color: '#fff' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#2a2a2a",
+                    border: "1px solid #444",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "#fff" }}
                 />
-                <Legend 
-                  wrapperStyle={{ color: '#fff' }}
-                  iconType="circle"
-                />
+                <Legend wrapperStyle={{ color: "#fff" }} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {activeChart === 'bar' && (
+        {activeChart === "bar" && (
           <div>
-            <h4 style={{ color: '#FF9800', fontSize: '14px', marginBottom: '10px' }}>
-              📊 灾害类型统计（柱状图）<span style={{ color: '#888', fontSize: '12px', marginLeft: '10px' }}>💡 点击柱形查看详情</span>
+            <h4 style={{ color: "#FF9800", fontSize: "14px", marginBottom: "10px" }}>
+              📊 灾害类型统计（柱状图）
+              <span style={{ color: "#888", fontSize: "12px", marginLeft: "10px" }}>
+                💡 点击柱形查看详情
+              </span>
             </h4>
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#888"
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                />
+                <XAxis dataKey="name" stroke="#888" angle={-45} textAnchor="end" height={100} />
                 <YAxis stroke="#888" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#2a2a2a', border: '1px solid #444', borderRadius: '6px' }}
-                  itemStyle={{ color: '#fff' }}
-                  cursor={{ fill: 'rgba(255, 152, 0, 0.1)' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#2a2a2a",
+                    border: "1px solid #444",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "#fff" }}
+                  cursor={{ fill: "rgba(255, 152, 0, 0.1)" }}
                 />
-                <Legend wrapperStyle={{ color: '#fff' }} />
-                <Bar 
-                  dataKey="value" 
-                  fill="#FF9800" 
-                  name="数量" 
+                <Legend wrapperStyle={{ color: "#fff" }} />
+                <Bar
+                  dataKey="value"
+                  fill="#FF9800"
+                  name="数量"
                   onClick={(data, index) => {
-                    console.log('Bar clicked:', { data, index });
-                    handleChartClick(data, 'type');
+                    console.log("Bar clicked:", { data, index });
+                    handleChartClick(data, "type");
                   }}
                   cursor="pointer"
                 />
@@ -320,31 +395,31 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
           </div>
         )}
 
-        {activeChart === 'line' && (
+        {activeChart === "line" && (
           <div>
-            <h4 style={{ color: '#2196F3', fontSize: '14px', marginBottom: '10px' }}>📈 灾害时间趋势（时间线图）</h4>
+            <h4 style={{ color: "#2196F3", fontSize: "14px", marginBottom: "10px" }}>
+              📈 灾害时间趋势（时间线图）
+            </h4>
             <ResponsiveContainer width="100%" height={350}>
               <LineChart data={timelineData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#888"
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                />
+                <XAxis dataKey="date" stroke="#888" angle={-45} textAnchor="end" height={100} />
                 <YAxis stroke="#888" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#2a2a2a', border: '1px solid #444', borderRadius: '6px' }}
-                  itemStyle={{ color: '#fff' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#2a2a2a",
+                    border: "1px solid #444",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "#fff" }}
                 />
-                <Legend wrapperStyle={{ color: '#fff' }} />
-                <Line 
-                  type="monotone" 
-                  dataKey="count" 
-                  stroke="#2196F3" 
+                <Legend wrapperStyle={{ color: "#fff" }} />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#2196F3"
                   strokeWidth={3}
-                  dot={{ fill: '#2196F3', r: 5 }}
+                  dot={{ fill: "#2196F3", r: 5 }}
                   activeDot={{ r: 8 }}
                   name="灾害数量"
                 />
@@ -353,31 +428,38 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
           </div>
         )}
 
-        {activeChart === 'area' && (
+        {activeChart === "area" && (
           <div>
-            <h4 style={{ color: '#9C27B0', fontSize: '14px', marginBottom: '10px' }}>
-              📉 严重性分布（面积图）<span style={{ color: '#888', fontSize: '12px', marginLeft: '10px' }}>💡 点击区域查看详情</span>
+            <h4 style={{ color: "#9C27B0", fontSize: "14px", marginBottom: "10px" }}>
+              📉 严重性分布（面积图）
+              <span style={{ color: "#888", fontSize: "12px", marginLeft: "10px" }}>
+                💡 点击区域查看详情
+              </span>
             </h4>
             <ResponsiveContainer width="100%" height={350}>
               <AreaChart data={severityData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                 <XAxis dataKey="name" stroke="#888" />
                 <YAxis stroke="#888" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#2a2a2a', border: '1px solid #444', borderRadius: '6px' }}
-                  itemStyle={{ color: '#fff' }}
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#2a2a2a",
+                    border: "1px solid #444",
+                    borderRadius: "6px",
+                  }}
+                  itemStyle={{ color: "#fff" }}
                 />
-                <Legend wrapperStyle={{ color: '#fff' }} />
-                <Area 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#9C27B0" 
+                <Legend wrapperStyle={{ color: "#fff" }} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#9C27B0"
                   fill="#9C27B0"
                   fillOpacity={0.6}
                   name="数量"
                   onClick={(data, index) => {
-                    console.log('Area clicked:', { data, index });
-                    handleChartClick(data, 'severity');
+                    console.log("Area clicked:", { data, index });
+                    handleChartClick(data, "severity");
                   }}
                   cursor="pointer"
                 />
@@ -388,30 +470,67 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
       </div>
 
       {/* 数据统计摘要 */}
-      <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #333' }}>
-        <h4 style={{ color: '#4CAF50', fontSize: '14px', marginBottom: '12px' }}>📈 数据统计摘要</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', fontSize: '13px' }}>
-          <div style={{ padding: '12px', backgroundColor: '#2a2a2a', borderRadius: '6px', border: '1px solid #4CAF50' }}>
-            <div style={{ color: '#888', fontSize: '11px' }}>总灾害数</div>
-            <div style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '20px' }}>
+      <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #333" }}>
+        <h4 style={{ color: "#4CAF50", fontSize: "14px", marginBottom: "12px" }}>
+          📈 数据统计摘要
+        </h4>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: "10px",
+            fontSize: "13px",
+          }}
+        >
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "6px",
+              border: "1px solid #4CAF50",
+            }}
+          >
+            <div style={{ color: "#888", fontSize: "11px" }}>总灾害数</div>
+            <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "20px" }}>
               {hazards.length}
             </div>
           </div>
-          <div style={{ padding: '12px', backgroundColor: '#2a2a2a', borderRadius: '6px', border: '1px solid #FF9800' }}>
-            <div style={{ color: '#888', fontSize: '11px' }}>灾害类型</div>
-            <div style={{ color: '#FF9800', fontWeight: 'bold', fontSize: '20px' }}>
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "6px",
+              border: "1px solid #FF9800",
+            }}
+          >
+            <div style={{ color: "#888", fontSize: "11px" }}>灾害类型</div>
+            <div style={{ color: "#FF9800", fontWeight: "bold", fontSize: "20px" }}>
               {Object.keys(hazardsByType).length}
             </div>
           </div>
-          <div style={{ padding: '12px', backgroundColor: '#2a2a2a', borderRadius: '6px', border: '1px solid #2196F3' }}>
-            <div style={{ color: '#888', fontSize: '11px' }}>时间跨度</div>
-            <div style={{ color: '#2196F3', fontWeight: 'bold', fontSize: '20px' }}>
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "6px",
+              border: "1px solid #2196F3",
+            }}
+          >
+            <div style={{ color: "#888", fontSize: "11px" }}>时间跨度</div>
+            <div style={{ color: "#2196F3", fontWeight: "bold", fontSize: "20px" }}>
               {timelineData.length}天
             </div>
           </div>
-          <div style={{ padding: '12px', backgroundColor: '#2a2a2a', borderRadius: '6px', border: '1px solid #9C27B0' }}>
-            <div style={{ color: '#888', fontSize: '11px' }}>严重性级别</div>
-            <div style={{ color: '#9C27B0', fontWeight: 'bold', fontSize: '20px' }}>
+          <div
+            style={{
+              padding: "12px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "6px",
+              border: "1px solid #9C27B0",
+            }}
+          >
+            <div style={{ color: "#888", fontSize: "11px" }}>严重性级别</div>
+            <div style={{ color: "#9C27B0", fontWeight: "bold", fontSize: "20px" }}>
               {severityData.length}
             </div>
           </div>
@@ -419,21 +538,30 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
       </div>
 
       {pythonStats && (
-        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #333' }}>
-          <h4 style={{ color: '#4CAF50', fontSize: '14px', marginBottom: '12px' }}>🐍 Python 高级统计</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+        <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #333" }}>
+          <h4 style={{ color: "#4CAF50", fontSize: "14px", marginBottom: "12px" }}>
+            🐍 Python 高级统计
+          </h4>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "10px",
+              fontSize: "13px",
+            }}
+          >
             {pythonStats.basicStats && (
               <>
-                <div style={{ padding: '8px', backgroundColor: '#2a2a2a', borderRadius: '4px' }}>
-                  <div style={{ color: '#888' }}>平均值</div>
-                  <div style={{ color: '#fff', fontWeight: 'bold' }}>
-                    {pythonStats.basicStats.mean?.toFixed(2) || 'N/A'}
+                <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
+                  <div style={{ color: "#888" }}>平均值</div>
+                  <div style={{ color: "#fff", fontWeight: "bold" }}>
+                    {pythonStats.basicStats.mean?.toFixed(2) || "N/A"}
                   </div>
                 </div>
-                <div style={{ padding: '8px', backgroundColor: '#2a2a2a', borderRadius: '4px' }}>
-                  <div style={{ color: '#888' }}>标准差</div>
-                  <div style={{ color: '#fff', fontWeight: 'bold' }}>
-                    {pythonStats.basicStats.std?.toFixed(2) || 'N/A'}
+                <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
+                  <div style={{ color: "#888" }}>标准差</div>
+                  <div style={{ color: "#fff", fontWeight: "bold" }}>
+                    {pythonStats.basicStats.std?.toFixed(2) || "N/A"}
                   </div>
                 </div>
               </>
@@ -445,11 +573,14 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
       {/* 钻取弹窗 */}
       {isDrilldownOpen && drilldownData ? (
         <>
-          {console.log('Rendering modal:', { isDrilldownOpen, drilldownData })}
+          {(() => {
+            console.log("Rendering modal:", { isDrilldownOpen, drilldownData });
+            return null;
+          })()}
           <ChartDrilldownModal
             isOpen={isDrilldownOpen}
             onClose={() => {
-              console.log('Closing modal');
+              console.log("Closing modal");
               setIsDrilldownOpen(false);
             }}
             title={drilldownData.title}
@@ -459,7 +590,13 @@ const ChartsPanel: React.FC<{ hazards: any[] }> = ({ hazards }) => {
           />
         </>
       ) : (
-        console.log('Modal not rendered:', { isDrilldownOpen, hasDrilldownData: !!drilldownData })
+        (() => {
+          console.log("Modal not rendered:", {
+            isDrilldownOpen,
+            hasDrilldownData: !!drilldownData,
+          });
+          return null;
+        })()
       )}
     </div>
   );

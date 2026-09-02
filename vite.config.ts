@@ -9,15 +9,14 @@ export default defineConfig({
       "/api/ai": {
         target: "http://localhost:8080",
         changeOrigin: true,
-        secure: false
+        secure: false,
       },
       "/api": {
-        target: "https://api.disasteraware.com",
+        target: "http://localhost:8080",
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/api/, ""),
-        secure: false
-      }
-    }
+        secure: false,
+      },
+    },
   },
   build: {
     rollupOptions: {
@@ -25,17 +24,17 @@ export default defineConfig({
         // 手动配置代码分块策略
         manualChunks: {
           // React核心库单独打包
-          'react-vendor': ['react', 'react-dom'],
+          "react-vendor": ["react", "react-dom"],
           // 地图库单独打包（体积大）
-          'mapbox-vendor': ['mapbox-gl'],
+          "mapbox-vendor": ["mapbox-gl"],
           // 图表库单独打包（体积大）
-          'charts-vendor': ['recharts'],
+          "charts-vendor": ["recharts"],
           // 日期和工具库
-          'utils-vendor': ['date-fns', 'lodash']
-        }
-      }
+          "utils-vendor": ["date-fns", "lodash"],
+        },
+      },
     },
     // 提高chunk大小警告阈值（因为已经做了分块）
-    chunkSizeWarningLimit: 1000
-  }
+    chunkSizeWarningLimit: 1000,
+  },
 });
