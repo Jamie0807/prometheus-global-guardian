@@ -20,6 +20,7 @@ The system consolidates live hazard feeds, normalizes event data, renders global
 - [Runtime Requirements](#runtime-requirements)
 - [Configuration](#configuration)
 - [Local Development](#local-development)
+- [Testing](#testing)
 - [Docker Compose](#docker-compose)
 - [Python Analytics Service](#python-analytics-service)
 - [AI Assistant Provider](#ai-assistant-provider)
@@ -71,8 +72,8 @@ The platform consists of a React frontend, a lightweight Express API layer, a Py
 - Injects current hazard context into the system prompt.
 - Offers quick prompts for global situation review, flood risk, seismic activity, wildfire threat, forecasting, and emergency response.
 - Falls back to local demo responses when no model key is configured.
-- Prioritizes Volcengine Ark through an OpenAI-compatible Chat Completions endpoint.
-- Retains compatibility with generic OpenAI-format providers.
+- Uses the BFF router to send disaster-domain questions to ai-workflow and general conversation to Volcengine Ark.
+- Supports Ark's OpenAI-compatible Chat Completions and Responses protocols through the BFF.
 
 #### Reporting and Notifications
 
@@ -92,65 +93,69 @@ flowchart LR
   PublicFeeds["USGS / NASA EONET / GDACS"]
   LLM["Volcengine Ark / OpenAI-Compatible LLM"]
 
-  Browser -->|/api/authorize, /api/hazards/active| Express
+  Browser -->|/api/authorize, /api/hazards/*, /api/ai/chat| Express
   Express --> DisasterAware
   Express -->|/api/hazards aggregation| PublicFeeds
   Browser -->|analytics requests| Python
-  Browser -->|streaming chat completions| LLM
+  Express -->|routed streaming requests| LLM
 ```
 
-The Express layer currently handles production static hosting, DisasterAware API proxying, and multi-source hazard aggregation under `/api/hazards`.
+The Express BFF handles production static hosting, server-side DisasterAware authorization and proxying, AI provider routing, and multi-source hazard aggregation under `/api/hazards`. Browser assets never receive DisasterAware credentials, provider API keys, or upstream access tokens.
 
 The Python analytics service runs as an independent FastAPI process on port `8001` by default.
 
 ### Service Topology
 
-| Service | Runtime | Default Port | Responsibility |
-|---|---:|---:|---|
-| React / Vite client | Node.js | 5173 | Frontend development server |
-| Express server | Node.js | 8080 | Static hosting, API proxying, hazard aggregation |
-| Python analytics service | Python 3.13 | 8001 | Statistics, prediction, ETL, risk, quality APIs |
-| External LLM provider | SaaS | HTTPS | Chat completion and streaming response |
+| Service                  |     Runtime | Default Port | Responsibility                                   |
+| ------------------------ | ----------: | -----------: | ------------------------------------------------ |
+| React / Vite client      |     Node.js |         5173 | Frontend development server                      |
+| Express server           |     Node.js |         8080 | Static hosting, API proxying, hazard aggregation |
+| Python analytics service | Python 3.13 |         8001 | Statistics, prediction, ETL, risk, quality APIs  |
+| External LLM provider    |        SaaS |        HTTPS | Chat completion and streaming response           |
 
 ### Technology Stack
 
 #### Frontend
 
-| Technology | Purpose |
-|---|---|
-| React 19 | Component model and UI rendering |
-| TypeScript 5.9 | Static typing and application contracts |
-| Vite 7 | Development server and production build |
-| Mapbox GL | Interactive map rendering |
-| deck.gl / loaders.gl | Optional 3D Tiles integration |
-| Recharts | Analytics visualizations |
-| DOMPurify | Sanitization for rendered assistant output |
+| Technology           | Purpose                                    |
+| -------------------- | ------------------------------------------ |
+| React 19             | Component model and UI rendering           |
+| TypeScript 5.9       | Static typing and application contracts    |
+| Vite 7               | Development server and production build    |
+| Mapbox GL            | Interactive map rendering                  |
+| deck.gl / loaders.gl | Optional 3D Tiles integration              |
+| Recharts             | Analytics visualizations                   |
+| DOMPurify            | Sanitization for rendered assistant output |
 
 #### Backend and Analytics
 
-| Technology | Purpose |
-|---|---|
-| Express 5 | API proxy layer and production app server |
-| node-fetch | Server-side requests to external providers |
-| raw-body | Request body forwarding for proxied API calls |
-| FastAPI | Python analytics API service |
-| Pandas / NumPy | Data processing and numerical computation |
-| SciPy / Statsmodels | Statistical analysis |
-| Scikit-learn | Prediction and modeling workflows |
+| Technology          | Purpose                                       |
+| ------------------- | --------------------------------------------- |
+| Express 5           | API proxy layer and production app server     |
+| node-fetch          | Server-side requests to external providers    |
+| raw-body            | Request body forwarding for proxied API calls |
+| FastAPI             | Python analytics API service                  |
+| Pandas / NumPy      | Data processing and numerical computation     |
+| SciPy / Statsmodels | Statistical analysis                          |
+| Scikit-learn        | Prediction and modeling workflows             |
 
 ### Runtime Requirements
 
-| Runtime | Version |
-|---|---|
-| Node.js | 20.19.x |
-| npm | Compatible with Node 20.19 |
-| Python | 3.13 recommended for analytics |
+| Runtime | Version                           |
+| ------- | --------------------------------- |
+| Node.js | 20.19.x or later in the 20.x line |
+| pnpm    | 10.15.1                           |
+| Python  | 3.13 recommended for analytics    |
 
-The repository includes `.nvmrc`; use the following command to switch Node versions:
+The repository includes `.nvmrc`. Project commands automatically use the required Node.js version through nvm. To switch the current terminal session manually, use:
 
 ```bash
 nvm use
 ```
+
+If the required version is not installed, project commands install it automatically through nvm before starting. This requires nvm and network access on the first run.
+
+Docker images already include Node.js 20.19.0 and do not require nvm.
 
 ### Configuration
 
@@ -166,14 +171,14 @@ cp .env.example .env
 VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
 ```
 
-#### Optional DisasterAware Credentials
+#### Optional DisasterAware Credentials (server-side)
 
 ```dotenv
-VITE_USERNAME=your_username_here
-VITE_PASSWORD=your_password_here
+DISASTERAWARE_USERNAME=your_username_here
+DISASTERAWARE_PASSWORD=your_password_here
 ```
 
-When DisasterAware credentials are unavailable, the application can still use public feed fallbacks where supported.
+The Express BFF reads these credentials at runtime; browser assets never receive them. When unavailable, the application can still use public feed fallbacks where supported.
 
 #### Optional Python Analytics Endpoint
 
@@ -181,7 +186,16 @@ When DisasterAware credentials are unavailable, the application can still use pu
 VITE_PYTHON_API_URL=http://localhost:8001
 ```
 
-#### Optional AI Provider Configuration
+#### Optional 3D Tiles Configuration
+
+```dotenv
+VITE_3D_TILES_URL=
+VITE_CESIUM_ION_TOKEN=
+```
+
+3D Tiles are optional. When `VITE_3D_TILES_URL` is not set, the map falls back to Mapbox fill-extrusion buildings when supported by the style.
+
+#### Optional AI Provider Configuration (server-side)
 
 ```dotenv
 AI_PROVIDER=router
@@ -202,16 +216,25 @@ If the BFF runs in Docker while the workflow app runs on your host machine, use 
 
 ### Local Development
 
-Install dependencies:
+Install dependencies with the repository's pinned package manager:
 
 ```bash
-npm install
+pnpm install
 ```
 
-Start the frontend development server:
+`pnpm-lock.yaml` is the canonical lockfile for local and Docker installs. The existing `package-lock.json` is retained for legacy compatibility and is not used by the Dockerfile.
+
+Start the Express BFF in one terminal. It supplies `/api/authorize`, `/api/hazards/*`, and `/api/ai/chat` for the Vite proxy:
 
 ```bash
-npm run dev
+pnpm run build:server
+node dist-server/server.js
+```
+
+Start the frontend development server in a second terminal:
+
+```bash
+pnpm run dev
 ```
 
 Open:
@@ -220,21 +243,43 @@ Open:
 http://localhost:5173
 ```
 
+### Testing
+
+Run the current automated test suite:
+
+```bash
+pnpm test
+```
+
+The command runs the server-side BFF tests and then the frontend Service-layer Vitest tests. Current test sources live in `tests/`:
+
+- `tests/ai-provider.test.ts`: provider configuration and Ark / Workflow request construction.
+- `tests/ai-router.test.ts`: smart routing signals, live hazard context, forced provider modes, and fallback order.
+- `tests/ai-stream.test.ts`: Ark and Workflow SSE response conversion.
+- `tests/server-auth.test.ts`: BFF authorization, token injection, refresh, and local hazard aggregation.
+- `tests/service-http.test.ts`, `tests/service-adapters.test.ts`, `tests/service-analytics.test.ts`, and `tests/service-ai.test.ts`: frontend Service-layer unit tests.
+
+Run the two groups independently with `pnpm run test:bff` and `pnpm run test:services`. These tests do not open a browser or exercise React components, page interactions, or visual layout. The frontend component testing system and Playwright browser flows are tracked in the project optimization backlog.
+
 Run linting:
 
 ```bash
-npm run lint
+pnpm run lint
+pnpm run format:check
+pnpm run typecheck:client
+pnpm run typecheck:server
 ```
 
-Build the application:
+Command purposes:
 
-```bash
-npm run build
-```
+- `pnpm run lint`: runs ESLint to check code rules and potential issues.
+- `pnpm run format:check`: runs Prettier to verify formatting without changing files.
+- `pnpm run typecheck:client`: runs TypeScript checks for the React frontend without emitting files.
+- `pnpm run typecheck:server`: runs TypeScript checks for the Express BFF without emitting files.
 
-For real AI assistant calls during local Vite development, keep the Express BFF available on `http://localhost:8080` because `/api/ai/*` is proxied there. Docker Compose is the simplest way to run the full stack.
+For local Vite development, keep the Express BFF available on `http://localhost:8080`; Vite proxies all `/api` calls to it. Analytics requests go directly from the browser to `VITE_PYTHON_API_URL`. Docker Compose is the simplest way to run the full stack.
 
-#### Docker Compose
+### Docker Compose
 
 Docker Compose is the recommended one-command startup path for running the production web server, Express BFF, and Python analytics service together.
 
@@ -268,9 +313,11 @@ Follow logs:
 docker compose logs -f
 ```
 
-Docker reads safe build-time frontend variables from `.env`. By default, the Compose build only passes `VITE_MAPBOX_TOKEN` and `VITE_PYTHON_API_URL` into the frontend image. Do not bake DisasterAware credentials or model provider keys into browser assets; route those through a server-side proxy for production.
+Docker reads safe build-time frontend variables from `.env`. The Compose build only passes public `VITE_MAPBOX_TOKEN`, `VITE_PYTHON_API_URL`, and optional 3D Tiles variables into the frontend image. `DISASTERAWARE_*` and AI provider variables are passed only to the Express runtime. Do not bake credentials or model provider keys into browser assets.
 
 Keep `VITE_PYTHON_API_URL=http://localhost:8001` for the Docker setup because analytics requests are made by the browser through the host-published port.
+
+The Docker image uses the repository's `pnpm-lock.yaml` for reproducible dependency installation. Frontend build arguments are public; runtime secrets are provided to the Express container only.
 
 Check running containers:
 
@@ -300,11 +347,11 @@ python main.py
 
 Service endpoints:
 
-| URL | Purpose |
-|---|---|
-| `http://localhost:8001/health` | Health check |
-| `http://localhost:8001/docs` | Swagger API documentation |
-| `http://localhost:8001/redoc` | ReDoc API documentation |
+| URL                            | Purpose                   |
+| ------------------------------ | ------------------------- |
+| `http://localhost:8001/health` | Health check              |
+| `http://localhost:8001/docs`   | Swagger API documentation |
+| `http://localhost:8001/redoc`  | ReDoc API documentation   |
 
 ### AI Assistant Provider
 
@@ -326,19 +373,15 @@ If the provider does not start responding before `VOLCENGINE_ARK_TIMEOUT_MS`, th
 Build the client:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
-The build also compiles the Express BFF into `dist-server/`. To check server types without emitting files:
-
-```bash
-npm run typecheck:server
-```
+The build also compiles the Express BFF into `dist-server/`.
 
 Start the production Express server:
 
 ```bash
-npm start
+pnpm start
 ```
 
 Default server URL:
@@ -350,47 +393,58 @@ http://localhost:8080
 Static-only hosting:
 
 ```bash
-npm run start:static
+pnpm run start:static
 ```
 
 ### API Surface
 
 #### Express API Layer
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/hazards` | `GET` | Aggregates public hazard feeds from USGS, NASA EONET, and GDACS |
-| `/api/hazards?source=USGS,NASA` | `GET` | Filters aggregation by source |
-| `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET` | Filters aggregation by hazard type |
-| `/api/ai/chat` | `POST` | Streams AI assistant responses through the Express BFF |
-| `/api/*` | Any | Proxies remaining API calls to DisasterAware |
+| Endpoint                             | Method | Description                                                                                       |
+| ------------------------------------ | ------ | ------------------------------------------------------------------------------------------------- |
+| `/api/authorize`                     | `POST` | Authenticates with DisasterAware using server-side credentials; returns authorization status only |
+| `/api/hazards`                       | `GET`  | Aggregates public hazard feeds from USGS, NASA EONET, and GDACS                                   |
+| `/api/hazards?source=USGS,NASA`      | `GET`  | Filters aggregation by source                                                                     |
+| `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET`  | Filters aggregation by hazard type                                                                |
+| `/api/ai/chat`                       | `POST` | Streams AI assistant responses through the Express BFF                                            |
+| `/api/hazards/*`                     | Any    | Proxies authenticated DisasterAware hazard requests through the BFF                               |
+| `/api/*`                             | Any    | Proxies other authenticated API calls to DisasterAware                                            |
 
 #### Python Analytics API
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/health` | `GET` | Service health check |
-| `/api/v1/statistics` | `POST` | Statistical analysis |
-| `/api/v1/predictions` | `POST` | Predictive analysis |
-| `/api/v1/risk-assessment` | `POST` | Risk scoring and recommendations |
-| `/api/v1/etl/process` | `POST` | Data normalization and quality processing |
+| Endpoint                     | Method | Description                                              |
+| ---------------------------- | ------ | -------------------------------------------------------- |
+| `/`                          | `GET`  | Service information                                      |
+| `/health`                    | `GET`  | Service health check                                     |
+| `/metrics`                   | `GET`  | Service metrics summary                                  |
+| `/cache/clear`               | `POST` | Clear the analytics cache                                |
+| `/api/v1/analyze`            | `POST` | Run the unified analysis workflow                        |
+| `/api/v1/statistics`         | `POST` | Statistical analysis                                     |
+| `/api/v1/predictions`        | `POST` | Predictive analysis                                      |
+| `/api/v1/risk-assessment`    | `POST` | Risk scoring and recommendations                         |
+| `/api/v1/etl/process`        | `POST` | Data normalization and quality processing                |
+| `/api/v1/quality/assess`     | `POST` | Data quality assessment                                  |
+| `/api/v1/quality/thresholds` | `GET`  | Quality thresholds                                       |
+| `/api/v1/quality/history`    | `GET`  | Quality assessment history                               |
+| `/api/v1/pivot/*`            | `POST` | Pivot creation, query, trend, risk, and summary analysis |
+| `/api/v1/unified-model/*`    | `POST` | Unified model transformation and merge operations        |
 
 ### Data Sources
 
-| Source | Scope | Usage |
-|---|---|---|
-| DisasterAware | Active hazard and type APIs | Primary authenticated provider |
-| USGS | Earthquake GeoJSON feeds | Earthquake fallback and aggregation source |
-| NASA EONET | Environmental event tracking | Wildfire, volcano, flood, storm, drought, landslide events |
-| GDACS | Global disaster alerts | Global alert and coordination data |
+| Source        | Scope                        | Usage                                                      |
+| ------------- | ---------------------------- | ---------------------------------------------------------- |
+| DisasterAware | Active hazard and type APIs  | Primary authenticated provider                             |
+| USGS          | Earthquake GeoJSON feeds     | Earthquake fallback and aggregation source                 |
+| NASA EONET    | Environmental event tracking | Wildfire, volcano, flood, storm, drought, landslide events |
+| GDACS         | Global disaster alerts       | Global alert and coordination data                         |
 
 ### Operational Notes
 
 - The Python analytics service must be available at `VITE_PYTHON_API_URL` for workflows that call FastAPI endpoints.
 - When the Python service is offline, map and public hazard workflows can still run, while analytics panels may show offline or error states.
-- `npm start` serves the built app through Express and enables the backend `/api/hazards` aggregation endpoint.
+- `pnpm start` serves the built app through Express and enables the backend `/api/hazards` aggregation endpoint.
 - `docker compose up --build` is the recommended way to run the production Web / Express BFF and Python analytics service together.
-- `npm run dev` uses Vite for frontend development; `/api` requests are handled by the Vite proxy in development.
+- `pnpm run dev` uses Vite for frontend development; all `/api` requests are proxied to the local Express BFF.
 - Mapbox rendering requires a valid `VITE_MAPBOX_TOKEN`.
 - `dist/` is generated output and should be rebuilt for production releases.
 
@@ -399,15 +453,26 @@ npm run start:static
 - `.env` is ignored by git and must not be committed.
 - Variables prefixed with `VITE_` are exposed to browser assets; do not place production-only secrets there.
 - For production AI usage, prefer a server-side proxy for Volcengine Ark or other model providers.
-- Review proxy logging in `server.ts` before production deployment; current logs are useful for diagnostics but may expose sensitive headers or payloads.
+- Review proxy logging in `server.ts` before production deployment; current AI router logs omit message content and credentials, but deployment logging policies should still be checked.
 - DisasterAware credentials and model provider keys should be managed through deployment secret storage.
 
 ### Project Structure
 
 ```text
 prometheus-global-guardian/
+├── .husky/
+│   ├── commit-msg
+│   └── pre-commit
+├── docs/
+│   ├── PROJECT_OPTIMIZATION_BACKLOG.md
+│   └── superpowers/plans/
+│       ├── 2026-09-02-bff-typescript-migration.md
+│       ├── 2026-09-03-api-service-layer-unification.md
+│       └── 2026-09-03-project-governance.md
 ├── public/
-│   └── assets/
+│   └── assets/                  # Logo and static assets
+├── scripts/
+│   └── with-node-version.sh      # Run commands with the Node.js version from .nvmrc
 ├── python-analytics-service/
 │   ├── analytics/
 │   │   ├── etl_processor.py
@@ -419,19 +484,34 @@ prometheus-global-guardian/
 │   │   └── unified_model.py
 │   ├── main.py
 │   ├── requirements.txt
-│   └── start.sh
+│   ├── start.sh
+│   ├── demo_test.py
+│   ├── test_pivot_table.py
+│   └── test_service.py
 ├── src/
-│   ├── api/
+│   ├── api/                     # Backward-compatible API facades
 │   │   ├── aiAssistant.ts
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
 │   │   ├── hazards.ts
 │   │   └── pythonAnalytics.ts
-│   ├── components/
-│   ├── config/
-│   ├── types/
-│   ├── utils/
-│   ├── workers/
+│   ├── services/                # Frontend business and network services
+│   │   ├── ai/aiAssistantService.ts
+│   │   ├── analytics/
+│   │   │   ├── analyticsService.ts
+│   │   │   └── analyticsTypes.ts
+│   │   ├── auth/authService.ts
+│   │   ├── hazards/
+│   │   │   ├── hazardAdapters.ts
+│   │   │   └── hazardService.ts
+│   │   └── http/
+│   │       ├── httpClient.ts
+│   │       └── serviceError.ts
+│   ├── components/              # React UI components
+│   ├── config/                  # Public frontend configuration
+│   ├── types/                   # Shared frontend domain types
+│   ├── utils/                   # UI helpers and utilities
+│   ├── workers/                 # Web Workers
 │   ├── App.tsx
 │   ├── index.css
 │   └── index.tsx
@@ -442,15 +522,39 @@ prometheus-global-guardian/
 │   │   └── ai-stream.ts
 │   ├── env.ts
 │   └── express.d.ts
+├── tests/
+│   ├── ai-provider.test.ts
+│   ├── ai-router.test.ts
+│   ├── ai-stream.test.ts
+│   ├── server-auth.test.ts
+│   ├── service-adapters.test.ts
+│   ├── service-analytics.test.ts
+│   ├── service-ai.test.ts
+│   └── service-http.test.ts
+├── AGENTS.md                   # Project-level development constraints
+├── .gitignore
+├── .env.example
+├── .prettierignore
+├── .prettierrc.json
+├── cspell.json
+├── commitlint.config.cjs
 ├── hazards-source.ts
 ├── server.ts
-├── dist-server/          # Generated server output
+├── eslint.config.js
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+├── tsconfig.server.json
+├── tsconfig.server.test.json
 ├── start-python-service.sh
 ├── docker-compose.yml
 ├── .dockerignore
 ├── Dockerfile
-├── package.json
-└── vite.config.ts
+├── vite.config.ts
+└── vitest.config.ts
 ```
 
 ### License
@@ -475,6 +579,7 @@ Prometheus Global Guardian 是一套面向灾害监测、地理态势可视化�
 - [运行环境](#运行环境)
 - [配置](#配置)
 - [本地开发](#本地开发)
+- [测试](#测试)
 - [Docker Compose](#docker-compose-1)
 - [Python 分析服务](#python-分析服务)
 - [AI 助手模型服务](#ai-助手模型服务)
@@ -526,8 +631,8 @@ Prometheus Global Guardian 是一套面向灾害监测、地理态势可视化�
 - 自动将当前灾害上下文注入 System Prompt。
 - 提供全球态势、洪水、地震、野火、趋势预测、应急响应等快捷分析入口。
 - 未配置模型 Key 时自动进入本地 Demo 降级模式。
-- 优先支持火山方舟（Volcengine Ark）OpenAI-compatible Chat Completions 接口。
-- 保留通用 OpenAI-format 模型服务兼容能力。
+- 由 BFF Router 将灾害领域问题发送到 ai-workflow，将普通对话发送到火山方舟。
+- 通过 BFF 兼容火山方舟的 OpenAI-compatible Chat Completions 和 Responses 协议。
 
 #### 报告与通知
 
@@ -547,65 +652,69 @@ flowchart LR
   PublicFeeds["USGS / NASA EONET / GDACS"]
   LLM["Volcengine Ark / OpenAI-Compatible LLM"]
 
-  Browser -->|/api/authorize, /api/hazards/active| Express
+  Browser -->|/api/authorize, /api/hazards/*, /api/ai/chat| Express
   Express --> DisasterAware
   Express -->|/api/hazards aggregation| PublicFeeds
   Browser -->|analytics requests| Python
-  Browser -->|streaming chat completions| LLM
+  Express -->|routed streaming requests| LLM
 ```
 
-Express 层当前负责生产环境静态资源托管、DisasterAware API 代理，以及 `/api/hazards` 多源灾害数据聚合。
+Express BFF 当前负责生产环境静态资源托管、服务端 DisasterAware 鉴权和代理、AI provider 路由，以及 `/api/hazards` 多源灾害数据聚合。浏览器构建产物不会接收 DisasterAware 凭据、模型服务 Key 或上游 access token。
 
 Python 分析服务作为独立 FastAPI 进程运行，默认端口为 `8001`。
 
 ### 服务拓扑
 
-| 服务 | 运行时 | 默认端口 | 职责 |
-|---|---:|---:|---|
-| React / Vite client | Node.js | 5173 | 本地开发前端服务 |
-| Express server | Node.js | 8080 | 生产静态托管、API 代理、灾害聚合 |
-| Python analytics service | Python 3.13 | 8001 | 统计、预测、ETL、风险和数据质量接口 |
-| External LLM provider | SaaS | HTTPS | AI 对话补全和流式响应 |
+| 服务                     |      运行时 | 默认端口 | 职责                                |
+| ------------------------ | ----------: | -------: | ----------------------------------- |
+| React / Vite client      |     Node.js |     5173 | 本地开发前端服务                    |
+| Express server           |     Node.js |     8080 | 生产静态托管、API 代理、灾害聚合    |
+| Python analytics service | Python 3.13 |     8001 | 统计、预测、ETL、风险和数据质量接口 |
+| External LLM provider    |        SaaS |    HTTPS | AI 对话补全和流式响应               |
 
 ### 技术栈
 
 #### 前端
 
-| 技术 | 用途 |
-|---|---|
-| React 19 | UI 组件和渲染 |
-| TypeScript 5.9 | 静态类型和应用契约 |
-| Vite 7 | 开发服务和生产构建 |
-| Mapbox GL | 交互式地图渲染 |
+| 技术                 | 用途               |
+| -------------------- | ------------------ |
+| React 19             | UI 组件和渲染      |
+| TypeScript 5.9       | 静态类型和应用契约 |
+| Vite 7               | 开发服务和生产构建 |
+| Mapbox GL            | 交互式地图渲染     |
 | deck.gl / loaders.gl | 可选 3D Tiles 集成 |
-| Recharts | 分析图表 |
-| DOMPurify | AI 输出内容净化 |
+| Recharts             | 分析图表           |
+| DOMPurify            | AI 输出内容净化    |
 
 #### 后端与分析
 
-| 技术 | 用途 |
-|---|---|
-| Express 5 | API 代理层和生产服务 |
-| node-fetch | 服务端外部请求 |
-| raw-body | 代理请求体转发 |
-| FastAPI | Python 分析 API 服务 |
-| Pandas / NumPy | 数据处理和数值计算 |
-| SciPy / Statsmodels | 统计分析 |
-| Scikit-learn | 预测和建模流程 |
+| 技术                | 用途                 |
+| ------------------- | -------------------- |
+| Express 5           | API 代理层和生产服务 |
+| node-fetch          | 服务端外部请求       |
+| raw-body            | 代理请求体转发       |
+| FastAPI             | Python 分析 API 服务 |
+| Pandas / NumPy      | 数据处理和数值计算   |
+| SciPy / Statsmodels | 统计分析             |
+| Scikit-learn        | 预测和建模流程       |
 
 ### 运行环境
 
-| 运行时 | 版本 |
-|---|---|
-| Node.js | 20.19.x |
-| npm | 与 Node 20.19 兼容 |
-| Python | 推荐 3.13，用于分析服务 |
+| 运行时  | 版本                     |
+| ------- | ------------------------ |
+| Node.js | 20.19.x 或 20.x 最新版本 |
+| pnpm    | 10.15.1                  |
+| Python  | 推荐 3.13，用于分析服务  |
 
-仓库包含 `.nvmrc`，可用以下命令切换 Node 版本：
+仓库包含 `.nvmrc`。项目启动、构建、测试和代码检查命令会通过 nvm 自动使用要求的 Node.js 版本。需要手动切换当前终端会话时，可执行：
 
 ```bash
 nvm use
 ```
+
+如果要求的版本尚未安装，项目命令会在首次运行前通过 nvm 自动安装；首次安装需要 nvm 和网络访问权限。
+
+Docker 镜像已内置 Node.js 20.19.0，不需要安装 nvm。
 
 ### 配置
 
@@ -621,14 +730,14 @@ cp .env.example .env
 VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
 ```
 
-#### 可选 DisasterAware 凭据
+#### 可选 DisasterAware 凭据（仅服务端）
 
 ```dotenv
-VITE_USERNAME=your_username_here
-VITE_PASSWORD=your_password_here
+DISASTERAWARE_USERNAME=your_username_here
+DISASTERAWARE_PASSWORD=your_password_here
 ```
 
-未配置 DisasterAware 凭据时，应用仍可在支持的场景下使用公共数据源降级。
+Express BFF 会在运行时读取这些凭据，浏览器构建产物不会包含它们。未配置 DisasterAware 凭据时，应用仍可在支持的场景下使用公共数据源降级。
 
 #### 可选 Python 分析服务地址
 
@@ -636,7 +745,16 @@ VITE_PASSWORD=your_password_here
 VITE_PYTHON_API_URL=http://localhost:8001
 ```
 
-#### 可选 AI 模型服务配置
+#### 可选 3D Tiles 配置
+
+```dotenv
+VITE_3D_TILES_URL=
+VITE_CESIUM_ION_TOKEN=
+```
+
+3D Tiles 为可选能力。未配置 `VITE_3D_TILES_URL` 时，地图会在样式支持的情况下回退到 Mapbox fill-extrusion 建筑图层。
+
+#### 可选 AI 模型服务配置（仅服务端）
 
 ```dotenv
 AI_PROVIDER=router
@@ -657,16 +775,25 @@ VOLCENGINE_ARK_TIMEOUT_MS=30000
 
 ### 本地开发
 
-安装依赖：
+使用仓库固定的包管理器安装依赖：
 
 ```bash
-npm install
+pnpm install
 ```
 
-启动前端开发服务：
+`pnpm-lock.yaml` 是本地和 Docker 安装依赖时使用的规范锁文件。现有 `package-lock.json` 仅为兼容旧环境保留，Dockerfile 不会使用它。
+
+先在一个终端启动 Express BFF。它为 Vite 提供 `/api/authorize`、`/api/hazards/*` 和 `/api/ai/chat`：
 
 ```bash
-npm run dev
+pnpm run build:server
+node dist-server/server.js
+```
+
+再在第二个终端启动前端开发服务：
+
+```bash
+pnpm run dev
 ```
 
 访问：
@@ -675,27 +802,46 @@ npm run dev
 http://localhost:5173
 ```
 
+### 测试
+
+运行当前自动化测试：
+
+```bash
+pnpm test
+```
+
+该命令会先运行服务端 BFF 测试，再运行前端 Service 层的 Vitest 测试。当前测试代码都位于 `tests/`：
+
+- `tests/ai-provider.test.ts`：provider 配置以及 Ark / Workflow 请求构造。
+- `tests/ai-router.test.ts`：智能路由信号、实时灾害上下文、强制 provider 模式和 fallback 顺序。
+- `tests/ai-stream.test.ts`：Ark 和 Workflow 的 SSE 响应转换。
+- `tests/server-auth.test.ts`：BFF 鉴权、token 注入、过期刷新和本地灾害聚合测试。
+- `tests/service-http.test.ts`：统一 HTTP 客户端的成功、超时、重试和错误测试。
+- `tests/service-adapters.test.ts`：USGS、NASA、GDACS 数据适配测试。
+- `tests/service-analytics.test.ts`：Analytics 数据格式化和时间戳回退测试。
+- `tests/service-ai.test.ts`：AI 请求、SSE 增量、错误处理和 Demo 降级测试。
+
+拆分运行时可以使用 `pnpm run test:bff` 和 `pnpm run test:services`。当前 Service 测试属于前端业务层单元测试，但不会打开浏览器，也不会测试 React 组件、页面交互或视觉布局；组件测试和 Playwright 浏览器流程仍记录在项目待优化清单中。
+
 运行代码检查：
 
 ```bash
-npm run lint
+pnpm run lint
+pnpm run format:check
+pnpm run typecheck:client
+pnpm run typecheck:server
 ```
 
-构建应用：
+各命令用途如下：
 
-```bash
-npm run build
-```
+- `pnpm run lint`：运行 ESLint，检查代码规范和潜在问题。
+- `pnpm run format:check`：运行 Prettier 检查代码格式，不会修改文件。
+- `pnpm run typecheck:client`：运行 TypeScript 前端类型检查，不生成编译文件。
+- `pnpm run typecheck:server`：运行 TypeScript Express BFF 类型检查，不生成编译文件。
 
-构建命令也会将 Express BFF 编译到 `dist-server/`。只检查服务端类型而不生成文件：
+本地 Vite 开发时必须让 Express BFF 运行在 `http://localhost:8080`，Vite 会将所有 `/api` 请求代理到 BFF。Analytics 请求则由浏览器直接发送到 `VITE_PYTHON_API_URL`。最简单的全栈启动方式是 Docker Compose。
 
-```bash
-npm run typecheck:server
-```
-
-本地 Vite 开发环境如需调用真实 AI 助手，需要让 Express BFF 运行在 `http://localhost:8080`，因为 `/api/ai/*` 会代理到这里。最简单的全栈启动方式是 Docker Compose。
-
-#### Docker Compose
+### Docker Compose
 
 Docker Compose 是推荐的一键启动方式，可以同时运行生产 Web 服务、Express BFF 和 Python 分析服务。
 
@@ -729,9 +875,11 @@ docker compose down
 docker compose logs -f
 ```
 
-Docker 会从 `.env` 读取安全的前端构建期变量。默认 Compose 构建只会把 `VITE_MAPBOX_TOKEN` 和 `VITE_PYTHON_API_URL` 注入前端镜像。不要把 DisasterAware 凭据或模型服务 Key 打进浏览器产物；生产环境建议通过服务端代理承接这些请求。
+Docker 会从 `.env` 读取安全的前端构建期变量。Compose 构建只会把公开的 `VITE_MAPBOX_TOKEN`、`VITE_PYTHON_API_URL` 和可选 3D Tiles 变量注入前端镜像；`DISASTERAWARE_*` 和 AI provider 变量只注入 Express 运行时。不要把凭据或模型服务 Key 打进浏览器产物。
 
 Docker 场景建议保持 `VITE_PYTHON_API_URL=http://localhost:8001`，因为分析请求由浏览器通过宿主机暴露端口发起。
+
+Docker 镜像使用仓库的 `pnpm-lock.yaml` 安装固定依赖。前端构建参数均为公开配置；运行时密钥只注入 Express 容器。
 
 查看容器状态：
 
@@ -761,11 +909,11 @@ python main.py
 
 服务端点：
 
-| URL | 用途 |
-|---|---|
-| `http://localhost:8001/health` | 健康检查 |
-| `http://localhost:8001/docs` | Swagger API 文档 |
-| `http://localhost:8001/redoc` | ReDoc API 文档 |
+| URL                            | 用途             |
+| ------------------------------ | ---------------- |
+| `http://localhost:8001/health` | 健康检查         |
+| `http://localhost:8001/docs`   | Swagger API 文档 |
+| `http://localhost:8001/redoc`  | ReDoc API 文档   |
 
 ### AI 助手模型服务
 
@@ -787,13 +935,13 @@ BFF 会在 `VOLCENGINE_ARK_TIMEOUT_MS` 超时后返回脱敏的超时错误，�
 构建客户端：
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 启动生产 Express 服务：
 
 ```bash
-npm start
+pnpm start
 ```
 
 默认监听地址：
@@ -805,47 +953,58 @@ http://localhost:8080
 仅静态托管：
 
 ```bash
-npm run start:static
+pnpm run start:static
 ```
 
 ### API 接口
 
 #### Express API 层
 
-| 接口 | 方法 | 说明 |
-|---|---|---|
-| `/api/hazards` | `GET` | 聚合 USGS、NASA EONET 和 GDACS 公共灾害数据 |
-| `/api/hazards?source=USGS,NASA` | `GET` | 按数据源筛选聚合结果 |
-| `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET` | 按灾害类型筛选聚合结果 |
-| `/api/ai/chat` | `POST` | 通过 Express BFF 流式返回 AI 助手响应 |
-| `/api/*` | Any | 代理其余 API 到 DisasterAware |
+| 接口                                 | 方法   | 说明                                             |
+| ------------------------------------ | ------ | ------------------------------------------------ |
+| `/api/authorize`                     | `POST` | 使用服务端凭据请求 DisasterAware，只返回鉴权状态 |
+| `/api/hazards`                       | `GET`  | 聚合 USGS、NASA EONET 和 GDACS 公共灾害数据      |
+| `/api/hazards?source=USGS,NASA`      | `GET`  | 按数据源筛选聚合结果                             |
+| `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET`  | 按灾害类型筛选聚合结果                           |
+| `/api/ai/chat`                       | `POST` | 通过 Express BFF 流式返回 AI 助手响应            |
+| `/api/hazards/*`                     | Any    | 通过 BFF 代理已鉴权的 DisasterAware 灾害请求     |
+| `/api/*`                             | Any    | 通过 BFF 代理其他已鉴权的 DisasterAware API      |
 
 #### Python 分析 API
 
-| 接口 | 方法 | 说明 |
-|---|---|---|
-| `/health` | `GET` | 服务健康检查 |
-| `/api/v1/statistics` | `POST` | 统计分析 |
-| `/api/v1/predictions` | `POST` | 预测分析 |
-| `/api/v1/risk-assessment` | `POST` | 风险评分和建议 |
-| `/api/v1/etl/process` | `POST` | 数据标准化和质量处理 |
+| 接口                         | 方法   | 说明                                   |
+| ---------------------------- | ------ | -------------------------------------- |
+| `/`                          | `GET`  | 服务信息                               |
+| `/health`                    | `GET`  | 服务健康检查                           |
+| `/metrics`                   | `GET`  | 服务指标摘要                           |
+| `/cache/clear`               | `POST` | 清理分析缓存                           |
+| `/api/v1/analyze`            | `POST` | 执行统一分析流程                       |
+| `/api/v1/statistics`         | `POST` | 统计分析                               |
+| `/api/v1/predictions`        | `POST` | 预测分析                               |
+| `/api/v1/risk-assessment`    | `POST` | 风险评分和建议                         |
+| `/api/v1/etl/process`        | `POST` | 数据标准化和质量处理                   |
+| `/api/v1/quality/assess`     | `POST` | 数据质量评估                           |
+| `/api/v1/quality/thresholds` | `GET`  | 数据质量阈值                           |
+| `/api/v1/quality/history`    | `GET`  | 数据质量评估历史                       |
+| `/api/v1/pivot/*`            | `POST` | 透视表创建、查询、趋势、风险和汇总分析 |
+| `/api/v1/unified-model/*`    | `POST` | 统一模型转换和合并操作                 |
 
 ### 数据源
 
-| 数据源 | 范围 | 用途 |
-|---|---|---|
-| DisasterAware | 活跃灾害和灾害类型 API | 已配置凭据时的主要灾害数据源 |
-| USGS | 地震 GeoJSON 数据 | 地震降级和聚合数据源 |
-| NASA EONET | 环境事件追踪 | 野火、火山、洪水、风暴、干旱、滑坡等事件 |
-| GDACS | 全球灾害警报 | 全球警报和协调数据 |
+| 数据源        | 范围                   | 用途                                     |
+| ------------- | ---------------------- | ---------------------------------------- |
+| DisasterAware | 活跃灾害和灾害类型 API | 已配置凭据时的主要灾害数据源             |
+| USGS          | 地震 GeoJSON 数据      | 地震降级和聚合数据源                     |
+| NASA EONET    | 环境事件追踪           | 野火、火山、洪水、风暴、干旱、滑坡等事件 |
+| GDACS         | 全球灾害警报           | 全球警报和协调数据                       |
 
 ### 运维说明
 
 - Python 分析服务需要在 `VITE_PYTHON_API_URL` 指定地址可用，相关分析流程才可调用 FastAPI 接口。
 - Python 服务离线时，前端地图和公共灾害数据流程仍可运行，但分析面板可能显示离线或错误状态。
-- `npm start` 通过 Express 托管构建产物，并启用后端 `/api/hazards` 聚合接口。
+- `pnpm start` 通过 Express 托管构建产物，并启用后端 `/api/hazards` 聚合接口。
 - `docker compose up --build` 是推荐的一键启动方式，用于同时运行生产 Web / Express BFF 和 Python 分析服务。
-- `npm run dev` 使用 Vite 开发服务；开发环境下 `/api` 请求由 Vite proxy 处理。
+- `pnpm run dev` 使用 Vite 开发服务；开发环境下所有 `/api` 请求由 Vite proxy 转发到 Express BFF。
 - Mapbox 地图渲染需要有效的 `VITE_MAPBOX_TOKEN`。
 - `dist/` 是构建产物，生产发布前应重新构建。
 
@@ -854,15 +1013,26 @@ npm run start:static
 - `.env` 已被 git 忽略，不能提交。
 - 以 `VITE_` 开头的变量会暴露到浏览器构建产物中，不应放置生产级敏感密钥。
 - 生产环境使用 AI 服务时，建议通过服务端代理火山方舟或其他模型服务请求。
-- 生产部署前应审查 `server.ts` 的代理日志；当前日志有助于诊断，但可能输出敏感请求头或请求体。
+- 生产部署前应审查 `server.ts` 的代理日志；当前 AI Router 日志不记录消息内容或凭据，但仍应检查部署平台的日志策略。
 - DisasterAware 凭据和模型服务 Key 应由部署平台的密钥管理能力托管。
 
 ### 项目结构
 
 ```text
 prometheus-global-guardian/
+├── .husky/
+│   ├── commit-msg
+│   └── pre-commit
+├── docs/
+│   ├── PROJECT_OPTIMIZATION_BACKLOG.md
+│   └── superpowers/plans/
+│       ├── 2026-09-02-bff-typescript-migration.md
+│       ├── 2026-09-03-api-service-layer-unification.md
+│       └── 2026-09-03-project-governance.md
 ├── public/
-│   └── assets/
+│   └── assets/                  # Logo 和静态资源
+├── scripts/
+│   └── with-node-version.sh      # 读取 .nvmrc 并使用项目 Node.js 版本执行命令
 ├── python-analytics-service/
 │   ├── analytics/
 │   │   ├── etl_processor.py
@@ -874,19 +1044,37 @@ prometheus-global-guardian/
 │   │   └── unified_model.py
 │   ├── main.py
 │   ├── requirements.txt
-│   └── start.sh
+│   ├── start.sh
+│   ├── demo_test.py
+│   ├── test_pivot_table.py
+│   └── test_service.py
 ├── src/
-│   ├── api/
+│   ├── api/                     # 兼容旧调用方的 API facade
 │   │   ├── aiAssistant.ts
 │   │   ├── auth.ts
 │   │   ├── disasteraware.ts
 │   │   ├── hazards.ts
 │   │   └── pythonAnalytics.ts
-│   ├── components/
-│   ├── config/
-│   ├── types/
-│   ├── utils/
-│   ├── workers/
+│   ├── services/                # 前端业务和网络 Service 层
+│   │   ├── ai/aiAssistantService.ts
+│   │   ├── analytics/
+│   │   │   ├── analyticsService.ts
+│   │   │   └── analyticsTypes.ts
+│   │   ├── auth/authService.ts
+│   │   ├── hazards/
+│   │   │   ├── hazardAdapters.ts
+│   │   │   └── hazardService.ts
+│   │   └── http/
+│   │       ├── httpClient.ts
+│   │       └── serviceError.ts
+│   ├── components/              # React UI 组件
+│   ├── config/                  # 可公开的前端配置
+│   ├── types/                   # 前端领域共享类型
+│   ├── utils/                   # UI 辅助函数和工具
+│   │   ├── aiAssistant.ts
+│   │   ├── dataExport.ts
+│   │   └── notifications.ts
+│   ├── workers/                 # Web Worker
 │   ├── App.tsx
 │   ├── index.css
 │   └── index.tsx
@@ -897,15 +1085,39 @@ prometheus-global-guardian/
 │   │   └── ai-stream.ts
 │   ├── env.ts
 │   └── express.d.ts
+├── tests/
+│   ├── ai-provider.test.ts
+│   ├── ai-router.test.ts
+│   ├── ai-stream.test.ts
+│   ├── server-auth.test.ts
+│   ├── service-adapters.test.ts
+│   ├── service-analytics.test.ts
+│   ├── service-ai.test.ts
+│   └── service-http.test.ts
+├── AGENTS.md                   # 项目级开发约束
+├── .gitignore
+├── .env.example
+├── .prettierignore
+├── .prettierrc.json
+├── cspell.json
+├── commitlint.config.cjs
 ├── hazards-source.ts
+├── eslint.config.js
 ├── server.ts
-├── dist-server/          # 构建生成的服务端产物
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
 ├── start-python-service.sh
 ├── docker-compose.yml
 ├── .dockerignore
 ├── Dockerfile
-├── package.json
-└── vite.config.ts
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+├── tsconfig.server.json
+├── tsconfig.server.test.json
+├── vite.config.ts
+└── vitest.config.ts
 ```
 
 ### 许可证
