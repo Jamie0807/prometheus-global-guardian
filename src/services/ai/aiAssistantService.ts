@@ -278,7 +278,7 @@ async function runDemoMode(
 ${ctx ? `📡 当前平台正在监控 **${ctx.total} 条**活跃灾害事件。` : ""}
 
 > 💡 **提示**：你可以点击下方快捷问题，或直接输入想了解的内容。
-> 
+>
 > ⚙️ **配置真实 LLM**：在 \`.env\` 中设置 \`VOLCENGINE_ARK_API_KEY\` 和 \`VOLCENGINE_ARK_MODEL\`，由 Express BFF 调用火山方舟模型服务（当前为 Demo 演示模式）。`;
   }
 
