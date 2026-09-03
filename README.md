@@ -86,21 +86,25 @@ The platform consists of a React frontend, a lightweight Express API layer, a Py
 
 ```mermaid
 flowchart LR
-  Browser["React Client"]
-  Express["Express API Layer"]
-  Python["Python Analytics Service"]
-  DisasterAware["DisasterAware API"]
-  PublicFeeds["USGS / NASA EONET / GDACS"]
-  LLM["Volcengine Ark / OpenAI-Compatible LLM"]
+  Browser["React 19 frontend\nBrowser"]
+  Express["Express BFF\nNode.js · 8080"]
+  Python["Python analytics service\nFastAPI · 8001"]
+  DisasterAware["DisasterAware\nprimary provider"]
+  PublicFeeds["USGS · NASA EONET · GDACS\npublic fallback feeds"]
+  Workflow["ai-workflow\ndisaster knowledge / RAG"]
+  Ark["Volcengine Ark\ngeneral conversation"]
 
-  Browser -->|/api/authorize, /api/hazards/*, /api/ai/chat| Express
-  Express --> DisasterAware
+  Browser -->|/api/authorize\n/api/hazards/*\n/api/ai/chat| Express
+  Browser -->|/api/v1/*\nanalytics requests| Python
+  Express -->|authenticated proxy| DisasterAware
   Express -->|/api/hazards aggregation| PublicFeeds
-  Browser -->|analytics requests| Python
-  Express -->|routed streaming requests| LLM
+  Express -->|disaster-domain route| Workflow
+  Express -->|general-conversation route| Ark
 ```
 
-The Express BFF handles production static hosting, server-side DisasterAware authorization and proxying, AI provider routing, and multi-source hazard aggregation under `/api/hazards`. Browser assets never receive DisasterAware credentials, provider API keys, or upstream access tokens.
+In development, Vite serves the browser client on port `5173`; in production, Express serves the built client on port `8080`. Analytics requests go directly from the browser to FastAPI on port `8001`, while DisasterAware authorization/proxying, public hazard aggregation, and AI provider routing go through the Express BFF. Browser assets never receive DisasterAware credentials, provider API keys, or upstream access tokens.
+
+With `AI_PROVIDER=router`, disaster knowledge, emergency plans, and live hazard analysis use ai-workflow, while general conversation uses Volcengine Ark. Forced provider modes and local Demo fallback are also supported.
 
 The Python analytics service runs as an independent FastAPI process on port `8001` by default.
 
@@ -349,6 +353,8 @@ docker compose ps
 
 The analytics service runs independently from the React application and must be started separately when analytics features are required.
 
+See the dedicated [Python Analytics Service README](python-analytics-service/README.md) for its request model, endpoint catalog, test scripts, and known analysis limitations.
+
 Recommended command from the repository root:
 
 ```bash
@@ -507,6 +513,7 @@ prometheus-global-guardian/
 │   │   └── unified_model.py
 │   ├── main.py
 │   ├── requirements.txt
+│   ├── README.md
 │   ├── start.sh
 │   ├── demo_test.py
 │   ├── test_pivot_table.py
@@ -669,21 +676,25 @@ Prometheus Global Guardian 是一套面向灾害监测、地理态势可视化�
 
 ```mermaid
 flowchart LR
-  Browser["React 前端"]
-  Express["Express API 层"]
-  Python["Python 分析服务"]
-  DisasterAware["DisasterAware API"]
-  PublicFeeds["USGS / NASA EONET / GDACS"]
-  LLM["Volcengine Ark / OpenAI-Compatible LLM"]
+  Browser["React 19 前端客户端\nBrowser"]
+  Express["Express BFF\nNode.js · 8080"]
+  Python["Python 分析服务\nFastAPI · 8001"]
+  DisasterAware["DisasterAware\n主要数据提供方"]
+  PublicFeeds["USGS · NASA EONET · GDACS\n公共降级数据源"]
+  Workflow["ai-workflow\n灾害知识 / RAG"]
+  Ark["火山方舟\n通用对话"]
 
-  Browser -->|/api/authorize, /api/hazards/*, /api/ai/chat| Express
-  Express --> DisasterAware
-  Express -->|/api/hazards aggregation| PublicFeeds
-  Browser -->|analytics requests| Python
-  Express -->|routed streaming requests| LLM
+  Browser -->|/api/authorize\n/api/hazards/*\n/api/ai/chat| Express
+  Browser -->|/api/v1/*\n分析请求| Python
+  Express -->|服务端鉴权代理| DisasterAware
+  Express -->|/api/hazards 多源聚合| PublicFeeds
+  Express -->|灾害领域路由| Workflow
+  Express -->|普通对话路由| Ark
 ```
 
-Express BFF 当前负责生产环境静态资源托管、服务端 DisasterAware 鉴权和代理、AI provider 路由，以及 `/api/hazards` 多源灾害数据聚合。浏览器构建产物不会接收 DisasterAware 凭据、模型服务 Key 或上游 access token。
+开发环境由 Vite 在 `5173` 端口提供浏览器前端，生产环境由 Express 在 `8080` 端口托管构建产物。Analytics 请求由浏览器直接发送到 `8001` 端口的 FastAPI；DisasterAware 鉴权/代理、公共灾害数据聚合和 AI provider 路由经过 Express BFF。浏览器构建产物不会接收 DisasterAware 凭据、模型服务 Key 或上游 access token。
+
+当 `AI_PROVIDER=router` 时，灾害知识、应急预案和实时灾害分析调用 ai-workflow，普通对话调用火山方舟。项目同时支持强制指定 provider，以及未配置模型服务时的本地 Demo 降级。
 
 Python 分析服务作为独立 FastAPI 进程运行，默认端口为 `8001`。
 
@@ -939,6 +950,8 @@ docker compose ps
 
 分析服务独立于 React 应用运行，使用分析功能时需要单独启动。
 
+Python 服务的请求模型、完整接口、测试脚本和已知分析限制见 [Python 分析服务 README](python-analytics-service/README.md)。
+
 推荐从仓库根目录执行：
 
 ```bash
@@ -1095,6 +1108,7 @@ prometheus-global-guardian/
 │   │   └── unified_model.py
 │   ├── main.py
 │   ├── requirements.txt
+│   ├── README.md
 │   ├── start.sh
 │   ├── demo_test.py
 │   ├── test_pivot_table.py

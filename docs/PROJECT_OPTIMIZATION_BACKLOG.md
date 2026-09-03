@@ -44,6 +44,7 @@
 | P1     | 前端状态归属梳理                  | 待开始 | 降低耦合和无效重渲染                                   | 第二批   |
 | P1     | Python 服务结构整理               | 待开始 | 提升后端服务可维护性                                   | 第二批   |
 | P1     | Python API 契约与分析可靠性       | 待开始 | 让请求模型、缓存指标、错误语义和算法结果可验证         | 第二批   |
+| P1     | Analytics 结果语义与展示一致性    | 待开始 | 让预测、风险和质量结果可解释、可比较、可操作           | 第二批   |
 | P1     | 外部数据源时效性与韧性            | 待开始 | 提升刷新稳定性、降级可见性和数据新鲜度                 | 第二批   |
 | P1     | AI 流式会话生命周期治理           | 待开始 | 支持取消、输入限额、断流处理和成本控制                 | 第二批   |
 | P1     | 前端测试体系                      | 已完成 | 覆盖组件行为和关键页面交互，降低前端改动风险           | 第二批   |
@@ -62,7 +63,7 @@
 | --------------------- | ------ | --------------------------------------------------------------------------------------- |
 | Docker 一键启动前后端 | 已完成 | 通过 Docker Compose 同时启动 Web / Express BFF 和 Python FastAPI 分析服务               |
 | AI 助手 BFF 化改造    | 已完成 | 通过 Express BFF 统一封装 ai-workflow 与火山方舟模型调用，前端只消费 `/api/ai/chat`     |
-| AI BFF TypeScript 化  | 已完成 | 服务端源码统一为 TypeScript，编译到 `dist-server` 后由生产环境启动                      |
+| BFF TypeScript 化     | 已完成 | 服务端源码统一为 TypeScript，编译到 `dist-server` 后由生产环境启动                      |
 | API / Service 层统一  | 已完成 | 增加统一 HTTP 错误契约，完成鉴权、灾害、Analytics、AI Service 拆分，并保留 API 兼容入口 |
 
 ### Docker 一键启动前后端
@@ -124,7 +125,7 @@ AIChatAssistant
 - `AI_PROVIDER=workflow` 时，Docker 容器内确认 provider 为 workflow，协议为 workflow，并会在请求 Body 中发送 `stream: true`。
 - 未配置所选 provider 必要参数时，`POST /api/ai/chat` 返回 503 配置缺失状态，前端会降级到 Demo 模式。
 
-### AI BFF TypeScript 化
+### BFF TypeScript 化
 
 已完成 AI BFF 及其运行时依赖的 TypeScript 迁移：
 
@@ -147,7 +148,7 @@ AIChatAssistant
 - 仓库其他历史 JavaScript 配置文件仍保留；本次只迁移服务端运行时和 AI BFF，避免扩大改动范围。
 - 本机 Node 版本应遵循项目声明的 `>=20.19 <21`，以保持和 Docker runtime 一致。
 
-## AI 助手智能路由计划
+## P0：AI 助手智能路由
 
 当前 AI 助手通过 BFF 中的 LLM Router 判断请求路径：
 
@@ -190,10 +191,12 @@ AIChatAssistant
 - `src/services/analytics/analyticsService.ts` 的 `formatHazards` 仍主要读取 `h.properties.*`，会把现有扁平数据转换成默认标题、当前时间、`unknown` 严重性和空震级。
 - 同一 Service 的 4D 方法发送 `{ data: formattedData }`，而 `python-analytics-service/main.py` 的 `AnalysisRequest` 要求 `hazards`。
 - `AnalysisRequest` 没有声明 `time_dim`、`geo_dim`、`time_range`、`regions`、`types`、`severities` 和 `time_window`，这些参数即使传入也不会按接口说明生效。
+- `formatHazards` 对真实 `Hazard` 主要读取 `properties.magnitude`、`properties.timestamp`、`properties.severity` 和 `properties.source`；当前顶层字段会被转换成 `null`、当前时间、`unknown` 或默认来源。
 
 ### 风险
 
 - 统计、预测、风险评估可能基于错误字段运行。
+- 当顶层震级被转换为 `null` 时，地震预测的 `magnitude >= 4` 过滤会把有效事件全部排除，最终显示“数据不足 / N/A”；时间字段丢失还会污染 7 天趋势。
 - 4D 透视、趋势和风险评分请求可能直接返回 422，或静默使用默认参数。
 - 前后端字段变更无法由类型系统及时发现。
 
@@ -246,6 +249,7 @@ AIChatAssistant
 - `cache_response` 装饰器已定义但没有应用到分析路由；`/metrics` 宣称的缓存命中率不能代表实际分析缓存状态。
 - 多个接口把 `str(e)` 直接放入响应；算法模块大量捕获宽泛异常并返回空表、默认值或错误字典，调用方难以区分“无数据”“算法失败”和“输入无效”。
 - `unified_model.py` 对部分灾害类型使用零阈值或估算 magnitude，当前结果的业务含义和置信度没有统一说明。
+- `quality_monitor.py` 的已知类型、来源和严重程度集合与前端实际的大写值及 `DisasterAWARE` 来源不一致；同一记录可因多个问题重复计数，导致一致性得分低于 0（例如截图中的 `-200%`）。
 - 多个专用分析接口直接在 `async` 路由中执行 Pandas 和模型计算，可能阻塞 FastAPI 事件循环；当前只有综合分析使用线程池并行。
 
 ### 建议与验收
@@ -254,7 +258,23 @@ AIChatAssistant
 - 要么真正接入并验证缓存，要么删除虚假缓存指标；明确缓存键包含完整输入而不是仅长度、类型和首尾时间。
 - 生产响应只返回稳定错误码和用户可理解的消息，详细异常写入受控日志。
 - 为空数据、脏数据、缺少 magnitude、无时间序列和模型失败建立确定性测试，并对风险分数、置信度和阈值写出业务定义。
+- 统一枚举大小写和来源别名，按质量维度定义独立分母，限制最终评分在 `0-1` / `0-100` 合法范围内，并为负分、NaN、Infinity 和未知枚举增加回归测试。
 - 为 CPU 密集型分析统一使用线程池或任务队列，限制并发和单请求计算量，并用延迟/吞吐基准验证改造收益。
+
+## P1：Analytics 结果语义与展示一致性
+
+### 当前缺口
+
+- 预测模型会返回 `insufficient_data`，但前端主要展示 `N/A` 和“数据不足，无法预测”，没有显示实际数据量、最低样本要求或“暂不具备预测条件”的明确状态。
+- 风险评估会同时使用总体风险分数和独立规则生成建议，可能出现总体显示 `LOW`、建议却提示高地震活动的组合；当前结果没有解释两个结论的触发依据。
+- 预测、风险和数据质量面板存在英文建议与中文界面混用，状态名称、分数单位和百分比口径也没有统一说明。
+
+### 建议与验收
+
+- 为预测结果定义 `status`、`reason`、`dataPoints`、`minimumDataPoints` 和 `confidence` 等稳定字段；前端分别展示可用、样本不足、模型失败和服务不可用。
+- 为风险建议返回规则标识、触发指标和严重程度，明确总体评分与单项告警可以同时存在的业务关系，避免只显示互相冲突的自然语言。
+- 统一分数单位和精度，所有 UI 展示前验证有限数值、范围和缺失状态；不把 `undefined`、`NaN` 或负数直接格式化到页面。
+- 建立中英文文案资源和 Analytics 结果契约测试，覆盖样本不足、模型失败、低风险高关注项、质量负分和未知枚举。
 
 ## P1：外部数据源时效性与韧性
 
@@ -308,7 +328,7 @@ AIChatAssistant
 
 `src/services/analytics/analyticsService.ts`、`AnalyticsPage.tsx`、`ChartsPanel.tsx`、`DataQualityMonitor.tsx` 等仍大量使用 `any[]`、`Promise<any>` 和动态字段。应优先为 Analytics、图表、质量报告、钻取和导出定义稳定的响应类型与类型守卫；保留 `unknown` 只作为外部输入边界，并逐步把 ESLint 的 `no-explicit-any` 从 warning 提升为受控 error。
 
-## P0：拆分地图模块
+## P0：地图模块拆分
 
 ### 当前状态
 
@@ -360,7 +380,7 @@ src/features/map/
 - GeoJSON 生成逻辑有测试，覆盖 id、坐标、颜色、筛选行为。
 - 地图样式切换后，自定义图层仍能正确恢复。
 
-## P0：拆分分析页面
+## P0：分析页面拆分
 
 ### 当前状态
 
@@ -410,7 +430,7 @@ src/features/analytics/
 - 图表弹窗组件只接收明确类型的 props。
 - Python 分析 API 调用统一走 service 模块。
 
-## P0：统一 API 和 Service 层
+## P0：API / Service 层统一
 
 ### 当前实现状态
 
@@ -472,7 +492,7 @@ src/services/
 - AI 助手组件不直接暴露 provider 特有请求细节。
 - 网络错误、鉴权失败、响应结构异常已有统一处理方式。
 
-## P1：梳理前端状态归属
+## P1：前端状态归属梳理
 
 ### 当前状态
 
@@ -522,7 +542,7 @@ src/features/ui/
 - 弹窗状态被统一管理。
 - 地图实例、Marker 和 overlay 仍由地图专属 Hook 管理。
 
-## P1：整理 Python 分析服务结构
+## P1：Python 服务结构整理
 
 ### 当前状态
 
@@ -568,7 +588,7 @@ python-analytics-service/
 - 请求和响应模型放在 `schemas` 下。
 - 现有接口保持向后兼容。
 
-## P1：建设基础测试体系
+## P1：测试基线建设
 
 ### 当前状态
 
@@ -598,7 +618,7 @@ Python：
 - 本地质量基线包含 lint、格式、前后端类型检查、build、BFF 测试、Service 测试、React 组件测试和 Playwright 冒烟测试；Python 测试接入 CI 后再纳入统一命令。
 - 核心转换逻辑不依赖浏览器或 Mapbox 就能测试。
 
-## P1：建设前端测试体系
+## P1：前端测试体系
 
 ### 当前状态
 
@@ -620,7 +640,7 @@ Python：
 - 当前 E2E 失败时保留截图，重试时保留 trace；桌面端首页关键流程已覆盖，移动端和视觉回归待后续建设。
 - 增加 `pnpm run test:baseline`，统一执行 lint、格式、类型检查、build、前端测试和 BFF 测试；Python 测试接入 CI 后补入统一门禁。
 
-## P2：优化仓库结构
+## P2：仓库 / 包结构调整
 
 ### 当前状态
 
@@ -649,7 +669,7 @@ scripts/
 - 共享契约可以版本化或自动生成。
 - 根目录仍保留简单的开发启动命令。
 
-## P2：清理依赖和构建卫生
+## P2：依赖清理
 
 ### 当前状态
 
@@ -668,7 +688,7 @@ scripts/
 - 依赖分组能反映运行时归属。
 - 生产 bundle 体积可以被检查或周期性评估。
 
-## P2：提升生产可用性
+## P2：可观测性和错误上报
 
 ### 建议动作
 
