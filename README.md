@@ -245,13 +245,13 @@ http://localhost:5173
 
 ### Testing
 
-Run the current automated test suite:
+Run the unit-test suite:
 
 ```bash
 pnpm test
 ```
 
-The command runs the server-side BFF tests and then the frontend Service-layer Vitest tests. Current test sources live in `tests/`:
+`pnpm test` is an alias for `pnpm run test:unit`. It runs the server-side BFF tests and the frontend Service-layer Vitest tests. Current test sources live in `tests/`:
 
 - `tests/ai-provider.test.ts`: provider configuration and Ark / Workflow request construction.
 - `tests/ai-router.test.ts`: smart routing signals, live hazard context, forced provider modes, and fallback order.
@@ -259,7 +259,27 @@ The command runs the server-side BFF tests and then the frontend Service-layer V
 - `tests/server-auth.test.ts`: BFF authorization, token injection, refresh, and local hazard aggregation.
 - `tests/service-http.test.ts`, `tests/service-adapters.test.ts`, `tests/service-analytics.test.ts`, and `tests/service-ai.test.ts`: frontend Service-layer unit tests.
 
-Run the two groups independently with `pnpm run test:bff` and `pnpm run test:services`. These tests do not open a browser or exercise React components, page interactions, or visual layout. The frontend component testing system and Playwright browser flows are tracked in the project optimization backlog.
+Run the two unit-test groups independently with `pnpm run test:bff` and `pnpm run test:services`. These tests do not open a browser or exercise React components, page interactions, or visual layout.
+
+Run React component tests with Vitest, React Testing Library, and jsdom:
+
+```bash
+pnpm run test:component
+```
+
+Run the browser smoke test with Playwright. The test starts the local production server and mocks DisasterAware, hazard feeds, Mapbox, and the AI provider:
+
+```bash
+pnpm run test:e2e
+```
+
+Run the complete local quality baseline:
+
+```bash
+pnpm run test:baseline
+```
+
+The baseline runs ESLint, Prettier check, client and server type checks, BFF and Service unit tests, React component tests, the Playwright smoke test, and the production build. See [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md) for current counts, boundaries, and known non-blocking warnings.
 
 Run linting:
 
@@ -465,9 +485,11 @@ prometheus-global-guardian/
 │   └── pre-commit
 ├── docs/
 │   ├── PROJECT_OPTIMIZATION_BACKLOG.md
+│   ├── TESTING_BASELINE.md
 │   └── superpowers/plans/
 │       ├── 2026-09-02-bff-typescript-migration.md
 │       ├── 2026-09-03-api-service-layer-unification.md
+│       ├── 2026-09-03-frontend-testing-baseline.md
 │       └── 2026-09-03-project-governance.md
 ├── public/
 │   └── assets/                  # Logo and static assets
@@ -520,6 +542,11 @@ prometheus-global-guardian/
 │   ├── env.ts
 │   └── express.d.ts
 ├── tests/
+│   ├── component/
+│   │   ├── setup.ts
+│   │   └── status-panel.test.tsx
+│   ├── e2e/
+│   │   └── app-smoke.spec.ts
 │   ├── ai-provider.test.ts
 │   ├── ai-router.test.ts
 │   ├── ai-stream.test.ts
@@ -549,7 +576,9 @@ prometheus-global-guardian/
 ├── .dockerignore
 ├── Dockerfile
 ├── vite.config.ts
-└── vitest.config.ts
+├── vitest.config.ts
+├── vitest.component.config.ts
+└── playwright.config.ts
 ```
 
 ### License
@@ -799,13 +828,13 @@ http://localhost:5173
 
 ### 测试
 
-运行当前自动化测试：
+运行单元测试：
 
 ```bash
 pnpm test
 ```
 
-该命令会先运行服务端 BFF 测试，再运行前端 Service 层的 Vitest 测试。当前测试代码都位于 `tests/`：
+`pnpm test` 是 `pnpm run test:unit` 的别名，会先运行服务端 BFF 测试，再运行前端 Service 层的 Vitest 测试。当前测试代码都位于 `tests/`：
 
 - `tests/ai-provider.test.ts`：provider 配置以及 Ark / Workflow 请求构造。
 - `tests/ai-router.test.ts`：智能路由信号、实时灾害上下文、强制 provider 模式和 fallback 顺序。
@@ -816,7 +845,31 @@ pnpm test
 - `tests/service-analytics.test.ts`：Analytics 数据格式化和时间戳回退测试。
 - `tests/service-ai.test.ts`：AI 请求、SSE 增量、错误处理和 Demo 降级测试。
 
-拆分运行时可以使用 `pnpm run test:bff` 和 `pnpm run test:services`。当前 Service 测试属于前端业务层单元测试，但不会打开浏览器，也不会测试 React 组件、页面交互或视觉布局；组件测试和 Playwright 浏览器流程仍记录在项目待优化清单中。
+拆分运行时可以使用 `pnpm run test:bff` 和 `pnpm run test:services`。Service 测试属于前端业务层单元测试，不会打开浏览器，也不会测试 React 组件、页面交互或视觉布局。
+
+运行 React 组件测试：
+
+```bash
+pnpm run test:component
+```
+
+该命令使用 Vitest、React Testing Library 和 jsdom，验证组件的加载状态、用户交互和对外回调。当前组件测试位于 `tests/component/`。
+
+运行 Playwright 浏览器冒烟测试：
+
+```bash
+pnpm run test:e2e
+```
+
+该命令会启动本地生产服务，使用 mock 隔离 DisasterAware、灾害数据源、Mapbox 和 AI provider，并验证首页加载、灾害类型筛选、AI 助手打开和消息展示。当前 E2E 测试位于 `tests/e2e/`；失败时会保留截图，重试时保留 trace。
+
+运行完整测试基线：
+
+```bash
+pnpm run test:baseline
+```
+
+该命令依次执行 ESLint、Prettier、前后端类型检查、BFF/Service 单元测试、React 组件测试、Playwright 冒烟测试和生产构建。当前测试数量、覆盖边界和已知非阻塞 warning 见 [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md)。
 
 运行代码检查：
 
@@ -1020,9 +1073,11 @@ prometheus-global-guardian/
 │   └── pre-commit
 ├── docs/
 │   ├── PROJECT_OPTIMIZATION_BACKLOG.md
+│   ├── TESTING_BASELINE.md
 │   └── superpowers/plans/
 │       ├── 2026-09-02-bff-typescript-migration.md
 │       ├── 2026-09-03-api-service-layer-unification.md
+│       ├── 2026-09-03-frontend-testing-baseline.md
 │       └── 2026-09-03-project-governance.md
 ├── public/
 │   └── assets/                  # Logo 和静态资源
@@ -1078,6 +1133,11 @@ prometheus-global-guardian/
 │   ├── env.ts
 │   └── express.d.ts
 ├── tests/
+│   ├── component/
+│   │   ├── setup.ts
+│   │   └── status-panel.test.tsx
+│   ├── e2e/
+│   │   └── app-smoke.spec.ts
 │   ├── ai-provider.test.ts
 │   ├── ai-router.test.ts
 │   ├── ai-stream.test.ts
@@ -1107,7 +1167,9 @@ prometheus-global-guardian/
 ├── tsconfig.server.json
 ├── tsconfig.server.test.json
 ├── vite.config.ts
-└── vitest.config.ts
+├── vitest.config.ts
+├── vitest.component.config.ts
+└── playwright.config.ts
 ```
 
 ### 许可证

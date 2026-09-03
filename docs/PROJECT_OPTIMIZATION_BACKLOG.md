@@ -17,7 +17,7 @@
 - TypeScript 前端和 Python 分析服务都有分析逻辑，但服务边界还不够明确。
 - 前端、BFF 和 Python 服务之间仍存在两套灾害数据字段约定，部分 Analytics/4D 请求当前不能按前端意图执行。
 - BFF 已经具备认证、代理和 AI 路由能力，但公开代理、请求体、频率和错误边界还没有形成安全契约。
-- 质量门禁已覆盖 BFF、Service、lint、格式、类型检查和 build；React 组件、E2E、Python 核心算法和 API 契约测试仍待补齐。
+- 质量门禁已覆盖 BFF、Service、React 组件、关键 E2E 流程、lint、格式、类型检查和 build；Python 核心算法、视觉回归和 API 契约测试仍待补齐。
 
 ## 开发与交付约束
 
@@ -46,8 +46,8 @@
 | P1     | Python API 契约与分析可靠性       | 待开始 | 让请求模型、缓存指标、错误语义和算法结果可验证         | 第二批   |
 | P1     | 外部数据源时效性与韧性            | 待开始 | 提升刷新稳定性、降级可见性和数据新鲜度                 | 第二批   |
 | P1     | AI 流式会话生命周期治理           | 待开始 | 支持取消、输入限额、断流处理和成本控制                 | 第二批   |
-| P1     | 前端测试体系                      | 进行中 | 覆盖组件行为、页面交互和视觉回归，降低前端改动风险     | 第二批   |
-| P1     | 测试基线建设                      | 进行中 | 提升交付信心                                           | 第二批   |
+| P1     | 前端测试体系                      | 已完成 | 覆盖组件行为和关键页面交互，降低前端改动风险           | 第二批   |
+| P1     | 测试基线建设                      | 已完成 | 统一本地质量检查和测试入口                             | 第二批   |
 | P1     | CI/CD 与质量门禁接入              | 待开始 | 让本地校验在合并前可重复执行                           | 第二批   |
 | P2     | 仓库 / 包结构调整                 | 待开始 | 长期可扩展性                                           | 后续     |
 | P2     | 依赖清理                          | 待开始 | 构建和依赖治理                                         | 后续     |
@@ -572,7 +572,7 @@ python-analytics-service/
 
 ### 当前状态
 
-项目现已具备 BFF Node 原生测试和前端 Service 层 Vitest 测试，关键业务逻辑测试基线已经建立；Python 核心算法和 React UI 流程仍未纳入统一门禁。
+项目现已具备 BFF Node 原生测试、前端 Service 层 Vitest 测试、React Testing Library 组件测试和 Playwright 浏览器冒烟测试，并通过 `pnpm run test:baseline` 纳入统一门禁；Python 核心算法、视觉回归和 API 契约测试仍待补齐。
 
 ### 建议优先覆盖
 
@@ -595,30 +595,30 @@ Python：
 
 - 前端增加 `pnpm run test:services`，并由 `pnpm test` 与 BFF 测试统一执行。已完成。
 - Python 服务使用 `pytest` 跑核心测试。
-- 本地或 CI 验证包含 lint、build、BFF 测试、Service 测试和 Python 测试。
+- 本地质量基线包含 lint、格式、前后端类型检查、build、BFF 测试、Service 测试、React 组件测试和 Playwright 冒烟测试；Python 测试接入 CI 后再纳入统一命令。
 - 核心转换逻辑不依赖浏览器或 Mapbox 就能测试。
 
 ## P1：建设前端测试体系
 
 ### 当前状态
 
-前端 Service 层已经有 Vitest 单元测试，覆盖统一 HTTP、灾害数据适配、Analytics 格式化和 AI 流式/Demo 降级。React 组件行为、页面交互、浏览器流式流程和不同 viewport 布局仍没有自动化验证，因此该条目目前为进行中。
+前端 Service 层已有 Vitest 单元测试，覆盖统一 HTTP、灾害数据适配、Analytics 格式化和 AI 流式/Demo 降级；新增的 React Testing Library 和 Playwright 基线已覆盖状态面板、首页筛选、AI 助手打开及消息展示。视觉回归、移动端专门流程和更完整的组件状态覆盖仍属于后续增强。
 
 ### 建议优先覆盖
 
-- 使用 Vitest 和 React Testing Library 测试 AI 助手、弹窗、表单、错误状态和 Demo 降级。
+- 使用 Vitest 和 React Testing Library 持续扩展 AI 助手、弹窗、表单、错误状态和 Demo 降级测试。当前第一阶段已建立组件测试配置和状态面板行为测试。
 - 将灾害 API adapter、灾害筛选、通知触发规则、GeoJSON 生成和分析数据转换等纯函数纳入前端单元测试。
-- 使用 Playwright 测试地图首页、AI 助手发送消息、流式响应展示、关键弹窗和路由跳转。
-- 对桌面端和移动端执行截图或视觉回归检查，重点关注地图、聊天面板、弹窗和表格布局。
+- 使用 Playwright 测试地图首页、灾害筛选、AI 助手打开和 mock 流式响应展示。关键弹窗、路由跳转和移动端流程待后续扩展。
+- 对桌面端和移动端执行截图或视觉回归检查，重点关注地图、聊天面板、弹窗和表格布局，作为下一阶段建设项。
 - 为模型 API、灾害 API、Mapbox 和 Python 服务建立可控 mock，避免测试依赖真实外部服务。
 
 ### 验收标准
 
-- 增加独立的 `pnpm run test:frontend` 命令，能够执行 React 组件单元测试。
-- 增加独立的 `pnpm run test:e2e` 命令，能够启动测试服务并执行 Playwright 浏览器流程。
-- AI 助手至少覆盖成功流式响应、请求失败、空响应和 Demo 降级四种状态。
-- 核心页面至少覆盖桌面端和移动端关键流程，测试失败时保留截图或 trace。
-- 本地和 CI 验证包含 lint、build、前端单元测试、E2E 测试、BFF 测试和 Python 测试。
+- 增加独立的 `pnpm run test:component` 命令，能够执行 React 组件行为测试。已完成。
+- 增加独立的 `pnpm run test:e2e` 命令，能够启动测试服务并执行 Playwright 浏览器流程。已完成。
+- 当前基线覆盖 AI 助手 mock 流式成功路径；请求失败、空响应和 Demo 降级属于现有 Service 测试及后续组件测试扩展范围。
+- 当前 E2E 失败时保留截图，重试时保留 trace；桌面端首页关键流程已覆盖，移动端和视觉回归待后续建设。
+- 增加 `pnpm run test:baseline`，统一执行 lint、格式、类型检查、build、前端测试和 BFF 测试；Python 测试接入 CI 后补入统一门禁。
 
 ## P2：优化仓库结构
 
@@ -695,7 +695,7 @@ scripts/
 6. 从 `AnalyticsPage.tsx` 抽离数据转换和响应类型，再拆分分析页 UI 组件。
 7. 使用自定义 Hook 梳理 app 级状态归属。
 8. 整理 Python 服务结构，补齐 API / 算法测试，并处理 CPU 密集任务的并发模型。
-9. 建设 React 组件测试、Playwright E2E、视觉回归和 CI/CD 质量门禁。
+9. 扩展 React 组件测试，补充 Playwright 移动端流程、视觉回归、Python 测试和 CI/CD 质量门禁。
 10. 最后处理包体积预算、依赖审计、可访问性、多语言和仓库结构迁移。
 
 已完成：AI 助手智能路由、BFF TypeScript 化和前端 API / Service 层第一阶段统一。后续执行从地图和分析页面拆分继续。

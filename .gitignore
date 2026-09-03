@@ -13,6 +13,8 @@ dist
 dist-server
 dist-ssr
 *.local
+playwright-report/
+test-results/
 
 # Environment variables
 .env
