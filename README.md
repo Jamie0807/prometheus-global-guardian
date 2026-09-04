@@ -285,6 +285,15 @@ pnpm run test:baseline
 
 The baseline runs ESLint, Prettier check, client and server type checks, BFF and Service unit tests, React component tests, the Playwright smoke test, and the production build. See [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md) for current counts, boundaries, and known non-blocking warnings.
 
+Run the Python API contract tests separately from the repository root:
+
+```bash
+cd python-analytics-service
+python -m unittest discover -s tests -p 'test_*.py'
+```
+
+These tests do not require a running analytics service. They validate the shared `hazards` request shape, 4D parameter validation, endpoint parameter forwarding, and numeric pivot aggregation.
+
 Run linting:
 
 ```bash
@@ -496,7 +505,8 @@ prometheus-global-guardian/
 │       ├── 2026-09-02-bff-typescript-migration.md
 │       ├── 2026-09-03-api-service-layer-unification.md
 │       ├── 2026-09-03-frontend-testing-baseline.md
-│       └── 2026-09-03-project-governance.md
+│       ├── 2026-09-03-project-governance.md
+│       └── 2026-09-03-unify-hazard-analytics-contract.md
 ├── public/
 │   └── assets/                  # Logo and static assets
 ├── scripts/
@@ -511,6 +521,8 @@ prometheus-global-guardian/
 │   │   ├── risk_assessment.py
 │   │   ├── statistical_algorithms.py
 │   │   └── unified_model.py
+│   ├── tests/
+│   │   └── test_api_contract.py
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── README.md
@@ -882,6 +894,15 @@ pnpm run test:baseline
 
 该命令依次执行 ESLint、Prettier、前后端类型检查、BFF/Service 单元测试、React 组件测试、Playwright 冒烟测试和生产构建。当前测试数量、覆盖边界和已知非阻塞 warning 见 [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md)。
 
+单独运行 Python API 契约测试：
+
+```bash
+cd python-analytics-service
+python -m unittest discover -s tests -p 'test_*.py'
+```
+
+该测试不需要启动 Python 服务，验证统一 `hazards` 请求结构、4D 参数校验、端点参数传递和数值透视聚合。
+
 运行代码检查：
 
 ```bash
@@ -1091,7 +1112,8 @@ prometheus-global-guardian/
 │       ├── 2026-09-02-bff-typescript-migration.md
 │       ├── 2026-09-03-api-service-layer-unification.md
 │       ├── 2026-09-03-frontend-testing-baseline.md
-│       └── 2026-09-03-project-governance.md
+│       ├── 2026-09-03-project-governance.md
+│       └── 2026-09-03-unify-hazard-analytics-contract.md
 ├── public/
 │   └── assets/                  # Logo 和静态资源
 ├── scripts/
@@ -1106,6 +1128,8 @@ prometheus-global-guardian/
 │   │   ├── risk_assessment.py
 │   │   ├── statistical_algorithms.py
 │   │   └── unified_model.py
+│   ├── tests/
+│   │   └── test_api_contract.py
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── README.md

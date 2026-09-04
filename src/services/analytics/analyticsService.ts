@@ -11,7 +11,7 @@
 
 import { requestRaw } from "../http/httpClient";
 import type { Hazard } from "../../types";
-import type { AnalyticsResponse, HazardData } from "./analyticsTypes";
+import type { AnalysisRequest, AnalyticsResponse, HazardData } from "./analyticsTypes";
 
 const API_BASE_URL = import.meta.env.VITE_PYTHON_API_URL ?? "http://localhost:8001";
 const REQUEST_TIMEOUT = 30000; // 30秒超时
@@ -20,6 +20,7 @@ const MAX_RETRIES = 3;
 type AnalyticsResult<T = unknown> = Omit<AnalyticsResponse<T>, "data"> & { data: T };
 type HazardProperties = Record<string, unknown>;
 type HazardInput = Partial<Hazard> & {
+  populationExposed?: number | null;
   properties?: HazardProperties;
 };
 
@@ -432,19 +433,60 @@ export async function getQualityHistory(limit: number = 10): Promise<AnalyticsRe
  * 格式化灾害数据为 Python API 期望的格式
  */
 export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
-  return hazards.map((h, idx) => ({
-    id: String(h.id || `hazard-${idx}-${Date.now()}`),
-    type: String(h.type || h.properties?.type || "未分类"),
-    title: String(h.properties?.title || h.properties?.description || "Unknown Event"),
-    coordinates: Array.isArray(h.geometry?.coordinates) ? h.geometry.coordinates : [0, 0],
-    timestamp: h.properties?.timestamp ? String(h.properties.timestamp) : new Date().toISOString(),
-    magnitude: h.properties?.magnitude ? Number(h.properties.magnitude) : null,
-    severity: h.properties?.severity ? String(h.properties.severity) : "unknown",
-    source: String(h.properties?.source || "DisasterAWARE"),
-    populationExposed: h.properties?.populationExposed
-      ? Number(h.properties.populationExposed)
-      : null,
-  }));
+  return hazards.map((hazard, idx) => {
+    const properties = hazard.properties;
+
+    return {
+      id: String(hazard.id ?? properties?.id ?? `hazard-${idx}-${Date.now()}`),
+      type: String(hazard.type ?? properties?.type ?? "未分类"),
+      title: String(
+        hazard.title ??
+          properties?.title ??
+          hazard.description ??
+          properties?.description ??
+          "Unknown Event",
+      ),
+      coordinates: toCoordinates(hazard.geometry?.coordinates) ??
+        toCoordinates(properties?.coordinates) ?? [0, 0],
+      timestamp: String(hazard.timestamp ?? properties?.timestamp ?? new Date().toISOString()),
+      magnitude: toNullableNumber(hazard.magnitude ?? properties?.magnitude),
+      severity: String(hazard.severity ?? properties?.severity ?? "unknown"),
+      source: String(hazard.source ?? properties?.source ?? "DisasterAWARE"),
+      populationExposed: toNullableNumber(
+        hazard.populationExposed ?? properties?.populationExposed,
+      ),
+    };
+  });
+}
+
+function toCoordinates(value: unknown): HazardData["coordinates"] | undefined {
+  if (!Array.isArray(value) || value.length < 2) {
+    return undefined;
+  }
+
+  const [longitude, latitude] = value;
+  return typeof longitude === "number" &&
+    Number.isFinite(longitude) &&
+    typeof latitude === "number" &&
+    Number.isFinite(latitude)
+    ? [longitude, latitude]
+    : undefined;
+}
+
+function toNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (
+    (typeof value !== "number" && typeof value !== "string") ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    return null;
+  }
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
 }
 
 // ==================== 4维数据透视表API ====================
@@ -455,23 +497,24 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
 export async function create4DPivotTable(
   hazards: readonly HazardInput[],
   options?: {
-    timeDim?: "year" | "quarter" | "month" | "week" | "day" | "date_only";
-    geoDim?: "region" | "continent" | "geo_grid";
-    aggfunc?: "count" | "sum" | "mean";
+    timeDim?: NonNullable<AnalysisRequest["time_dim"]>;
+    geoDim?: NonNullable<AnalysisRequest["geo_dim"]>;
+    aggfunc?: NonNullable<AnalysisRequest["aggfunc"]>;
   },
 ): Promise<AnalyticsResult> {
   try {
     const formattedData = formatHazards(hazards);
+    const request = {
+      hazards: formattedData,
+      time_dim: options?.timeDim ?? "month",
+      geo_dim: options?.geoDim ?? "region",
+      aggfunc: options?.aggfunc ?? "count",
+    } satisfies AnalysisRequest;
 
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/pivot/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: formattedData,
-        time_dim: options?.timeDim || "month",
-        geo_dim: options?.geoDim || "region",
-        aggfunc: options?.aggfunc || "count",
-      }),
+      body: JSON.stringify(request),
     });
 
     if (!response.ok) {
@@ -499,17 +542,18 @@ export async function multiDimensionalQuery(
 ): Promise<AnalyticsResult> {
   try {
     const formattedData = formatHazards(hazards);
+    const request = {
+      hazards: formattedData,
+      time_range: filters.timeRange,
+      regions: filters.regions,
+      types: filters.types,
+      severities: filters.severities,
+    } satisfies AnalysisRequest;
 
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/pivot/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: formattedData,
-        time_range: filters.timeRange,
-        regions: filters.regions,
-        types: filters.types,
-        severities: filters.severities,
-      }),
+      body: JSON.stringify(request),
     });
 
     if (!response.ok) {
@@ -532,14 +576,15 @@ export async function analyze4DTrends(
 ): Promise<AnalyticsResult> {
   try {
     const formattedData = formatHazards(hazards);
+    const request = {
+      hazards: formattedData,
+      time_window: timeWindow,
+    } satisfies AnalysisRequest;
 
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/pivot/trend-analysis`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: formattedData,
-        time_window: timeWindow,
-      }),
+      body: JSON.stringify(request),
     });
 
     if (!response.ok) {
@@ -562,14 +607,15 @@ export async function calculate4DRiskScores(
 ): Promise<AnalyticsResult> {
   try {
     const formattedData = formatHazards(hazards);
+    const request = {
+      hazards: formattedData,
+      time_window: timeWindow,
+    } satisfies AnalysisRequest;
 
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/pivot/risk-score`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: formattedData,
-        time_window: timeWindow,
-      }),
+      body: JSON.stringify(request),
     });
 
     if (!response.ok) {
@@ -589,13 +635,14 @@ export async function calculate4DRiskScores(
 export async function get4DSummary(hazards: readonly HazardInput[]): Promise<AnalyticsResult> {
   try {
     const formattedData = formatHazards(hazards);
+    const request = {
+      hazards: formattedData,
+    } satisfies AnalysisRequest;
 
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/pivot/summary`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: formattedData,
-      }),
+      body: JSON.stringify(request),
     });
 
     if (!response.ok) {

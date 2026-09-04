@@ -97,13 +97,33 @@ docker run --rm -p 8001:8001 prometheus-analytics:latest
 
 \`\`\`json
 {
-"hazards": [],
+"hazards": [
+{
+"id": "event-001",
+"type": "EARTHQUAKE",
+"title": "Example event",
+"coordinates": [116.4, 39.9],
+"timestamp": "2026-09-03T00:00:00.000Z",
+"magnitude": 4.5,
+"severity": "WARNING",
+"source": "USGS",
+"populationExposed": 1000
+}
+],
 "analysisType": "comprehensive",
-"timeRange": 30
+"timeRange": 30,
+"time_dim": "month",
+"geo_dim": "region",
+"aggfunc": "count",
+"time_range": ["2026-09-01T00:00:00.000Z", "2026-09-03T00:00:00.000Z"],
+"regions": ["Asia-Pacific"],
+"types": ["EARTHQUAKE"],
+"severities": ["WARNING"],
+"time_window": 7
 }
 \`\`\`
 
-约定：\`coordinates\` 使用 \`[longitude, latitude]\`，\`timestamp\` 使用可解析的 ISO 8601 时间，\`type\`、\`severity\` 和 \`source\` 应使用项目统一枚举。当前 Pydantic 模型对坐标长度、坐标范围、枚举大小写和请求数组长度的校验仍不完整，详见项目待优化清单。
+约定：\`coordinates\` 使用 \`[longitude, latitude]\`，\`timestamp\` 使用可解析的 ISO 8601 时间，\`type\`、\`severity\` 和 \`source\` 应使用项目统一枚举。所有分析接口使用 \`hazards\`，不接受 \`data\` 别名。四维接口的 \`time_dim\`、\`geo_dim\`、\`aggfunc\`、\`time_range\`、筛选数组和 \`time_window\` 已纳入 Pydantic 请求模型；非法维度、聚合函数、时间范围或非正时间窗口会在 API 边界返回 422。
 
 ## API 接口
 
@@ -146,7 +166,7 @@ docker run --rm -p 8001:8001 prometheus-analytics:latest
 | \`POST\` | \`/api/v1/pivot/risk-score\`     | 计算四维组合风险分数               |
 | \`POST\` | \`/api/v1/pivot/summary\`        | 返回透视数据汇总                   |
 
-四维接口目前复用 \`AnalysisRequest\`，部分 \`time_dim\`、\`geo_dim\`、\`time_range\`、\`regions\`、\`types\`、\`severities\` 和 \`time_window\` 参数尚未全部声明为 Pydantic 字段，因此不能把这些参数视为已经稳定生效的 API 契约。
+四维接口复用 \`AnalysisRequest\`。创建透视表会使用 \`time_dim\`、\`geo_dim\` 和 \`aggfunc\`；多维查询会使用时间范围、区域、类型和严重性筛选；趋势与风险评分会使用 \`time_window\`。创建透视表使用 \`count\` 时统计记录数，使用 \`sum\` 或 \`mean\` 时聚合数值型 \`magnitude\`。
 
 ## 分析能力
 
@@ -185,6 +205,13 @@ python test_pivot_table.py
 
 \`test_pivot_table.py\` 是打印式的透视表和算法冒烟脚本，不是 pytest 测试套件。
 
+```bash
+cd python-analytics-service
+python -m unittest discover -s tests -p 'test_*.py'
+```
+
+`tests/test_api_contract.py` 是不依赖已启动服务的 API 契约单元测试，覆盖统一 `hazards` 请求体、4D 参数校验、端点参数传递和数值聚合行为。
+
 \`\`\`bash
 cd python-analytics-service
 python test_service.py
@@ -192,7 +219,7 @@ python test_service.py
 
 \`test_service.py\` 是依赖已启动服务的手工集成脚本，会等待用户按回车后请求 \`8001\` 端点。它主要打印结果并汇总布尔状态，也不是 pytest 单元测试。
 
-Python 测试体系、API 契约测试、算法边界测试和 CI 接入属于后续建设项。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
+现有 Python 测试仍分为契约单元测试、打印式算法冒烟脚本和依赖已启动服务的手工集成脚本；pytest、算法边界覆盖和 CI 接入属于后续建设项。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
 
 ## 项目结构
 
@@ -202,6 +229,8 @@ python-analytics-service/
 ├── requirements.txt # Python 依赖
 ├── Dockerfile # Python 3.13 镜像
 ├── start.sh # 服务目录内启动脚本
+├── tests/
+│ └── test_api_contract.py # API 契约单元测试
 ├── test_service.py # 手工集成测试脚本
 ├── test_pivot_table.py # 打印式透视算法测试脚本
 └── analytics/

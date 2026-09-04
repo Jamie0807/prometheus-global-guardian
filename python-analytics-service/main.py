@@ -13,8 +13,8 @@ Prometheus Global Guardian - Python Analytics Service
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import List, Dict, Any, Literal, Optional, Tuple
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -67,9 +67,33 @@ class HazardData(BaseModel):
     populationExposed: Optional[int] = None
 
 class AnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     hazards: List[HazardData]
     analysisType: str = "comprehensive"
     timeRange: int = 30  # days
+    time_dim: Literal["year", "quarter", "month", "week", "day", "date_only"] = "month"
+    geo_dim: Literal["region", "continent", "geo_grid"] = "region"
+    aggfunc: Literal["count", "sum", "mean"] = "count"
+    time_range: Optional[Tuple[str, str]] = None
+    regions: Optional[List[str]] = None
+    types: Optional[List[str]] = None
+    severities: Optional[List[str]] = None
+    time_window: int = Field(default=7, gt=0)
+
+    @field_validator("time_range")
+    @classmethod
+    def validate_time_range(cls, value: Optional[Tuple[str, str]]) -> Optional[Tuple[str, str]]:
+        if value is None:
+            return None
+
+        for timestamp in value:
+            try:
+                datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError("time_range must contain ISO 8601 timestamps") from exc
+
+        return value
 
 class AnalysisResponse(BaseModel):
     success: bool
@@ -109,7 +133,7 @@ def cache_response(ttl: int = CACHE_TTL):
             if not request or not hasattr(request, 'hazards'):
                 return await func(*args, **kwargs)
             
-            cache_key = get_cache_key([h.dict() for h in request.hazards])
+            cache_key = get_cache_key([h.model_dump() for h in request.hazards])
             
             # 检查缓存
             if cache_key in GLOBAL_CACHE:
@@ -207,7 +231,7 @@ async def comprehensive_analysis(request: AnalysisRequest):
             request.hazards = request.hazards[:1000]
         
         # 转换数据格式
-        df = etl_processor.convert_to_dataframe([hazard.dict() for hazard in request.hazards])
+        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         
         # 并行执行三个分析任务（使用asyncio）
         loop = asyncio.get_event_loop()
@@ -265,7 +289,7 @@ async def comprehensive_analysis(request: AnalysisRequest):
 async def statistical_analysis(request: AnalysisRequest):
     """专门的统计分析接口 - 23种算法"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.dict() for hazard in request.hazards])
+        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         results = statistical_analyzer.run_comprehensive_analysis(df)
         return {"success": True, "data": results}
     except Exception as e:
@@ -275,7 +299,7 @@ async def statistical_analysis(request: AnalysisRequest):
 async def prediction_analysis(request: AnalysisRequest):
     """专门的预测分析接口 - 5个回归模型"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.dict() for hazard in request.hazards])
+        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         results = prediction_engine.generate_predictions(df)
         return {"success": True, "data": results}
     except Exception as e:
@@ -285,7 +309,7 @@ async def prediction_analysis(request: AnalysisRequest):
 async def etl_processing(request: AnalysisRequest):
     """ETL数据处理接口"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.dict() for hazard in request.hazards])
+        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         processed_data = etl_processor.process_data(df)
         quality_metrics = etl_processor.assess_data_quality(processed_data)
         
@@ -308,7 +332,7 @@ async def etl_processing(request: AnalysisRequest):
 async def risk_assessment(request: AnalysisRequest):
     """风险评估接口"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.dict() for hazard in request.hazards])
+        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         risk_results = risk_assessor.calculate_comprehensive_risk(df)
         return {"success": True, "data": risk_results}
     except Exception as e:
@@ -340,7 +364,7 @@ async def assess_data_quality(request: QualityCheckRequest):
     - 有效性 (Validity)
     """
     try:
-        df = etl_processor.convert_to_dataframe([hazard.dict() for hazard in request.hazards])
+        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         quality_report = etl_processor.assess_data_quality(df, request.source)
         
         return {
@@ -360,7 +384,7 @@ async def transform_to_unified_model(request: QualityCheckRequest):
     返回标准化的DataFrame Schema
     """
     try:
-        hazards_data = [hazard.dict() for hazard in request.hazards]
+        hazards_data = [hazard.model_dump() for hazard in request.hazards]
         unified_df = etl_processor.transform_to_unified_model(hazards_data, request.source)
         
         # 转换为JSON可序列化格式
@@ -455,18 +479,19 @@ async def create_4d_pivot_table(request: AnalysisRequest):
     """
     try:
         start_time = asyncio.get_event_loop().time()
-        df = pd.DataFrame([h.dict() for h in request.hazards])
+        df = pd.DataFrame([h.model_dump() for h in request.hazards])
         
         # 创建4维透视表分析器
         analyzer = FourDimensionalPivotTable(df)
         
         # 构建透视表
         pivot_table = analyzer.create_4d_pivot(
-            time_dim=request.time_dim if hasattr(request, 'time_dim') else 'month',
-            geo_dim=request.geo_dim if hasattr(request, 'geo_dim') else 'region',
+            time_dim=request.time_dim,
+            geo_dim=request.geo_dim,
             type_dim='type_category',
             severity_dim='severity',
-            aggfunc='count'
+            aggfunc=request.aggfunc,
+            values_col='id' if request.aggfunc == 'count' else 'magnitude'
         )
         
         # 获取汇总统计
@@ -509,21 +534,21 @@ async def multi_dimensional_query(request: AnalysisRequest):
     """
     try:
         start_time = asyncio.get_event_loop().time()
-        df = pd.DataFrame([h.dict() for h in request.hazards])
+        df = pd.DataFrame([h.model_dump() for h in request.hazards])
         
         analyzer = FourDimensionalPivotTable(df)
         
         # 解析查询参数
         time_range = None
-        if hasattr(request, 'time_range') and request.time_range:
+        if request.time_range:
             time_range = (
                 pd.to_datetime(request.time_range[0]),
                 pd.to_datetime(request.time_range[1])
             )
         
-        regions = getattr(request, 'regions', None)
-        types = getattr(request, 'types', None)
-        severities = getattr(request, 'severities', None)
+        regions = request.regions
+        types = request.types
+        severities = request.severities
         
         # 执行多维度查询
         result_df = analyzer.multi_dimensional_query(
@@ -541,7 +566,7 @@ async def multi_dimensional_query(request: AnalysisRequest):
                 "results": result_df.to_dict('records'),
                 "total_count": len(result_df),
                 "query_params": {
-                    "time_range": request.time_range if hasattr(request, 'time_range') else None,
+                    "time_range": request.time_range,
                     "regions": regions,
                     "types": types,
                     "severities": severities
@@ -563,11 +588,11 @@ async def analyze_4d_trends(request: AnalysisRequest):
     """
     try:
         start_time = asyncio.get_event_loop().time()
-        df = pd.DataFrame([h.dict() for h in request.hazards])
+        df = pd.DataFrame([h.model_dump() for h in request.hazards])
         
         analyzer = FourDimensionalPivotTable(df)
         
-        time_window = getattr(request, 'time_window', 7)
+        time_window = request.time_window
         
         # 执行趋势分析
         trend_df = analyzer.trend_analysis_4d(time_window=time_window)
@@ -577,7 +602,8 @@ async def analyze_4d_trends(request: AnalysisRequest):
                 "success": True,
                 "data": {
                     "trends": [],
-                    "message": "时间窗口内数据不足"
+                    "message": "时间窗口内数据不足",
+                    "time_window": time_window
                 },
                 "processingTime": asyncio.get_event_loop().time() - start_time,
                 "timestamp": datetime.now().isoformat()
@@ -621,11 +647,11 @@ async def calculate_4d_risk_scores(request: AnalysisRequest):
     """
     try:
         start_time = asyncio.get_event_loop().time()
-        df = pd.DataFrame([h.dict() for h in request.hazards])
+        df = pd.DataFrame([h.model_dump() for h in request.hazards])
         
         analyzer = FourDimensionalPivotTable(df)
         
-        time_window = getattr(request, 'time_window', 7)
+        time_window = request.time_window
         
         # 计算风险评分
         risk_df = analyzer.risk_score_4d(time_window=time_window)
@@ -635,7 +661,8 @@ async def calculate_4d_risk_scores(request: AnalysisRequest):
                 "success": True,
                 "data": {
                     "risk_scores": [],
-                    "message": "时间窗口内数据不足"
+                    "message": "时间窗口内数据不足",
+                    "time_window": time_window
                 },
                 "processingTime": asyncio.get_event_loop().time() - start_time,
                 "timestamp": datetime.now().isoformat()
@@ -671,7 +698,7 @@ async def get_4d_summary(request: AnalysisRequest):
     """获取4维数据的汇总统计信息"""
     try:
         start_time = asyncio.get_event_loop().time()
-        df = pd.DataFrame([h.dict() for h in request.hazards])
+        df = pd.DataFrame([h.model_dump() for h in request.hazards])
         
         analyzer = FourDimensionalPivotTable(df)
         summary = analyzer.get_summary_statistics()
