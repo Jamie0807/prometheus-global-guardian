@@ -283,7 +283,7 @@ Run the complete local quality baseline:
 pnpm run test:baseline
 ```
 
-The baseline runs ESLint, Prettier check, client and server type checks, BFF and Service unit tests, React component tests, the Playwright smoke test, and the production build. See [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md) for current counts, boundaries, and known non-blocking warnings.
+The baseline runs ESLint, Prettier check, client and server type checks, BFF and Service unit tests, React component tests, the Playwright smoke test, and the production build. Python API contract tests are currently run as a separate command. See [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md) for current counts, boundaries, and known non-blocking warnings.
 
 Run the Python API contract tests separately from the repository root:
 
@@ -292,7 +292,7 @@ cd python-analytics-service
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-These tests do not require a running analytics service. They validate the shared `hazards` request shape, 4D parameter validation, endpoint parameter forwarding, and numeric pivot aggregation.
+These tests do not require a running analytics service. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation.
 
 Run linting:
 
@@ -506,7 +506,8 @@ prometheus-global-guardian/
 │       ├── 2026-09-03-api-service-layer-unification.md
 │       ├── 2026-09-03-frontend-testing-baseline.md
 │       ├── 2026-09-03-project-governance.md
-│       └── 2026-09-03-unify-hazard-analytics-contract.md
+│       ├── 2026-09-03-unify-hazard-analytics-contract.md
+│       └── 2026-09-04-analytics-contract-http-integration.md
 ├── public/
 │   └── assets/                  # Logo and static assets
 ├── scripts/
@@ -522,7 +523,8 @@ prometheus-global-guardian/
 │   │   ├── statistical_algorithms.py
 │   │   └── unified_model.py
 │   ├── tests/
-│   │   └── test_api_contract.py
+│   │   ├── test_api_contract.py
+│   │   └── test_api_routes.py
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── README.md
@@ -892,7 +894,7 @@ pnpm run test:e2e
 pnpm run test:baseline
 ```
 
-该命令依次执行 ESLint、Prettier、前后端类型检查、BFF/Service 单元测试、React 组件测试、Playwright 冒烟测试和生产构建。当前测试数量、覆盖边界和已知非阻塞 warning 见 [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md)。
+该命令依次执行 ESLint、Prettier、前后端类型检查、BFF/Service 单元测试、React 组件测试、Playwright 冒烟测试和生产构建。Python API 契约测试目前单独执行；当前测试数量、覆盖边界和已知非阻塞 warning 见 [`docs/TESTING_BASELINE.md`](docs/TESTING_BASELINE.md)。
 
 单独运行 Python API 契约测试：
 
@@ -901,7 +903,7 @@ cd python-analytics-service
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-该测试不需要启动 Python 服务，验证统一 `hazards` 请求结构、4D 参数校验、端点参数传递和数值透视聚合。
+这组测试不需要启动 Python 服务：`test_api_contract.py` 验证请求模型和直接端点行为，`test_api_routes.py` 使用 FastAPI `TestClient` 验证五个 4D HTTP 路由、参数回显、空结果和 2xx/422 状态码。
 
 运行代码检查：
 
@@ -1113,7 +1115,8 @@ prometheus-global-guardian/
 │       ├── 2026-09-03-api-service-layer-unification.md
 │       ├── 2026-09-03-frontend-testing-baseline.md
 │       ├── 2026-09-03-project-governance.md
-│       └── 2026-09-03-unify-hazard-analytics-contract.md
+│       ├── 2026-09-03-unify-hazard-analytics-contract.md
+│       └── 2026-09-04-analytics-contract-http-integration.md
 ├── public/
 │   └── assets/                  # Logo 和静态资源
 ├── scripts/
@@ -1129,7 +1132,8 @@ prometheus-global-guardian/
 │   │   ├── statistical_algorithms.py
 │   │   └── unified_model.py
 │   ├── tests/
-│   │   └── test_api_contract.py
+│   │   ├── test_api_contract.py
+│   │   └── test_api_routes.py
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── README.md

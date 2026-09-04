@@ -17,7 +17,7 @@
 - TypeScript 前端和 Python 分析服务都有分析逻辑，但服务边界还不够明确。
 - 前端、BFF 和 Python 服务之间仍存在两套灾害数据字段约定，部分 Analytics/4D 请求当前不能按前端意图执行。
 - BFF 已经具备认证、代理和 AI 路由能力，但公开代理、请求体、频率和错误边界还没有形成安全契约。
-- 质量门禁已覆盖 BFF、Service、React 组件、关键 E2E 流程、lint、格式、类型检查和 build；Python 核心算法、视觉回归和 API 契约测试仍待补齐。
+- 质量门禁已覆盖 BFF、Service、React 组件、关键 E2E 流程、lint、格式、类型检查和 build；Python 核心算法、Python 契约测试统一接入、视觉回归和 CI/CD 仍待补齐。
 
 ## 开发与交付约束
 
@@ -37,7 +37,7 @@
 | P0     | API / Service 层统一              | 已完成             | 提升稳定性和排查效率                                   | 第一批   |
 | P0     | AI 助手智能路由                   | 已完成             | 由 LLM 判断普通模型与 RAG 工作流调用边界               | 第一批   |
 | P0     | BFF TypeScript 化                 | 已完成             | 统一项目技术栈，降低 JavaScript 与 TypeScript 混用成本 | 第一批   |
-| P0     | 统一灾害数据与 Analytics API 契约 | 已完成（第一阶段） | 修复分析字段丢失、4D 请求 422 和筛选参数失效           | 第一批   |
+| P0     | 统一灾害数据与 Analytics API 契约 | 已完成（第二阶段） | 修复分析字段丢失、4D 请求 422 和筛选参数失效           | 第一批   |
 | P0     | BFF 代理暴露面与请求边界治理      | 待开始             | 防止任意上游代理、请求体耗尽、鉴权滥用和敏感头转发     | 第一批   |
 | P0     | 地图外部数据输出安全              | 待开始             | 防止灾害源文本通过 Mapbox Popup 注入 HTML              | 第一批   |
 | P0     | 报告下载闭环                      | 待开始             | 让“Save Report”从表单提交真正产出符合承诺的报告文件    | 第一批   |
@@ -192,6 +192,7 @@ AIChatAssistant
 - 5 个 4D Service 方法现在统一发送 `{ hazards: ... }`，并分别发送时间维度、地理维度、聚合函数、筛选条件和时间窗口。
 - `python-analytics-service/main.py` 的 `AnalysisRequest` 已显式声明 4D 字段，并用 Literal、二元时间范围和正数约束拒绝不符合契约的请求。
 - `sum` 和 `mean` 聚合使用数值型 `magnitude` 列，避免对字符串 `id` 做数值聚合。
+- `python-analytics-service/tests/test_api_routes.py` 使用 FastAPI `TestClient` 覆盖五个 4D HTTP 路由的合法响应、参数转发、响应回显、空结果和 422 校验。
 
 ### 风险
 
@@ -205,10 +206,16 @@ AIChatAssistant
 - 为前端和 Python 增加 4D 请求类型与契约测试，覆盖 `hazards` 请求体、筛选参数、时间窗口和聚合行为。
 - 验证合法 4D 参数按请求传入分析器，非法维度、聚合函数、时间范围和时间窗口在 Pydantic 边界被拒绝。
 
+### 第二阶段已完成
+
+- 增加真实 ASGI HTTP 路由契约测试，验证请求经过 FastAPI 路由和 Pydantic 边界，而不是只直接调用 Python 函数。
+- 为 `httpx` TestClient 依赖锁定版本；测试不需要启动服务、不访问真实外部数据源，并覆盖五个 4D 路由。
+- README 和测试基线已区分 Python 模型/端点单元测试、HTTP 路由测试、算法冒烟脚本和手工集成脚本。
+
 ### 后续工作
 
 - 评估生成或共享跨语言灾害输入契约，避免 TypeScript 与 Pydantic 模型长期手工同步。
-- 为真实 FastAPI HTTP 路由增加完整 2xx/422 集成测试，并将 Python 契约测试接入统一 CI 门禁。
+- 将 Python 契约测试接入统一 CI 门禁，并继续补充 Python 核心算法边界测试。
 
 ## P0：BFF 代理暴露面与请求边界治理
 
@@ -595,7 +602,7 @@ python-analytics-service/
 
 ### 当前状态
 
-项目现已具备 BFF Node 原生测试、前端 Service 层 Vitest 测试、React Testing Library 组件测试和 Playwright 浏览器冒烟测试，并通过 `pnpm run test:baseline` 纳入统一门禁；Python 核心算法、视觉回归和 API 契约测试仍待补齐。
+项目现已具备 BFF Node 原生测试、前端 Service 层 Vitest 测试、React Testing Library 组件测试、Playwright 浏览器冒烟测试，以及独立的 Python API 模型和 HTTP 路由契约测试。前端和 BFF 已通过 `pnpm run test:baseline` 纳入统一门禁；Python 核心算法测试、Python 测试统一接入、视觉回归和 CI/CD 接入仍待补齐。
 
 ### 建议优先覆盖
 
@@ -618,7 +625,7 @@ Python：
 
 - 前端增加 `pnpm run test:services`，并由 `pnpm test` 与 BFF 测试统一执行。已完成。
 - Python 服务使用 `pytest` 跑核心测试。
-- 本地质量基线包含 lint、格式、前后端类型检查、build、BFF 测试、Service 测试、React 组件测试和 Playwright 冒烟测试；Python 测试接入 CI 后再纳入统一命令。
+- 本地质量基线包含 lint、格式、前后端类型检查、build、BFF 测试、Service 测试、React 组件测试和 Playwright 冒烟测试；Python 契约测试目前独立执行，接入 CI 后再纳入统一命令。
 - 核心转换逻辑不依赖浏览器或 Mapbox 就能测试。
 
 ## P1：前端测试体系
@@ -710,7 +717,7 @@ scripts/
 
 ## 建议执行顺序
 
-1. 修复灾害数据、Analytics 和 4D API 契约，先补回归测试。
+1. 灾害数据、Analytics 和 4D API 契约的前两阶段已完成，继续推进跨语言共享契约和 CI 接入。
 2. 收紧 BFF / Python 的路径、请求体、认证、限流和错误边界。
 3. 修复地图 Popup 输出安全问题，并补齐报告下载闭环。
 4. 统一灾害数据入口，增加来源状态、自动刷新、取消和竞态保护。
@@ -721,7 +728,7 @@ scripts/
 9. 扩展 React 组件测试，补充 Playwright 移动端流程、视觉回归、Python 测试和 CI/CD 质量门禁。
 10. 最后处理包体积预算、依赖审计、可访问性、多语言和仓库结构迁移。
 
-已完成：AI 助手智能路由、BFF TypeScript 化和前端 API / Service 层第一阶段统一。后续执行从地图和分析页面拆分继续。
+已完成：AI 助手智能路由、BFF TypeScript 化、前端 API / Service 层统一，以及灾害数据与 Analytics API 契约前两阶段。后续执行从跨语言契约、CI 接入、地图和分析页面拆分继续。
 
 ## 第一轮优化的非目标
 

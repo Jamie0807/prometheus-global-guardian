@@ -196,7 +196,7 @@ docker run --rm -p 8001:8001 prometheus-analytics:latest
 
 ## 测试
 
-Python 服务目前包含两类脚本测试，但尚未纳入根目录 \`pnpm run test:baseline\`：
+Python 服务目前包含 API 契约自动化测试、打印式算法冒烟脚本和依赖已启动服务的手工集成脚本；Python 测试尚未纳入根目录 \`pnpm run test:baseline\`：
 
 \`\`\`bash
 cd python-analytics-service
@@ -210,7 +210,14 @@ cd python-analytics-service
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-`tests/test_api_contract.py` 是不依赖已启动服务的 API 契约单元测试，覆盖统一 `hazards` 请求体、4D 参数校验、端点参数传递和数值聚合行为。
+`tests/test_api_contract.py` 是不依赖已启动服务、直接调用模型和路由函数的 API 契约单元测试，覆盖统一 `hazards` 请求体、4D 参数校验、端点参数传递和数值聚合行为。
+
+```bash
+cd python-analytics-service
+python -m unittest tests.test_api_routes
+```
+
+`tests/test_api_routes.py` 使用 FastAPI `TestClient` 通过 ASGI 发送真实 HTTP 路由请求，覆盖五个 4D 路由的 2xx 响应、参数转发、查询回显、空结果和 422 校验；不需要启动 `8001` 服务，也不访问真实外部数据源。
 
 \`\`\`bash
 cd python-analytics-service
@@ -219,7 +226,7 @@ python test_service.py
 
 \`test_service.py\` 是依赖已启动服务的手工集成脚本，会等待用户按回车后请求 \`8001\` 端点。它主要打印结果并汇总布尔状态，也不是 pytest 单元测试。
 
-现有 Python 测试仍分为契约单元测试、打印式算法冒烟脚本和依赖已启动服务的手工集成脚本；pytest、算法边界覆盖和 CI 接入属于后续建设项。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
+现有 Python 自动化测试覆盖请求模型和 FastAPI HTTP 路由，但仍缺少系统性的算法边界覆盖、pytest 迁移和 CI 接入。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
 
 ## 项目结构
 
@@ -230,7 +237,8 @@ python-analytics-service/
 ├── Dockerfile # Python 3.13 镜像
 ├── start.sh # 服务目录内启动脚本
 ├── tests/
-│ └── test_api_contract.py # API 契约单元测试
+│ ├── test_api_contract.py # API 契约单元测试
+│ └── test_api_routes.py # FastAPI HTTP 路由契约测试
 ├── test_service.py # 手工集成测试脚本
 ├── test_pivot_table.py # 打印式透视算法测试脚本
 └── analytics/

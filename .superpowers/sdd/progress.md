@@ -17,7 +17,11 @@
 - [x] 任务 3：迁移 Python Analytics 服务；保留原有导出并增加格式化测试。
 - [x] 任务 4：迁移 AI 服务和剩余调用方；网络/Demo 在 Service，UI helper 在 utils。
 - [x] 任务 5：收口兼容层、文档和完整回归验证。
+- [x] P0 Analytics 契约第一阶段：统一前端字段、4D 请求体和 Python Pydantic 模型，提交为 `fe07f08`。
+- [x] P0 Analytics 契约第二阶段：增加 FastAPI `TestClient` HTTP 路由契约测试，覆盖五个 4D 路由的 2xx/422 行为；本阶段保持未提交。
 
 ## 复核记录
 
 实现复核：兼容 facade 保留在 `src/api`，组件已迁移到 Service 入口；Service 测试 17 个用例、BFF 测试 29 个用例全部通过。`pnpm run lint` 通过且无 error，`pnpm run format:check`、客户端/服务端类型检查、`pnpm run build` 和 `git diff --check` 均通过。子智能体在本轮因平台并发额度不可用，改由主会话按同一计划完成实现和本地复核。
+
+第二阶段复核：Python `unittest` 共 17 项通过，其中 7 项通过 FastAPI `TestClient` 验证 HTTP 路由；根目录格式、Lint、双端类型检查和 build 通过，提权后 `pnpm test` 的 BFF 29 项与 Service 21 项全部通过。剩余跨语言共享契约、Python 测试统一 CI 接入和算法边界覆盖仍是后续工作。
