@@ -65,6 +65,7 @@ The platform consists of a React frontend, a lightweight Express API layer, a Py
 - Renders type, severity, timeline, and source distribution charts with Recharts.
 - Uses the Python service for statistics, predictions, risk assessment, ETL, and data quality checks.
 - Includes service health, loading, error, retry, and cached-analysis states.
+- Presents prediction availability, sample requirements, confidence, risk levels, trends, and quality scores through one display adapter.
 
 #### AI-Assisted Incident Analysis
 
@@ -262,6 +263,7 @@ pnpm test
 - `tests/ai-stream.test.ts`: Ark and Workflow SSE response conversion.
 - `tests/server-auth.test.ts`: BFF authorization, token injection, refresh, and local hazard aggregation.
 - `tests/service-http.test.ts`, `tests/service-adapters.test.ts`, `tests/service-analytics.test.ts`, and `tests/service-ai.test.ts`: frontend Service-layer unit tests.
+- `tests/service-analytics-presentation.test.ts`: Analytics status, score, trend, recommendation, and quality-text presentation tests.
 
 Run the two unit-test groups independently with `pnpm run test:bff` and `pnpm run test:services`. These tests do not open a browser or exercise React components, page interactions, or visual layout.
 
@@ -507,7 +509,8 @@ prometheus-global-guardian/
 │       ├── 2026-09-03-frontend-testing-baseline.md
 │       ├── 2026-09-03-project-governance.md
 │       ├── 2026-09-03-unify-hazard-analytics-contract.md
-│       └── 2026-09-04-analytics-contract-http-integration.md
+│       ├── 2026-09-04-analytics-contract-http-integration.md
+│       └── 2026-09-04-analytics-result-semantics.md
 ├── public/
 │   └── assets/                  # Logo and static assets
 ├── scripts/
@@ -524,7 +527,8 @@ prometheus-global-guardian/
 │   │   └── unified_model.py
 │   ├── tests/
 │   │   ├── test_api_contract.py
-│   │   └── test_api_routes.py
+│   │   ├── test_api_routes.py
+│   │   └── test_result_semantics.py
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── README.md
@@ -536,6 +540,7 @@ prometheus-global-guardian/
 │   ├── services/                # Frontend business and network services
 │   │   ├── ai/aiAssistantService.ts
 │   │   ├── analytics/
+│   │   │   ├── analyticsPresentation.ts
 │   │   │   ├── analyticsService.ts
 │   │   │   └── analyticsTypes.ts
 │   │   ├── auth/authService.ts
@@ -574,6 +579,7 @@ prometheus-global-guardian/
 │   ├── server-auth.test.ts
 │   ├── service-adapters.test.ts
 │   ├── service-analytics.test.ts
+│   ├── service-analytics-presentation.test.ts
 │   ├── service-ai.test.ts
 │   └── service-http.test.ts
 ├── AGENTS.md                   # Project-level development constraints
@@ -669,6 +675,7 @@ Prometheus Global Guardian 是一套面向灾害监测、地理态势可视化�
 - 使用 Recharts 渲染类型分布、严重程度分布、时间趋势和数据源分布。
 - 通过 Python 服务提供统计分析、预测分析、风险评估、ETL 和数据质量检查。
 - 分析页面包含服务健康状态、加载状态、错误处理、重试和分析缓存控制。
+- 预测、风险和质量结果统一经过展示适配：明确样本状态、置信度、风险等级、趋势、分数范围和中文建议。
 
 #### AI 辅助研判
 
@@ -869,6 +876,7 @@ pnpm test
 - `tests/service-adapters.test.ts`：USGS、NASA、GDACS 数据适配测试。
 - `tests/service-analytics.test.ts`：Analytics 数据格式化和时间戳回退测试。
 - `tests/service-ai.test.ts`：AI 请求、SSE 增量、错误处理和 Demo 降级测试。
+- `tests/service-analytics-presentation.test.ts`：Analytics 状态、分数、趋势、建议和质量文案展示测试。
 
 拆分运行时可以使用 `pnpm run test:bff` 和 `pnpm run test:services`。Service 测试属于前端业务层单元测试，不会打开浏览器，也不会测试 React 组件、页面交互或视觉布局。
 
@@ -1116,7 +1124,8 @@ prometheus-global-guardian/
 │       ├── 2026-09-03-frontend-testing-baseline.md
 │       ├── 2026-09-03-project-governance.md
 │       ├── 2026-09-03-unify-hazard-analytics-contract.md
-│       └── 2026-09-04-analytics-contract-http-integration.md
+│       ├── 2026-09-04-analytics-contract-http-integration.md
+│       └── 2026-09-04-analytics-result-semantics.md
 ├── public/
 │   └── assets/                  # Logo 和静态资源
 ├── scripts/
@@ -1133,7 +1142,8 @@ prometheus-global-guardian/
 │   │   └── unified_model.py
 │   ├── tests/
 │   │   ├── test_api_contract.py
-│   │   └── test_api_routes.py
+│   │   ├── test_api_routes.py
+│   │   └── test_result_semantics.py
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── README.md
@@ -1145,6 +1155,7 @@ prometheus-global-guardian/
 │   ├── services/                # 前端业务和网络 Service 层
 │   │   ├── ai/aiAssistantService.ts
 │   │   ├── analytics/
+│   │   │   ├── analyticsPresentation.ts
 │   │   │   ├── analyticsService.ts
 │   │   │   └── analyticsTypes.ts
 │   │   ├── auth/authService.ts
@@ -1186,6 +1197,7 @@ prometheus-global-guardian/
 │   ├── server-auth.test.ts
 │   ├── service-adapters.test.ts
 │   ├── service-analytics.test.ts
+│   ├── service-analytics-presentation.test.ts
 │   ├── service-ai.test.ts
 │   └── service-http.test.ts
 ├── AGENTS.md                   # 项目级开发约束

@@ -46,6 +46,39 @@ class PredictionEngine:
             return False
         
         return True
+
+    def _prediction_status(
+        self,
+        hazard_type: str,
+        status: str,
+        reason: str,
+        data_points: int,
+        minimum_data_points: int,
+    ) -> Dict[str, Any]:
+        """Return the stable metadata shared by every prediction result."""
+        return {
+            "type": hazard_type,
+            "status": status,
+            "reason": reason,
+            "dataPoints": int(data_points),
+            "minimumDataPoints": int(minimum_data_points),
+            "confidence": None,
+        }
+
+    def _ready_prediction_metadata(
+        self, hazard_type: str, r_squared: float, data_points: int, minimum_data_points: int
+    ) -> Dict[str, Any]:
+        confidence = float(np.clip(r_squared, 0, 1)) if np.isfinite(r_squared) else 0.0
+        return {
+            "type": hazard_type,
+            "status": "ready",
+            "reason": "model_fitted",
+            "dataPoints": int(data_points),
+            "minimumDataPoints": int(minimum_data_points),
+            "confidence": confidence,
+            "rSquared": float(r_squared) if np.isfinite(r_squared) else None,
+            "accuracy": confidence * 100,
+        }
         
     def generate_predictions(self, df: pd.DataFrame) -> Dict[str, Any]:
         """生成所有类型的预测结果
@@ -69,8 +102,17 @@ class PredictionEngine:
                 "stormPrediction": self._storm_prediction_model(df),
                 "floodPrediction": self._flood_prediction_model(df),
                 "wildfirePrediction": self._wildfire_prediction_model(df),
-                "overallRiskAssessment": self._aggregate_risk_assessment(df)
             }
+            accuracies = [
+                result["accuracy"]
+                for result in predictions.values()
+                if result.get("status") == "ready"
+                and isinstance(result.get("accuracy"), (int, float))
+                and np.isfinite(result["accuracy"])
+            ]
+            predictions["overallRiskAssessment"] = self._aggregate_risk_assessment(
+                df, accuracies
+            )
             
             elapsed = (datetime.now() - start_time).total_seconds()
             self.logger.info(f"Predictions generated in {elapsed:.3f}s for {len(df)} records")
@@ -128,16 +170,16 @@ class PredictionEngine:
             earthquakes = df[(df['type'] == 'EARTHQUAKE') & (df['magnitude'] >= 4.0)].copy()
             
             if len(earthquakes) < 5:
-                return {
-                    "type": "EARTHQUAKE",
-                    "status": "insufficient_data",
-                    "dataPoints": len(earthquakes)
-                }
+                return self._prediction_status(
+                    "EARTHQUAKE", "insufficient_data", "not_enough_data", len(earthquakes), 5
+                )
             
             X, y = self._prepare_time_series_data(df, 'EARTHQUAKE', window_days=30)
             
             if len(X) < 3:
-                return {"type": "EARTHQUAKE", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "EARTHQUAKE", "insufficient_data", "not_enough_time_points", len(X), 3
+                )
             
             # 训练线性回归模型
             model = LinearRegression()
@@ -154,9 +196,7 @@ class PredictionEngine:
             avg_magnitude = earthquakes['magnitude'].mean()
             
             return {
-                "type": "EARTHQUAKE",
-                "rSquared": float(r_squared),
-                "accuracy": float(r_squared * 100),  # 87.2% 目标
+                **self._ready_prediction_metadata("EARTHQUAKE", r_squared, len(earthquakes), 5),
                 "predictions": {
                     "next7Days": [max(0, float(p)) for p in predictions],
                     "averageMagnitude": float(avg_magnitude),
@@ -176,7 +216,12 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Earthquake prediction failed: {e}")
-            return {"type": "EARTHQUAKE", "error": str(e)}
+            return {
+                **self._prediction_status(
+                    "EARTHQUAKE", "model_error", "model_execution_failed", 0, 5
+                ),
+                "error": str(e),
+            }
     
     def _volcano_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """火山预测模型 - 关联地震数据分析"""
@@ -185,12 +230,16 @@ class PredictionEngine:
             earthquakes = df[df['type'] == 'EARTHQUAKE'].copy()
             
             if len(volcanoes) < 3:
-                return {"type": "VOLCANO", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "VOLCANO", "insufficient_data", "not_enough_data", len(volcanoes), 3
+                )
             
             X, y = self._prepare_time_series_data(df, 'VOLCANO', window_days=30)
             
             if len(X) < 3:
-                return {"type": "VOLCANO", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "VOLCANO", "insufficient_data", "not_enough_time_points", len(X), 3
+                )
             
             model = LinearRegression()
             model.fit(X, y)
@@ -204,9 +253,7 @@ class PredictionEngine:
             correlation = self._calculate_delayed_correlation(earthquakes, volcanoes, delay_days=10)
             
             return {
-                "type": "VOLCANO",
-                "rSquared": float(r_squared),
-                "accuracy": float(r_squared * 100),  # 83.1% 目标
+                **self._ready_prediction_metadata("VOLCANO", r_squared, len(volcanoes), 3),
                 "predictions": {
                     "next7Days": [max(0, float(p)) for p in predictions],
                     "confidenceInterval": self._calculate_confidence_interval(y)
@@ -225,7 +272,10 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Volcano prediction failed: {e}")
-            return {"type": "VOLCANO", "error": str(e)}
+            return {
+                **self._prediction_status("VOLCANO", "model_error", "model_execution_failed", 0, 3),
+                "error": str(e),
+            }
     
     def _storm_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """风暴预测模型 - 季节性分解"""
@@ -233,7 +283,9 @@ class PredictionEngine:
             storms = df[df['type'].isin(['STORM', 'HURRICANE', 'TYPHOON'])].copy()
             
             if len(storms) < 5:
-                return {"type": "STORM", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "STORM", "insufficient_data", "not_enough_data", len(storms), 5
+                )
             
             X, y = self._prepare_time_series_data(df, 'STORM', window_days=30)
             
@@ -242,7 +294,9 @@ class PredictionEngine:
                 if len(X_alt) >= 3:
                     X, y = X_alt, y_alt
                 else:
-                    return {"type": "STORM", "status": "insufficient_data"}
+                    return self._prediction_status(
+                        "STORM", "insufficient_data", "not_enough_time_points", len(X), 3
+                    )
             
             model = LinearRegression()
             model.fit(X, y)
@@ -256,9 +310,7 @@ class PredictionEngine:
             seasonal_boost = self._calculate_seasonal_boost(storms)
             
             return {
-                "type": "STORM",
-                "rSquared": float(r_squared),
-                "accuracy": float(r_squared * 100),  # 88.5% 目标
+                **self._ready_prediction_metadata("STORM", r_squared, len(storms), 5),
                 "predictions": {
                     "next7Days": [max(0, float(p)) for p in predictions],
                     "confidenceInterval": self._calculate_confidence_interval(y)
@@ -276,7 +328,10 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Storm prediction failed: {e}")
-            return {"type": "STORM", "error": str(e)}
+            return {
+                **self._prediction_status("STORM", "model_error", "model_execution_failed", 0, 5),
+                "error": str(e),
+            }
     
     def _flood_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """洪水预测模型 - 级联灾害建模"""
@@ -285,12 +340,16 @@ class PredictionEngine:
             storms = df[df['type'].isin(['STORM', 'HURRICANE'])].copy()
             
             if len(floods) < 3:
-                return {"type": "FLOOD", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "FLOOD", "insufficient_data", "not_enough_data", len(floods), 3
+                )
             
             X, y = self._prepare_time_series_data(df, 'FLOOD', window_days=30)
             
             if len(X) < 3:
-                return {"type": "FLOOD", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "FLOOD", "insufficient_data", "not_enough_time_points", len(X), 3
+                )
             
             model = LinearRegression()
             model.fit(X, y)
@@ -304,9 +363,7 @@ class PredictionEngine:
             cascade_correlation = self._calculate_cascade_correlation(storms, floods)
             
             return {
-                "type": "FLOOD",
-                "rSquared": float(r_squared),
-                "accuracy": float(r_squared * 100),  # 90.3% 目标
+                **self._ready_prediction_metadata("FLOOD", r_squared, len(floods), 3),
                 "predictions": {
                     "next7Days": [max(0, float(p)) for p in predictions],
                     "confidenceInterval": self._calculate_confidence_interval(y)
@@ -325,7 +382,10 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Flood prediction failed: {e}")
-            return {"type": "FLOOD", "error": str(e)}
+            return {
+                **self._prediction_status("FLOOD", "model_error", "model_execution_failed", 0, 3),
+                "error": str(e),
+            }
     
     def _wildfire_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """野火预测模型 - 多因子回归"""
@@ -333,12 +393,16 @@ class PredictionEngine:
             wildfires = df[df['type'] == 'WILDFIRE'].copy()
             
             if len(wildfires) < 3:
-                return {"type": "WILDFIRE", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "WILDFIRE", "insufficient_data", "not_enough_data", len(wildfires), 3
+                )
             
             X, y = self._prepare_time_series_data(df, 'WILDFIRE', window_days=30)
             
             if len(X) < 3:
-                return {"type": "WILDFIRE", "status": "insufficient_data"}
+                return self._prediction_status(
+                    "WILDFIRE", "insufficient_data", "not_enough_time_points", len(X), 3
+                )
             
             model = LinearRegression()
             model.fit(X, y)
@@ -349,9 +413,7 @@ class PredictionEngine:
             r_squared = r2_score(y, model.predict(X))
             
             return {
-                "type": "WILDFIRE",
-                "rSquared": float(r_squared),
-                "accuracy": float(r_squared * 100),  # 84.7% 目标
+                **self._ready_prediction_metadata("WILDFIRE", r_squared, len(wildfires), 3),
                 "predictions": {
                     "next7Days": [max(0, float(p)) for p in predictions],
                     "confidenceInterval": self._calculate_confidence_interval(y)
@@ -369,9 +431,14 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Wildfire prediction failed: {e}")
-            return {"type": "WILDFIRE", "error": str(e)}
+            return {
+                **self._prediction_status("WILDFIRE", "model_error", "model_execution_failed", 0, 3),
+                "error": str(e),
+            }
     
-    def _aggregate_risk_assessment(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def _aggregate_risk_assessment(
+        self, df: pd.DataFrame, accuracies: List[float] | None = None
+    ) -> Dict[str, Any]:
         """多模型融合风险评估"""
         try:
             # 加权风险聚合
@@ -395,10 +462,15 @@ class PredictionEngine:
             max_possible = len(df)
             normalized_score = min(100, (total_risk_score / max_possible * 100) if max_possible > 0 else 0)
             
+            average_accuracy = round(float(np.mean(accuracies)), 1) if accuracies else None
+
             return {
+                "status": "ready" if accuracies else "insufficient_data",
+                "reason": "model_fitted" if accuracies else "no_ready_models",
                 "overallRiskScore": float(normalized_score),
                 "riskLevel": self._get_risk_level(normalized_score),
-                "averageAccuracy": 85.3,  # 5个模型平均准确率
+                "averageAccuracy": average_accuracy,
+                "confidence": average_accuracy / 100 if average_accuracy is not None else None,
                 "modelWeights": risk_weights,
                 "recommendation": self._generate_recommendation(normalized_score)
             }

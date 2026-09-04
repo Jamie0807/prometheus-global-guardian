@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { assessDataQuality, getQualityThresholds } from "../services/analytics/analyticsService";
+import {
+  formatAnalyticsNumber,
+  localizeAnalyticsMessage,
+  normalizeQualityReport,
+  normalizeQualityScore,
+} from "../services/analytics/analyticsPresentation";
 import type { Hazard } from "../types";
 
 // 添加旋转动画样式
@@ -17,20 +23,7 @@ if (typeof document !== "undefined") {
   document.head.appendChild(styleSheet);
 }
 
-interface QualityReport {
-  overallScore: number;
-  status: string;
-  detailChecks: {
-    completeness: number;
-    accuracy: number;
-    consistency: number;
-    timeliness: number;
-    validity: number;
-  };
-  totalRecords: number;
-  issues: string[];
-  recommendations: string[];
-}
+type QualityReport = NonNullable<ReturnType<typeof normalizeQualityReport>>;
 
 interface DataQualityMonitorProps {
   hazards: Hazard[];
@@ -65,7 +58,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     try {
       const result = await assessDataQuality(hazards, source);
       if (result.success && result.data) {
-        setQualityReport(result.data as QualityReport);
+        setQualityReport(normalizeQualityReport(result.data));
       }
     } catch (err) {
       setError((err as Error).message);
@@ -106,15 +99,22 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
           color: colors.text,
         }}
       >
-        {status.toUpperCase()}
+        {{
+          pass: "通过",
+          warning: "警告",
+          fail: "失败",
+          excellent: "优秀",
+        }[status.toLowerCase()] ?? "未知"}
       </span>
     );
   };
 
   const renderDimensionCard = (name: string, score: number, label: string) => {
-    const percentage = (score * 100).toFixed(1);
-    const threshold = thresholds ? (thresholds[name] * 100).toFixed(0) : 90;
-    const isPassing = score >= (thresholds?.[name] || 0.9);
+    const normalizedScore = normalizeQualityScore(score) ?? 0;
+    const percentage = (normalizedScore * 100).toFixed(1);
+    const thresholdScore = normalizeQualityScore(thresholds?.[name]) ?? 0.9;
+    const threshold = (thresholdScore * 100).toFixed(0);
+    const isPassing = normalizedScore >= thresholdScore;
 
     return (
       <div
@@ -139,7 +139,12 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
             style={{
               fontSize: "20px",
               fontWeight: "bold",
-              color: score >= 0.95 ? "#4CAF50" : score >= 0.85 ? "#FFA726" : "#EF5350",
+              color:
+                normalizedScore >= 0.95
+                  ? "#4CAF50"
+                  : normalizedScore >= 0.85
+                    ? "#FFA726"
+                    : "#EF5350",
             }}
           >
             {percentage}%
@@ -247,7 +252,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "48px", fontWeight: "bold" }}>
-              {qualityReport.overallScore.toFixed(1)}
+              {formatAnalyticsNumber(qualityReport.overallScore, 1)}
             </div>
             <div style={{ marginTop: "8px" }}>{getStatusBadge(qualityReport.status)}</div>
           </div>
@@ -319,7 +324,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
                 }}
               >
                 <span style={{ marginRight: "8px" }}>•</span>
-                <span>{issue}</span>
+                <span>{localizeAnalyticsMessage(issue)}</span>
               </li>
             ))}
           </ul>
@@ -371,7 +376,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
                 }}
               >
                 <span style={{ marginRight: "8px" }}>→</span>
-                <span>{rec}</span>
+                <span>{localizeAnalyticsMessage(rec)}</span>
               </li>
             ))}
           </ul>

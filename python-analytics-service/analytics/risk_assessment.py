@@ -83,13 +83,15 @@ class RiskAssessor:
             if not self._validate_dataframe(df):
                 raise ValueError("Invalid dataframe for risk assessment")
             
+            recommendation_details = self._generate_recommendation_details(df)
             risk_results = {
                 "overallRiskScore": self._calculate_overall_risk(df),
                 "typeRisks": self._calculate_type_risks(df),
                 "geographicRisks": self._identify_high_risk_regions(df),
                 "temporalRisks": self._analyze_temporal_risks(df),
                 "populationImpact": self._assess_population_impact(df),
-                "recommendations": self._generate_recommendations(df)
+                "recommendations": [item["message"] for item in recommendation_details],
+                "recommendationDetails": recommendation_details,
             }
             
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -220,28 +222,57 @@ class RiskAssessor:
             "averageExposure": int(df['populationExposed'].mean()) if not pd.isna(df['populationExposed'].mean()) else 0
         }
     
-    def _generate_recommendations(self, df: pd.DataFrame) -> List[str]:
-        """生成风险建议"""
-        recommendations = []
-        
-        # 基于总体风险
+    def _generate_recommendation_details(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Generate recommendations with stable rule metadata for the UI."""
+        recommendations: List[Dict[str, Any]] = []
         overall_risk = self._calculate_overall_risk(df)
         if overall_risk['score'] >= 80:
-            recommendations.append("CRITICAL: Activate emergency response protocols immediately")
+            recommendations.append({
+                "ruleId": "overall_critical",
+                "severity": "critical",
+                "message": "Immediate action required. Activate emergency response protocols.",
+                "metrics": {"score": overall_risk["score"], "threshold": 80},
+            })
         elif overall_risk['score'] >= 60:
-            recommendations.append("HIGH RISK: Enhance monitoring and prepare response teams")
-        
-        # 基于趋势
+            recommendations.append({
+                "ruleId": "overall_high",
+                "severity": "warning",
+                "message": "Enhance monitoring and prepare response teams.",
+                "metrics": {"score": overall_risk["score"], "threshold": 60},
+            })
+
         temporal = self._analyze_temporal_risks(df)
         if temporal.get('trend') == 'increasing':
-            recommendations.append(f"Activity increasing by {temporal.get('growthRate', 0):.1f}% - intensify surveillance")
-        
-        # 基于类型
+            growth_rate = float(temporal.get("growthRate", 0))
+            recommendations.append({
+                "ruleId": "temporal_increasing",
+                "severity": "warning",
+                "message": "Activity is increasing. Intensify surveillance.",
+                "metrics": {"growthRate": growth_rate, "threshold": 10},
+            })
+
         type_counts = df['type'].value_counts()
         if 'EARTHQUAKE' in type_counts.index and type_counts['EARTHQUAKE'] > 50:
-            recommendations.append("High seismic activity detected - review building safety protocols")
-        
-        return recommendations if recommendations else ["Maintain standard monitoring procedures"]
+            recommendations.append({
+                "ruleId": "earthquake_activity",
+                "severity": "warning",
+                "message": "High seismic activity detected. Review building safety protocols.",
+                "metrics": {"eventCount": int(type_counts['EARTHQUAKE']), "threshold": 50},
+            })
+
+        if not recommendations:
+            recommendations.append({
+                "ruleId": "standard_monitoring",
+                "severity": "info",
+                "message": "Maintain standard monitoring procedures.",
+                "metrics": {"score": overall_risk["score"], "threshold": 20},
+            })
+
+        return recommendations
+
+    def _generate_recommendations(self, df: pd.DataFrame) -> List[str]:
+        """保持旧字符串建议字段的兼容入口。"""
+        return [item["message"] for item in self._generate_recommendation_details(df)]
     
     def _calculate_risk_trend(self, df: pd.DataFrame) -> str:
         """计算风险趋势"""

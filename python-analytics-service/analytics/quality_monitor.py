@@ -39,6 +39,18 @@ class DataQualityMonitor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.quality_history: List[Dict] = []
+
+    @staticmethod
+    def _bounded_score(value: Any) -> float:
+        """Keep quality scores finite and within the documented 0..1 range."""
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+        if not np.isfinite(numeric_value):
+            return 0.0
+        return round(float(np.clip(numeric_value, 0.0, 1.0)), 4)
     
     def assess_quality(self, df: pd.DataFrame, source: str = 'unknown') -> Dict[str, Any]:
         """
@@ -60,11 +72,21 @@ class DataQualityMonitor:
             return self._empty_quality_report(source)
         
         # 评估各个维度
-        completeness = self._check_completeness(df)
-        accuracy = self._check_accuracy(df)
-        consistency = self._check_consistency(df)
-        timeliness = self._check_timeliness(df)
-        validity = self._check_validity(df)
+        dimension_results = {
+            'completeness': self._check_completeness(df),
+            'accuracy': self._check_accuracy(df),
+            'consistency': self._check_consistency(df),
+            'timeliness': self._check_timeliness(df),
+            'validity': self._check_validity(df),
+        }
+
+        for dimension_name, dimension_data in dimension_results.items():
+            dimension_data['score'] = self._bounded_score(dimension_data.get('score'))
+            dimension_data['status'] = (
+                'pass'
+                if dimension_data['score'] >= self.QUALITY_THRESHOLDS[dimension_name]
+                else 'fail'
+            )
         
         # 计算综合得分（加权平均）
         weights = {
@@ -76,24 +98,19 @@ class DataQualityMonitor:
         }
         
         overall_score = (
-            completeness['score'] * weights['completeness'] +
-            accuracy['score'] * weights['accuracy'] +
-            consistency['score'] * weights['consistency'] +
-            timeliness['score'] * weights['timeliness'] +
-            validity['score'] * weights['validity']
+            dimension_results['completeness']['score'] * weights['completeness'] +
+            dimension_results['accuracy']['score'] * weights['accuracy'] +
+            dimension_results['consistency']['score'] * weights['consistency'] +
+            dimension_results['timeliness']['score'] * weights['timeliness'] +
+            dimension_results['validity']['score'] * weights['validity']
         )
+        overall_score = self._bounded_score(overall_score)
         
         # 收集所有问题
         all_issues = []
         all_recommendations = []
         
-        for dimension_name, dimension_data in [
-            ('completeness', completeness),
-            ('accuracy', accuracy),
-            ('consistency', consistency),
-            ('timeliness', timeliness),
-            ('validity', validity)
-        ]:
+        for dimension_data in dimension_results.values():
             all_issues.extend(dimension_data.get('issues', []))
             all_recommendations.extend(dimension_data.get('recommendations', []))
         
@@ -104,11 +121,7 @@ class DataQualityMonitor:
             'overall_score': round(overall_score, 4),
             'overall_status': 'pass' if overall_score >= 0.85 else 'warning' if overall_score >= 0.70 else 'fail',
             'dimensions': {
-                'completeness': completeness,
-                'accuracy': accuracy,
-                'consistency': consistency,
-                'timeliness': timeliness,
-                'validity': validity
+                **dimension_results,
             },
             'issues': all_issues,
             'recommendations': all_recommendations
@@ -227,31 +240,34 @@ class DataQualityMonitor:
         type_inconsistencies = 0
         if 'type' in df.columns:
             # 检查是否有未知类型
-            known_types = {'earthquake', 'wildfire', 'flood', 'volcano', 'cyclone', 'storm'}
-            unknown_types = set(df['type'].unique()) - known_types
+            known_types = {'EARTHQUAKE', 'WILDFIRE', 'FLOOD', 'VOLCANO', 'CYCLONE', 'STORM'}
+            normalized_types = df['type'].dropna().astype(str).str.upper()
+            unknown_types = set(normalized_types.unique()) - known_types
             if unknown_types:
                 issues.append(f"Found unknown hazard types: {', '.join(unknown_types)}")
                 recommendations.append("Standardize hazard type naming")
-                type_inconsistencies = df['type'].isin(unknown_types).sum()
+                type_inconsistencies = normalized_types.isin(unknown_types).sum()
                 inconsistency_count += type_inconsistencies
         
         # 检查源一致性
         if 'source' in df.columns:
-            known_sources = {'USGS', 'NASA', 'GDACS'}
-            unknown_sources = set(df['source'].unique()) - known_sources
+            known_sources = {'USGS', 'NASA', 'GDACS', 'DISASTERAWARE'}
+            normalized_sources = df['source'].dropna().astype(str).str.upper()
+            unknown_sources = set(normalized_sources.unique()) - known_sources
             if unknown_sources:
                 issues.append(f"Found unknown data sources: {', '.join(unknown_sources)}")
                 recommendations.append("Verify and standardize data source names")
-                inconsistency_count += df['source'].isin(unknown_sources).sum()
+                inconsistency_count += normalized_sources.isin(unknown_sources).sum()
         
         # 检查严重程度一致性
         if 'severity' in df.columns:
-            known_severities = {'low', 'medium', 'high', 'critical'}
-            unknown_severities = set(df['severity'].dropna().unique()) - known_severities
+            known_severities = {'LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'MODERATE', 'WARNING', 'WATCH'}
+            normalized_severities = df['severity'].dropna().astype(str).str.upper()
+            unknown_severities = set(normalized_severities.unique()) - known_severities
             if unknown_severities:
                 issues.append(f"Found invalid severity levels: {', '.join(map(str, unknown_severities))}")
                 recommendations.append("Recalculate severity levels using standard thresholds")
-                inconsistency_count += df['severity'].isin(unknown_severities).sum()
+                inconsistency_count += normalized_severities.isin(unknown_severities).sum()
         
         total_records = len(df)
         consistency_score = 1 - (inconsistency_count / total_records) if total_records > 0 else 1.0
@@ -368,7 +384,7 @@ class DataQualityMonitor:
                 type_data = df[type_mask]
                 
                 # 简单检查：critical级别应该有较高的magnitude
-                critical_mask = type_data['severity'] == 'critical'
+                critical_mask = type_data['severity'].astype(str).str.upper() == 'CRITICAL'
                 if critical_mask.any():
                     critical_data = type_data[critical_mask]
                     low_mag_critical = critical_data['magnitude'] < 5.0  # 示例阈值

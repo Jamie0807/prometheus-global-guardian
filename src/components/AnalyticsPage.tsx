@@ -13,6 +13,15 @@ import { MetricCard, ProgressBar, LoadingSpinner, AlertBox, LineChart } from "./
 import ChartsPanel from "./ChartsPanel";
 import DataQualityMonitor from "./DataQualityMonitor";
 import type { Hazard as AppHazard } from "../types";
+import {
+  formatAnalyticsNumber,
+  formatAnalyticsPercent,
+  formatAnalyticsSignedPercent,
+  formatRiskRecommendation,
+  getPredictionDisplay,
+  getRiskLevelLabel,
+  getTrendLabel,
+} from "../services/analytics/analyticsPresentation";
 
 // 类型定义
 interface AnalyticsPageProps {
@@ -131,15 +140,27 @@ interface AnalyticsData {
     trend: string;
   };
   recommendations?: string[];
+  recommendationDetails?: RiskRecommendation[];
 }
 
 interface PredictionSummary {
   status?: string;
+  reason?: string;
+  dataPoints?: number;
+  minimumDataPoints?: number;
+  confidence?: number | null;
   accuracy?: number;
   predictions?: {
     next7Days?: number[];
     averageMagnitude?: number;
   };
+}
+
+interface RiskRecommendation {
+  ruleId?: string;
+  severity?: string;
+  message?: string;
+  metrics?: Record<string, unknown>;
 }
 
 interface TypeRisk {
@@ -238,6 +259,41 @@ const STYLES = {
     boxShadow: "0 4px 12px rgba(76, 175, 80, 0.2)",
     transition: "all 0.3s ease",
   },
+};
+
+const PredictionStatusBadge: React.FC<{ prediction: PredictionSummary }> = ({ prediction }) => {
+  const display = getPredictionDisplay(prediction);
+
+  return (
+    <span
+      style={{
+        padding: "4px 8px",
+        borderRadius: "4px",
+        backgroundColor: display.badgeColor,
+        color: "#fff",
+        fontSize: "11px",
+        fontWeight: "bold",
+      }}
+    >
+      {display.label}
+    </span>
+  );
+};
+
+const RiskRecommendationLine: React.FC<{ recommendation: RiskRecommendation | string }> = ({
+  recommendation,
+}) => {
+  const display =
+    typeof recommendation === "string"
+      ? formatRiskRecommendation({ message: recommendation })
+      : formatRiskRecommendation(recommendation);
+
+  return (
+    <li style={{ marginBottom: "8px", fontSize: "14px" }}>
+      <strong style={{ color: "#FFD54F" }}>{display.severityLabel}: </strong>
+      {display.text}
+    </li>
+  );
 };
 
 const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
@@ -2396,7 +2452,10 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                           marginTop: "5px",
                         }}
                       >
-                        {predictions.data.overallRiskAssessment.overallRiskScore?.toFixed(1)}
+                        {formatAnalyticsNumber(
+                          predictions.data.overallRiskAssessment.overallRiskScore,
+                          1,
+                        )}
                       </div>
                     </div>
                     <div>
@@ -2409,7 +2468,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                           marginTop: "5px",
                         }}
                       >
-                        {predictions.data.overallRiskAssessment.riskLevel}
+                        {getRiskLevelLabel(predictions.data.overallRiskAssessment.riskLevel)}
                       </div>
                     </div>
                     <div>
@@ -2422,7 +2481,9 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                           marginTop: "5px",
                         }}
                       >
-                        {predictions.data.overallRiskAssessment.averageAccuracy?.toFixed(1)}%
+                        {formatAnalyticsPercent(
+                          predictions.data.overallRiskAssessment.averageAccuracy,
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2440,7 +2501,11 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         💡 建议
                       </div>
                       <div style={{ color: "#fff", fontSize: "14px" }}>
-                        {predictions.data.overallRiskAssessment.recommendation}
+                        {
+                          formatRiskRecommendation({
+                            message: predictions.data.overallRiskAssessment.recommendation,
+                          }).text
+                        }
                       </div>
                     </div>
                   )}
@@ -2478,27 +2543,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "16px" }}>
                           🌍 地震预测
                         </span>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              predictions.data.earthquakePrediction.status === "insufficient_data"
-                                ? "#666"
-                                : (predictions.data.earthquakePrediction.accuracy ?? 0) >= 80
-                                  ? "#4CAF50"
-                                  : "#ff9800",
-                            color: "#fff",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {predictions.data.earthquakePrediction.status === "insufficient_data"
-                            ? "N/A"
-                            : predictions.data.earthquakePrediction.accuracy
-                              ? `${predictions.data.earthquakePrediction.accuracy.toFixed(1)}%`
-                              : "N/A"}
-                        </span>
+                        <PredictionStatusBadge prediction={predictions.data.earthquakePrediction} />
                       </div>
 
                       {/* 7天预测数据 */}
@@ -2529,29 +2574,34 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                               </div>
                             ),
                           )}
-                          {predictions.data.earthquakePrediction.predictions.averageMagnitude && (
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                padding: "6px",
-                                backgroundColor: "#0a0a0a",
-                                borderRadius: "4px",
-                              }}
-                            >
-                              <span style={{ color: "#888", fontSize: "11px" }}>平均震级: </span>
-                              <span
-                                style={{ color: "#FF9800", fontSize: "11px", fontWeight: "bold" }}
+                          {predictions.data.earthquakePrediction.predictions.averageMagnitude !==
+                            undefined &&
+                            predictions.data.earthquakePrediction.predictions.averageMagnitude !==
+                              null && (
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  padding: "6px",
+                                  backgroundColor: "#0a0a0a",
+                                  borderRadius: "4px",
+                                }}
                               >
-                                {predictions.data.earthquakePrediction.predictions.averageMagnitude.toFixed(
-                                  1,
-                                )}
-                              </span>
-                            </div>
-                          )}
+                                <span style={{ color: "#888", fontSize: "11px" }}>平均震级: </span>
+                                <span
+                                  style={{ color: "#FF9800", fontSize: "11px", fontWeight: "bold" }}
+                                >
+                                  {formatAnalyticsNumber(
+                                    predictions.data.earthquakePrediction.predictions
+                                      .averageMagnitude,
+                                    1,
+                                  )}
+                                </span>
+                              </div>
+                            )}
                         </div>
                       ) : (
                         <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
-                          数据不足，无法预测
+                          {getPredictionDisplay(predictions.data.earthquakePrediction).detail}
                         </div>
                       )}
                     </div>
@@ -2578,27 +2628,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         <span style={{ color: "#FF9800", fontWeight: "bold", fontSize: "16px" }}>
                           🌋 火山预测
                         </span>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              predictions.data.volcanoPrediction.status === "insufficient_data"
-                                ? "#666"
-                                : (predictions.data.volcanoPrediction.accuracy ?? 0) >= 80
-                                  ? "#4CAF50"
-                                  : "#ff9800",
-                            color: "#fff",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {predictions.data.volcanoPrediction.status === "insufficient_data"
-                            ? "N/A"
-                            : predictions.data.volcanoPrediction.accuracy
-                              ? `${predictions.data.volcanoPrediction.accuracy.toFixed(1)}%`
-                              : "N/A"}
-                        </span>
+                        <PredictionStatusBadge prediction={predictions.data.volcanoPrediction} />
                       </div>
                       {predictions.data.volcanoPrediction.predictions?.next7Days ? (
                         <div style={{ marginTop: "12px" }}>
@@ -2630,7 +2660,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         </div>
                       ) : (
                         <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
-                          数据不足，无法预测
+                          {getPredictionDisplay(predictions.data.volcanoPrediction).detail}
                         </div>
                       )}
                     </div>
@@ -2657,27 +2687,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         <span style={{ color: "#2196F3", fontWeight: "bold", fontSize: "16px" }}>
                           ⛈️ 风暴预测
                         </span>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              predictions.data.stormPrediction.status === "insufficient_data"
-                                ? "#666"
-                                : (predictions.data.stormPrediction.accuracy ?? 0) >= 80
-                                  ? "#4CAF50"
-                                  : "#ff9800",
-                            color: "#fff",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {predictions.data.stormPrediction.status === "insufficient_data"
-                            ? "N/A"
-                            : predictions.data.stormPrediction.accuracy
-                              ? `${predictions.data.stormPrediction.accuracy.toFixed(1)}%`
-                              : "N/A"}
-                        </span>
+                        <PredictionStatusBadge prediction={predictions.data.stormPrediction} />
                       </div>
                       {predictions.data.stormPrediction.predictions?.next7Days ? (
                         <div style={{ marginTop: "12px" }}>
@@ -2709,7 +2719,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         </div>
                       ) : (
                         <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
-                          数据不足，无法预测
+                          {getPredictionDisplay(predictions.data.stormPrediction).detail}
                         </div>
                       )}
                     </div>
@@ -2736,27 +2746,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         <span style={{ color: "#00BCD4", fontWeight: "bold", fontSize: "16px" }}>
                           🌊 洪水预测
                         </span>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              predictions.data.floodPrediction.status === "insufficient_data"
-                                ? "#666"
-                                : (predictions.data.floodPrediction.accuracy ?? 0) >= 80
-                                  ? "#4CAF50"
-                                  : "#ff9800",
-                            color: "#fff",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {predictions.data.floodPrediction.status === "insufficient_data"
-                            ? "N/A"
-                            : predictions.data.floodPrediction.accuracy
-                              ? `${predictions.data.floodPrediction.accuracy.toFixed(1)}%`
-                              : "N/A"}
-                        </span>
+                        <PredictionStatusBadge prediction={predictions.data.floodPrediction} />
                       </div>
                       {predictions.data.floodPrediction.predictions?.next7Days ? (
                         <div style={{ marginTop: "12px" }}>
@@ -2788,7 +2778,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         </div>
                       ) : (
                         <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
-                          数据不足，无法预测
+                          {getPredictionDisplay(predictions.data.floodPrediction).detail}
                         </div>
                       )}
                     </div>
@@ -2815,27 +2805,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         <span style={{ color: "#FF5722", fontWeight: "bold", fontSize: "16px" }}>
                           🔥 野火预测
                         </span>
-                        <span
-                          style={{
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            backgroundColor:
-                              predictions.data.wildfirePrediction.status === "insufficient_data"
-                                ? "#666"
-                                : (predictions.data.wildfirePrediction.accuracy ?? 0) >= 80
-                                  ? "#4CAF50"
-                                  : "#ff9800",
-                            color: "#fff",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {predictions.data.wildfirePrediction.status === "insufficient_data"
-                            ? "N/A"
-                            : predictions.data.wildfirePrediction.accuracy
-                              ? `${predictions.data.wildfirePrediction.accuracy.toFixed(1)}%`
-                              : "N/A"}
-                        </span>
+                        <PredictionStatusBadge prediction={predictions.data.wildfirePrediction} />
                       </div>
                       {predictions.data.wildfirePrediction.predictions?.next7Days ? (
                         <div style={{ marginTop: "12px" }}>
@@ -2867,7 +2837,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                         </div>
                       ) : (
                         <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
-                          数据不足，无法预测
+                          {getPredictionDisplay(predictions.data.wildfirePrediction).detail}
                         </div>
                       )}
                     </div>
@@ -2951,13 +2921,13 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                       marginBottom: "10px",
                     }}
                   >
-                    风险分数: {riskAssessment.data.overallRiskScore.score?.toFixed(2)}
+                    风险分数: {formatAnalyticsNumber(riskAssessment.data.overallRiskScore.score, 2)}
                   </div>
                   <div style={{ fontSize: "18px", color: "#fff" }}>
-                    等级: {riskAssessment.data.overallRiskScore.level}
+                    等级: {getRiskLevelLabel(riskAssessment.data.overallRiskScore.level)}
                   </div>
                   <div style={{ fontSize: "14px", color: "#888", marginTop: "10px" }}>
-                    趋势: {riskAssessment.data.overallRiskScore.trend}
+                    趋势: {getTrendLabel(riskAssessment.data.overallRiskScore.trend)}
                   </div>
                 </div>
               )}
@@ -3007,17 +2977,18 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                             <div>
                               <span style={{ color: "#666" }}>风险分数: </span>
                               <span style={{ color: "#fff", fontWeight: "bold" }}>
-                                {risk.riskScore?.toFixed(2) || "N/A"}
+                                {formatAnalyticsNumber(risk.riskScore, 2)}
                               </span>
                             </div>
-                            {risk.averageMagnitude && (
-                              <div>
-                                <span style={{ color: "#666" }}>平均震级: </span>
-                                <span style={{ color: "#fff", fontWeight: "bold" }}>
-                                  {risk.averageMagnitude?.toFixed(2)}
-                                </span>
-                              </div>
-                            )}
+                            {risk.averageMagnitude !== undefined &&
+                              risk.averageMagnitude !== null && (
+                                <div>
+                                  <span style={{ color: "#666" }}>平均震级: </span>
+                                  <span style={{ color: "#fff", fontWeight: "bold" }}>
+                                    {formatAnalyticsNumber(risk.averageMagnitude, 2)}
+                                  </span>
+                                </div>
+                              )}
                             <div>
                               <span style={{ color: "#666" }}>权重: </span>
                               <span style={{ color: "#888" }}>{risk.weight}</span>
@@ -3153,7 +3124,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                           marginTop: "5px",
                         }}
                       >
-                        {riskAssessment.data.temporalRisks.growthRate}%
+                        {formatAnalyticsSignedPercent(riskAssessment.data.temporalRisks.growthRate)}
                       </div>
                     </div>
                     <div>
@@ -3166,7 +3137,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
                           marginTop: "5px",
                         }}
                       >
-                        {riskAssessment.data.temporalRisks.trend}
+                        {getTrendLabel(riskAssessment.data.temporalRisks.trend)}
                       </div>
                     </div>
                   </div>
@@ -3174,26 +3145,28 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
               )}
 
               {/* 建议 */}
-              {riskAssessment.data?.recommendations &&
-                riskAssessment.data.recommendations.length > 0 && (
-                  <div
-                    style={{
-                      backgroundColor: "#1a1a1a",
-                      padding: "20px",
-                      borderRadius: "8px",
-                      border: "1px solid #4CAF50",
-                    }}
-                  >
-                    <h4 style={{ color: "#4CAF50", marginBottom: "15px" }}>💡 建议</h4>
-                    <ul style={{ margin: 0, paddingLeft: "20px", color: "#fff" }}>
-                      {riskAssessment.data.recommendations.map((rec: string, idx: number) => (
-                        <li key={idx} style={{ marginBottom: "8px", fontSize: "14px" }}>
-                          {rec}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              {((riskAssessment.data?.recommendationDetails?.length ?? 0) > 0 ||
+                (riskAssessment.data?.recommendations?.length ?? 0) > 0) && (
+                <div
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    padding: "20px",
+                    borderRadius: "8px",
+                    border: "1px solid #4CAF50",
+                  }}
+                >
+                  <h4 style={{ color: "#4CAF50", marginBottom: "15px" }}>💡 规则建议</h4>
+                  <ul style={{ margin: 0, paddingLeft: "20px", color: "#fff" }}>
+                    {(
+                      riskAssessment.data.recommendationDetails ??
+                      riskAssessment.data.recommendations ??
+                      []
+                    ).map((rec, idx) => (
+                      <RiskRecommendationLine key={idx} recommendation={rec} />
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 

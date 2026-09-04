@@ -184,15 +184,21 @@ docker run --rm -p 8001:8001 prometheus-analytics:latest
 - 洪水：洪水时间序列和风暴级联分析。
 - 野火：野火时间序列和多因子说明。
 
-当某类灾害未达到模型所需样本量、有效时间点或震级条件时，接口会返回 \`status: "insufficient_data"\`，前端可能展示 \`N/A\`。这表示当前数据不满足模型条件，不代表预测值为零。模型最低样本、状态原因和置信度尚未形成完整响应契约。
+当某类灾害未达到模型所需样本量、有效时间点或震级条件时，接口会返回 \`status: "insufficient_data"\`，并同时返回 \`reason\`、\`dataPoints\`、\`minimumDataPoints\` 和 \`confidence: null\`。这表示当前数据不满足模型条件，不代表预测值为零。模型执行失败时返回 \`status: "model_error"\`；可用结果返回 \`status: "ready"\`，其置信度统一限制在 \`0-1\`。
 
 ### 风险评估
 
-\`RiskAssessor\` 返回总体风险分数、风险等级、分类风险、地理热点、时间趋势、人口影响和建议。总体分数与建议由不同规则计算，因此出现“总体为 LOW 但同时提示高地震活动”并不一定是接口失败，但当前响应没有说明各建议的触发指标，容易造成结果语义冲突。
+\`RiskAssessor\` 返回总体风险分数、风险等级、分类风险、地理热点、时间趋势、人口影响和建议。\`recommendationDetails\` 为每条建议提供 \`ruleId\`、\`severity\`、\`metrics\` 和 \`message\`；总体风险与单项规则可以同时存在，前端应展示各自的触发依据。
 
 ### 数据质量
 
-\`DataQualityMonitor\` 评估完整性、准确性、一致性、时效性和有效性五个维度，并返回问题与改进建议。当前质量检查存在待治理问题：已知类型和来源规则与前端实际大写值及 \`DisasterAWARE\` 别名不完全一致；多个问题可能重复计数，使一致性得分低于 0，前端因此可能显示异常负分。该行为已记录在项目待优化清单中，当前不应把质量分数直接作为生产质量 SLA。
+\`DataQualityMonitor\` 评估完整性、准确性、一致性、时效性和有效性五个维度，并返回问题与改进建议。类型、来源和严重程度校验兼容前端大写枚举及 \`DisasterAWARE\` 别名；每个维度和总体质量分数均限制在 \`0-1\`，前端总分按 \`0-100\` 展示。
+
+### Analytics 结果语义
+
+- 预测状态：\`ready\`（可用）、\`insufficient_data\`（样本不足）、\`model_error\`（模型失败）。
+- 风险建议：优先使用结构化的 \`recommendationDetails\`，旧的字符串 \`recommendations\` 仅用于兼容。
+- 质量分数：服务内部维度使用 \`0-1\`，质量接口总分使用 \`0-100\`；无效数值不能直接作为展示结果。
 
 ## 测试
 
@@ -226,7 +232,7 @@ python test_service.py
 
 \`test_service.py\` 是依赖已启动服务的手工集成脚本，会等待用户按回车后请求 \`8001\` 端点。它主要打印结果并汇总布尔状态，也不是 pytest 单元测试。
 
-现有 Python 自动化测试覆盖请求模型和 FastAPI HTTP 路由，但仍缺少系统性的算法边界覆盖、pytest 迁移和 CI 接入。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
+现有 Python 自动化测试覆盖请求模型、FastAPI HTTP 路由，以及预测、风险和质量结果语义；仍缺少系统性的算法边界覆盖、pytest 迁移和 CI 接入。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
 
 ## 项目结构
 
@@ -238,7 +244,8 @@ python-analytics-service/
 ├── start.sh # 服务目录内启动脚本
 ├── tests/
 │ ├── test_api_contract.py # API 契约单元测试
-│ └── test_api_routes.py # FastAPI HTTP 路由契约测试
+│ ├── test_api_routes.py # FastAPI HTTP 路由契约测试
+│ └── test_result_semantics.py # 预测、风险和质量结果语义测试
 ├── test_service.py # 手工集成测试脚本
 ├── test_pivot_table.py # 打印式透视算法测试脚本
 └── analytics/

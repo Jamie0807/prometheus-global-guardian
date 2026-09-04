@@ -23,16 +23,16 @@
 截至 2026-09-04，基线包含：
 
 - BFF 单元测试：29 项。
-- Service 单元测试：17 项。
+- Service 单元测试：26 项。
 - React 组件测试：3 项。
 - Playwright E2E：1 项。
-- 合计：50 项自动化测试。
+- 合计：59 项自动化测试。
 
-独立执行的 Python API 契约测试：17 项，其中模型和端点单元测试 10 项，FastAPI HTTP 路由测试 7 项；它们目前不计入上述根目录基线总数。
+独立执行的 Python 自动化测试：22 项，其中模型和端点单元测试 10 项、FastAPI HTTP 路由测试 7 项、预测/风险/质量结果语义测试 5 项；它们目前不计入上述根目录基线总数。
 
 ## 测试边界
 
-单元测试验证 BFF provider、AI 路由和流式转换，以及前端 HTTP、灾害数据适配、Analytics 和 AI Service。组件测试验证状态面板的加载、筛选、刷新和健康状态展示。E2E 验证生产构建首页加载、灾害类型筛选、AI 助手打开和 mock 流式消息展示。
+单元测试验证 BFF provider、AI 路由和流式转换，以及前端 HTTP、灾害数据适配、Analytics 结果展示适配和 AI Service。组件测试验证状态面板的加载、筛选、刷新和健康状态展示。E2E 验证生产构建首页加载、灾害类型筛选、AI 助手打开和 mock 流式消息展示。
 
 E2E 通过 Playwright route mock 隔离 DisasterAware、公开灾害源、Mapbox 和 AI provider，不访问真实第三方服务，也不要求本地配置真实账号或模型 Key。失败时保留截图，重试时保留 trace。
 
