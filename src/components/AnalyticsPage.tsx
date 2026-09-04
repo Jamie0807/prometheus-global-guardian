@@ -9,6 +9,7 @@ import {
   calculate4DRiskScores,
 } from "../services/analytics/analyticsService";
 import { notify } from "../utils/notifications";
+import { getHazardIntensity } from "../utils/hazardMetrics";
 import { MetricCard, ProgressBar, LoadingSpinner, AlertBox, LineChart } from "./DataVisualization";
 import ChartsPanel from "./ChartsPanel";
 import DataQualityMonitor from "./DataQualityMonitor";
@@ -334,6 +335,15 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
       {} as Record<string, number>,
     );
   }, [hazards]);
+
+  const intensityData = useMemo(
+    () =>
+      hazards.flatMap((hazard, index) => {
+        const intensity = getHazardIntensity(hazard);
+        return intensity === null ? [] : [{ x: `#${index + 1}`, y: intensity }];
+      }),
+    [hazards],
+  );
 
   useEffect(() => {
     checkServiceStatus();
@@ -871,45 +881,17 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ hazards, onClose }) => {
               {/* 📈 折线图展示 */}
               <div style={{ marginBottom: "30px" }}>
                 <LineChart
-                  data={hazards.map((h, i) => {
-                    // 调试：查看第一条数据的结构（仅在开发环境）
-                    if (i === 0 && typeof window !== "undefined") {
-                      console.log("🔍 第一条灾害数据结构:", JSON.stringify(h, null, 2));
-                    }
-
-                    // 尝试从多个可能的字段获取强度值
-                    // 先尝试geometry中的坐标（可能包含震级等信息）
-                    const geometryMag = h.geometry.magnitudeValue || h.geometry.magnitude;
-
-                    // 再尝试properties中的各种可能字段
-                    const propMag =
-                      h.properties?.magnitude ||
-                      h.properties?.severity ||
-                      h.properties?.episodealertlevel ||
-                      h.properties?.alertlevel ||
-                      h.properties?.mag ||
-                      h.properties?.magnitudeValue;
-
-                    // 如果都没有，使用随机数而不是固定模式
-                    const randomValue = 2 + Math.random() * 7; // 2-9之间的随机数
-
-                    const magnitude = geometryMag || propMag || randomValue;
-
-                    return {
-                      x: `#${i + 1}`,
-                      y:
-                        typeof magnitude === "number"
-                          ? magnitude
-                          : parseFloat(magnitude) || randomValue,
-                    };
-                  })}
-                  title="📊 灾害强度趋势分析（全部数据）"
+                  data={intensityData}
+                  title="📊 灾害强度趋势分析（有效强度数据）"
                   color="#4CAF50"
                   xLabel="数据编号"
                   yLabel="灾害强度"
                   showDots={true}
                   height={280}
                 />
+                <div style={{ marginTop: "8px", color: "#888", fontSize: "12px" }}>
+                  有效强度数据：{intensityData.length} / {hazards.length}
+                </div>
               </div>
 
               {/* 基础统计 */}

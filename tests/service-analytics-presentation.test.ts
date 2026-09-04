@@ -76,6 +76,12 @@ describe("analytics presentation semantics", () => {
     expect(localizeAnalyticsMessage("Found unknown hazard types: STORM")).toBe(
       "发现未知灾害类型： STORM",
     );
+    expect(localizeAnalyticsMessage("184 records are older than 30 days")).toBe(
+      "184 条记录超过 30 天",
+    );
+    expect(localizeAnalyticsMessage("Update or archive outdated records")).toBe(
+      "更新或归档过期记录",
+    );
   });
 
   it("renders a localized recommendation with its trigger metric", () => {
@@ -89,6 +95,27 @@ describe("analytics presentation semantics", () => {
     ).toEqual({
       severityLabel: "重点关注",
       text: "总体风险达到 65.0 分（阈值 60.0 分），建议加强监测并准备响应团队。",
+    });
+  });
+
+  it("supports the English Analytics copy resource without changing the API shape", () => {
+    expect(
+      getPredictionDisplay(
+        { status: "insufficient_data", dataPoints: 2, minimumDataPoints: 5 },
+        "en-US",
+      ),
+    ).toMatchObject({
+      label: "Insufficient data",
+      detail: "2 records available; at least 5 required",
+      accuracyLabel: "No data",
+    });
+    expect(getRiskLevelLabel("CRITICAL", "en-US")).toBe("Critical risk");
+    expect(getTrendLabel("decreasing", "en-US")).toBe("Decreasing");
+    expect(
+      formatRiskRecommendation({ ruleId: "standard_monitoring", severity: "info" }, "en-US"),
+    ).toEqual({
+      severityLabel: "Routine monitoring",
+      text: "Risk is within the routine monitoring range.",
     });
   });
 });

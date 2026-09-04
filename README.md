@@ -66,6 +66,9 @@ The platform consists of a React frontend, a lightweight Express API layer, a Py
 - Uses the Python service for statistics, predictions, risk assessment, ETL, and data quality checks.
 - Includes service health, loading, error, retry, and cached-analysis states.
 - Presents prediction availability, sample requirements, confidence, risk levels, trends, and quality scores through one display adapter.
+- Supports `zh-CN` and `en-US` Analytics result copy resources without changing the Python API shape.
+- Builds the disaster-intensity trend from real numeric magnitude fields only; records without intensity are excluded and the valid-record count is shown.
+- Samples dense X-axis labels to at most eight evenly spaced labels while keeping the first and last record indexes visible.
 
 #### AI-Assisted Incident Analysis
 
@@ -264,6 +267,7 @@ pnpm test
 - `tests/server-auth.test.ts`: BFF authorization, token injection, refresh, and local hazard aggregation.
 - `tests/service-http.test.ts`, `tests/service-adapters.test.ts`, `tests/service-analytics.test.ts`, and `tests/service-ai.test.ts`: frontend Service-layer unit tests.
 - `tests/service-analytics-presentation.test.ts`: Analytics status, score, trend, recommendation, and quality-text presentation tests.
+- `tests/service-hazard-metrics.test.ts`: normalized magnitude priority, compatible fields, zero values, and missing-intensity behavior.
 
 Run the two unit-test groups independently with `pnpm run test:bff` and `pnpm run test:services`. These tests do not open a browser or exercise React components, page interactions, or visual layout.
 
@@ -510,7 +514,9 @@ prometheus-global-guardian/
 │       ├── 2026-09-03-project-governance.md
 │       ├── 2026-09-03-unify-hazard-analytics-contract.md
 │       ├── 2026-09-04-analytics-contract-http-integration.md
-│       └── 2026-09-04-analytics-result-semantics.md
+│       ├── 2026-09-04-analytics-result-semantics.md
+│       ├── 2026-09-04-analytics-presentation-phase2.md
+│       └── 2026-09-04-statistics-chart-axis-layout.md
 ├── public/
 │   └── assets/                  # Logo and static assets
 ├── scripts/
@@ -554,6 +560,11 @@ prometheus-global-guardian/
 │   ├── config/                  # Public frontend configuration
 │   ├── types/                   # Shared frontend domain types
 │   ├── utils/                   # UI helpers and utilities
+│   │   ├── chartLabels.ts
+│   │   ├── hazardMetrics.ts
+│   │   ├── aiAssistant.ts
+│   │   ├── dataExport.ts
+│   │   └── notifications.ts
 │   ├── workers/                 # Web Workers
 │   ├── App.tsx
 │   ├── index.css
@@ -570,6 +581,8 @@ prometheus-global-guardian/
 ├── tests/
 │   ├── component/
 │   │   ├── setup.ts
+│   │   ├── data-visualization.test.tsx
+│   │   ├── data-quality-monitor.test.tsx
 │   │   └── status-panel.test.tsx
 │   ├── e2e/
 │   │   └── app-smoke.spec.ts
@@ -580,6 +593,7 @@ prometheus-global-guardian/
 │   ├── service-adapters.test.ts
 │   ├── service-analytics.test.ts
 │   ├── service-analytics-presentation.test.ts
+│   ├── service-hazard-metrics.test.ts
 │   ├── service-ai.test.ts
 │   └── service-http.test.ts
 ├── AGENTS.md                   # Project-level development constraints
@@ -676,6 +690,9 @@ Prometheus Global Guardian 是一套面向灾害监测、地理态势可视化�
 - 通过 Python 服务提供统计分析、预测分析、风险评估、ETL 和数据质量检查。
 - 分析页面包含服务健康状态、加载状态、错误处理、重试和分析缓存控制。
 - 预测、风险和质量结果统一经过展示适配：明确样本状态、置信度、风险等级、趋势、分数范围和中文建议。
+- 展示适配器支持 `zh-CN` 和 `en-US` 文案资源，不改变 Python API 契约。
+- 灾害强度趋势只使用真实数值强度字段；缺少强度的记录会排除，并显示有效数据量。
+- 大数据量时 X 轴最多显示 8 个均匀抽样的标签，同时保留首尾记录编号。
 
 #### AI 辅助研判
 
@@ -877,6 +894,7 @@ pnpm test
 - `tests/service-analytics.test.ts`：Analytics 数据格式化和时间戳回退测试。
 - `tests/service-ai.test.ts`：AI 请求、SSE 增量、错误处理和 Demo 降级测试。
 - `tests/service-analytics-presentation.test.ts`：Analytics 状态、分数、趋势、建议和质量文案展示测试。
+- `tests/service-hazard-metrics.test.ts`：标准震级优先级、兼容字段、零值和缺失强度处理测试。
 
 拆分运行时可以使用 `pnpm run test:bff` 和 `pnpm run test:services`。Service 测试属于前端业务层单元测试，不会打开浏览器，也不会测试 React 组件、页面交互或视觉布局。
 
@@ -1125,7 +1143,9 @@ prometheus-global-guardian/
 │       ├── 2026-09-03-project-governance.md
 │       ├── 2026-09-03-unify-hazard-analytics-contract.md
 │       ├── 2026-09-04-analytics-contract-http-integration.md
-│       └── 2026-09-04-analytics-result-semantics.md
+│       ├── 2026-09-04-analytics-result-semantics.md
+│       ├── 2026-09-04-analytics-presentation-phase2.md
+│       └── 2026-09-04-statistics-chart-axis-layout.md
 ├── public/
 │   └── assets/                  # Logo 和静态资源
 ├── scripts/
@@ -1169,6 +1189,8 @@ prometheus-global-guardian/
 │   ├── config/                  # 可公开的前端配置
 │   ├── types/                   # 前端领域共享类型
 │   ├── utils/                   # UI 辅助函数和工具
+│   │   ├── chartLabels.ts
+│   │   ├── hazardMetrics.ts
 │   │   ├── aiAssistant.ts
 │   │   ├── dataExport.ts
 │   │   └── notifications.ts
@@ -1188,6 +1210,7 @@ prometheus-global-guardian/
 ├── tests/
 │   ├── component/
 │   │   ├── setup.ts
+│   │   ├── data-quality-monitor.test.tsx
 │   │   └── status-panel.test.tsx
 │   ├── e2e/
 │   │   └── app-smoke.spec.ts
