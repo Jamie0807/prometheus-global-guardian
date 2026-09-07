@@ -32,7 +32,7 @@
 
 | 优先级 | 优化领域                          | 状态               | 影响                                                   | 建议时机 |
 | ------ | --------------------------------- | ------------------ | ------------------------------------------------------ | -------- |
-| P0     | 地图模块拆分                      | 待开始             | 提升核心模块可维护性和性能可信度                       | 第一批   |
+| P0     | 地图模块拆分                      | 已完成             | 提升核心模块可维护性和性能可信度                       | 第一批   |
 | P0     | 分析页面拆分                      | 待开始             | 降低最大组件维护成本                                   | 第一批   |
 | P0     | API / Service 层统一              | 已完成             | 提升稳定性和排查效率                                   | 第一批   |
 | P0     | AI 助手智能路由                   | 已完成             | 由 LLM 判断普通模型与 RAG 工作流调用边界               | 第一批   |
@@ -375,6 +375,14 @@ AIChatAssistant
 `src/services/analytics/analyticsService.ts`、`AnalyticsPage.tsx`、`ChartsPanel.tsx`、`DataQualityMonitor.tsx` 等仍大量使用 `any[]`、`Promise<any>` 和动态字段。应优先为 Analytics、图表、质量报告、钻取和导出定义稳定的响应类型与类型守卫；保留 `unknown` 只作为外部输入边界，并逐步把 ESLint 的 `no-explicit-any` 从 warning 提升为受控 error。
 
 ## P0：地图模块拆分
+
+### 本轮完成情况
+
+- 将原 `src/components/MapView.tsx` 拆分为 `src/features/map/MapView.tsx`、6 个地图 hook 和 3 个纯工具模块。
+- 地图实例、数据与 Worker、Marker、LOD、热力图、3D Tiles/建筑回退均有独立职责；组合组件只负责 hook 编排和热力图切换控件。
+- 新增 GeoJSON/LOD 单元测试及 Mapbox/Worker mock 组件测试，覆盖临界 zoom、坐标过滤、热力图切换与组件挂载。
+- `pnpm run test:baseline` 已通过：BFF 29、Service 36、组件 8、E2E 1，前后端构建通过。
+- Popup 安全、统一灾害入口、自动刷新竞态和包体积治理仍按各自待办继续跟踪。
 
 ### 当前状态
 

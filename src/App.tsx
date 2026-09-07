@@ -4,7 +4,7 @@ import { notify } from "./utils/notifications";
 import Header from "./components/Header";
 import StatusPanel from "./components/StatusPanel";
 import LegendPanel from "./components/LegendPanel";
-import MapView from "./components/MapView";
+import MapView from "./features/map/MapView";
 import ErrorBoundary from "./components/ErrorBoundary";
 import type { Hazard, SaveReportPayload } from "./types";
 
