@@ -9,6 +9,7 @@ Prometheus Global Guardian 的 Python 数据分析服务，使用 FastAPI 提供
 - 前端通过 \`VITE_PYTHON_API_URL\` 直接请求本服务的 \`/api/v1/\*\` 接口。
 - Express BFF 负责 DisasterAware、灾害聚合和 AI provider 路由，当前不代理 Python Analytics 请求。
 - 服务不会读取前端模型 Key 或 DisasterAware 凭据。
+- \`/health\` 保持公开；\`/metrics\` 和 \`/cache/clear\` 是管理接口，必须配置服务端令牌才能使用。
 
 \`\`\`text
 React Browser
@@ -45,19 +46,26 @@ python main.py
 
 服务启动后可访问：
 
-| 地址                              | 用途       |
-| --------------------------------- | ---------- |
-| \`http://localhost:8001/\`        | 服务信息   |
-| \`http://localhost:8001/health\`  | 健康检查   |
-| \`http://localhost:8001/docs\`    | Swagger UI |
-| \`http://localhost:8001/redoc\`   | ReDoc      |
-| \`http://localhost:8001/metrics\` | 运行指标   |
+| 地址                              | 用途                 |
+| --------------------------------- | -------------------- |
+| \`http://localhost:8001/\`        | 服务信息             |
+| \`http://localhost:8001/health\`  | 健康检查             |
+| \`http://localhost:8001/docs\`    | Swagger UI           |
+| \`http://localhost:8001/redoc\`   | ReDoc                |
+| \`http://localhost:8001/metrics\` | 运行指标（管理令牌） |
 
 前端本地开发时，在根目录 \`.env\` 中设置：
 
 \`\`\`dotenv
 VITE_PYTHON_API_URL=http://localhost:8001
+ANALYTICS_ADMIN_TOKEN=replace-with-a-long-random-secret
+
+# 可选：逗号分隔的浏览器来源白名单
+
+ANALYTICS_CORS_ORIGINS=https://app.example
 \`\`\`
+
+`ANALYTICS_ADMIN_TOKEN` 只能作为服务端环境变量使用，不能使用 `VITE_` 前缀，也不能写入前端代码、日志或响应。未配置令牌时，`GET /metrics` 和 `POST /cache/clear` 均返回 `404`；配置后，调用方必须携带 `X-Analytics-Admin-Token`。默认 CORS 只允许 `http://localhost:5173`、`http://localhost:3000` 和 `http://localhost:8080`，不允许 Cookie 凭据；需要额外来源时使用 `ANALYTICS_CORS_ORIGINS` 显式覆盖。
 
 ### Docker 启动
 
@@ -74,6 +82,8 @@ cd python-analytics-service
 docker build -t prometheus-analytics:latest .
 docker run --rm -p 8001:8001 prometheus-analytics:latest
 \`\`\`
+
+Compose 默认将端口发布为 `127.0.0.1:8001`，供本机浏览器和健康检查使用，不对局域网开放。直接运行镜像时也应按部署环境限制端口绑定。
 
 ## 数据请求模型
 
@@ -129,12 +139,12 @@ docker run --rm -p 8001:8001 prometheus-analytics:latest
 
 ### 服务与运维接口
 
-| 方法     | 路径             | 说明                           |
-| -------- | ---------------- | ------------------------------ |
-| \`GET\`  | \`/\`            | 服务名称、版本和能力列表       |
-| \`GET\`  | \`/health\`      | 返回服务健康状态               |
-| \`GET\`  | \`/metrics\`     | 请求数、缓存指标和平均处理时间 |
-| \`POST\` | \`/cache/clear\` | 清理进程内分析缓存             |
+| 方法     | 路径             | 说明                                         |
+| -------- | ---------------- | -------------------------------------------- |
+| \`GET\`  | \`/\`            | 服务名称、版本和能力列表                     |
+| \`GET\`  | \`/health\`      | 返回服务健康状态                             |
+| \`GET\`  | \`/metrics\`     | 请求数、缓存指标和平均处理时间；需要管理令牌 |
+| \`POST\` | \`/cache/clear\` | 清理进程内分析缓存；需要管理令牌             |
 
 ### 基础分析接口
 
@@ -223,7 +233,7 @@ cd python-analytics-service
 python -m unittest tests.test_api_routes
 ```
 
-`tests/test_api_routes.py` 使用 FastAPI `TestClient` 通过 ASGI 发送真实 HTTP 路由请求，覆盖五个 4D 路由的 2xx 响应、参数转发、查询回显、空结果和 422 校验；不需要启动 `8001` 服务，也不访问真实外部数据源。
+`tests/test_api_routes.py` 使用 FastAPI `TestClient` 通过 ASGI 发送真实 HTTP 路由请求，覆盖五个 4D 路由的 2xx 响应、参数转发、查询回显、空结果、422 校验，以及管理令牌和 CORS 边界；不需要启动 `8001` 服务，也不访问真实外部数据源。
 
 \`\`\`bash
 cd python-analytics-service
@@ -239,6 +249,7 @@ python test_service.py
 \`\`\`text
 python-analytics-service/
 ├── main.py # FastAPI 应用、请求模型和路由
+├── security.py # 管理令牌依赖与 CORS 来源解析
 ├── requirements.txt # Python 依赖
 ├── Dockerfile # Python 3.13 镜像
 ├── start.sh # 服务目录内启动脚本

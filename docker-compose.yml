@@ -30,7 +30,10 @@ services:
       context: ./python-analytics-service
       dockerfile: Dockerfile
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
+    environment:
+      ANALYTICS_ADMIN_TOKEN: ${ANALYTICS_ADMIN_TOKEN:-}
+      ANALYTICS_CORS_ORIGINS: ${ANALYTICS_CORS_ORIGINS:-}
     healthcheck:
       test:
         [

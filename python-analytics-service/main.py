@@ -29,6 +29,7 @@ from analytics.prediction_models import PredictionEngine
 from analytics.etl_processor import ETLProcessor
 from analytics.risk_assessment import RiskAssessor
 from analytics.pivot_table_analyzer import FourDimensionalPivotTable
+from security import AdminAccess, get_cors_origins
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -44,14 +45,10 @@ app = FastAPI(
 # CORS配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:8080",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=get_cors_origins(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Analytics-Admin-Token"],
 )
 
 # 数据模型定义
@@ -191,7 +188,7 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/metrics")
-async def get_metrics():
+async def get_metrics(_: AdminAccess):
     """获取性能指标"""
     cache_hit_rate = (REQUEST_METRICS["cache_hits"] / 
                      max(1, REQUEST_METRICS["cache_hits"] + REQUEST_METRICS["cache_misses"])) * 100
@@ -207,7 +204,7 @@ async def get_metrics():
     }
 
 @app.post("/cache/clear")
-async def clear_cache():
+async def clear_cache(_: AdminAccess):
     """清除缓存"""
     GLOBAL_CACHE.clear()
     return {"success": True, "message": "Cache cleared"}

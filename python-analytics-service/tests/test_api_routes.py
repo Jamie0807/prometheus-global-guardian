@@ -1,3 +1,4 @@
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -12,6 +13,7 @@ if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
 import main as api
+import security
 
 
 HAZARD = {
@@ -191,6 +193,92 @@ class FourDimensionalHttpRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["trends"], [])
         self.assertEqual(response.json()["data"]["time_window"], 14)
+
+
+class PythonManagementBoundaryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(api.app)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.close()
+
+    def test_health_remains_public_but_management_routes_require_a_configured_token(self):
+        with patch.dict(os.environ, {"ANALYTICS_ADMIN_TOKEN": ""}):
+            self.assertEqual(self.client.get("/health").status_code, 200)
+            self.assertEqual(self.client.get("/metrics").status_code, 404)
+            self.assertEqual(self.client.post("/cache/clear").status_code, 404)
+
+    def test_management_routes_reject_invalid_tokens_and_accept_the_configured_token(self):
+        api.GLOBAL_CACHE["fixture"] = {"data": {}, "timestamp": api.datetime.now()}
+
+        with patch.dict(os.environ, {"ANALYTICS_ADMIN_TOKEN": "test-admin-token"}):
+            self.assertEqual(
+                self.client.get(
+                    "/metrics", headers={"X-Analytics-Admin-Token": "incorrect-token"}
+                ).status_code,
+                404,
+            )
+            self.assertEqual(
+                self.client.get(
+                    "/metrics", headers={"X-Analytics-Admin-Token": "test-admin-token"}
+                ).status_code,
+                200,
+            )
+            self.assertEqual(
+                self.client.post(
+                    "/cache/clear",
+                    headers={"X-Analytics-Admin-Token": "test-admin-token"},
+                ).status_code,
+                200,
+            )
+
+        self.assertEqual(api.GLOBAL_CACHE, {})
+
+    def test_cors_disallows_credentials_and_unsupported_methods(self):
+        allowed_origin = "http://localhost:5173"
+        response = self.client.options(
+            "/api/v1/quality/thresholds",
+            headers={
+                "Origin": allowed_origin,
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("access-control-allow-origin"), allowed_origin)
+        self.assertIsNone(response.headers.get("access-control-allow-credentials"))
+
+        unsupported_method_response = self.client.options(
+            "/api/v1/quality/thresholds",
+            headers={
+                "Origin": allowed_origin,
+                "Access-Control-Request-Method": "PUT",
+            },
+        )
+        self.assertEqual(unsupported_method_response.status_code, 400)
+
+        untrusted_origin_response = self.client.options(
+            "/api/v1/quality/thresholds",
+            headers={
+                "Origin": "https://untrusted.example",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        self.assertEqual(untrusted_origin_response.status_code, 400)
+        self.assertIsNone(
+            untrusted_origin_response.headers.get("access-control-allow-origin")
+        )
+
+    def test_cors_origin_override_uses_the_configured_explicit_origins(self):
+        with patch.dict(
+            os.environ,
+            {"ANALYTICS_CORS_ORIGINS": "https://app.example, https://ops.example"},
+        ):
+            self.assertEqual(
+                security.get_cors_origins(),
+                ["https://app.example", "https://ops.example"],
+            )
 
 
 if __name__ == "__main__":

@@ -306,7 +306,7 @@ cd python-analytics-service
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-These tests do not require a running analytics service. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation.
+These tests do not require a running analytics service. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, management-token boundaries, CORS policy, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation.
 
 Run linting:
 
@@ -362,7 +362,7 @@ docker compose logs -f
 
 Docker reads safe build-time frontend variables from `.env`. The Compose build only passes public `VITE_MAPBOX_TOKEN`, `VITE_PYTHON_API_URL`, and optional 3D Tiles variables into the frontend image. `DISASTERAWARE_*` and AI provider variables are passed only to the Express runtime. Do not bake credentials or model provider keys into browser assets.
 
-Keep `VITE_PYTHON_API_URL=http://localhost:8001` for the Docker setup because analytics requests are made by the browser through the host-published port.
+Keep `VITE_PYTHON_API_URL=http://localhost:8001` for the Docker setup because analytics requests are made by the browser through the host-published port. The analytics port is bound to `127.0.0.1`, not exposed to the LAN. `/health` remains public; `/metrics` and `/cache/clear` stay unavailable until server-side `ANALYTICS_ADMIN_TOKEN` is configured, then require the `X-Analytics-Admin-Token` header. Do not prefix that token with `VITE_`.
 
 The Docker image uses the repository's `pnpm-lock.yaml` for reproducible dependency installation. Frontend build arguments are public; runtime secrets are provided to the Express container only.
 
@@ -401,6 +401,8 @@ Service endpoints:
 | `http://localhost:8001/health` | Health check              |
 | `http://localhost:8001/docs`   | Swagger API documentation |
 | `http://localhost:8001/redoc`  | ReDoc API documentation   |
+
+For a non-local frontend origin, configure server-side `ANALYTICS_CORS_ORIGINS` as a comma-separated allowlist. By default the service only allows local Vite, Express, and Docker web origins.
 
 ### AI Assistant Provider
 
@@ -548,6 +550,7 @@ prometheus-global-guardian/
 │   │   ├── test_api_routes.py
 │   │   └── test_result_semantics.py
 │   ├── main.py
+│   ├── security.py
 │   ├── requirements.txt
 │   ├── README.md
 │   ├── start.sh
@@ -946,7 +949,7 @@ cd python-analytics-service
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-这组测试不需要启动 Python 服务：`test_api_contract.py` 验证请求模型和直接端点行为，`test_api_routes.py` 使用 FastAPI `TestClient` 验证五个 4D HTTP 路由、参数回显、空结果和 2xx/422 状态码。
+这组测试不需要启动 Python 服务：`test_api_contract.py` 验证请求模型和直接端点行为，`test_api_routes.py` 使用 FastAPI `TestClient` 验证五个 4D HTTP 路由、管理令牌边界、CORS 策略、参数回显、空结果和 2xx/422 状态码。
 
 运行代码检查：
 
@@ -1002,7 +1005,7 @@ docker compose logs -f
 
 Docker 会从 `.env` 读取安全的前端构建期变量。Compose 构建只会把公开的 `VITE_MAPBOX_TOKEN`、`VITE_PYTHON_API_URL` 和可选 3D Tiles 变量注入前端镜像；`DISASTERAWARE_*` 和 AI provider 变量只注入 Express 运行时。不要把凭据或模型服务 Key 打进浏览器产物。
 
-Docker 场景建议保持 `VITE_PYTHON_API_URL=http://localhost:8001`，因为分析请求由浏览器通过宿主机暴露端口发起。
+Docker 场景建议保持 `VITE_PYTHON_API_URL=http://localhost:8001`，因为分析请求由浏览器通过宿主机暴露端口发起。分析服务端口只绑定 `127.0.0.1`，不会暴露到局域网。`/health` 保持公开；`/metrics` 和 `/cache/clear` 在服务端配置 `ANALYTICS_ADMIN_TOKEN` 前不可用，配置后必须携带 `X-Analytics-Admin-Token` 请求头。该令牌不能使用 `VITE_` 前缀。
 
 Docker 镜像使用仓库的 `pnpm-lock.yaml` 安装固定依赖。前端构建参数均为公开配置；运行时密钥只注入 Express 容器。
 
@@ -1041,6 +1044,8 @@ python main.py
 | `http://localhost:8001/health` | 健康检查         |
 | `http://localhost:8001/docs`   | Swagger API 文档 |
 | `http://localhost:8001/redoc`  | ReDoc API 文档   |
+
+如需允许非本地前端来源，在服务端使用逗号分隔的白名单配置 `ANALYTICS_CORS_ORIGINS`。默认仅允许本地 Vite、Express 和 Docker Web 来源。
 
 ### AI 助手模型服务
 
@@ -1184,6 +1189,7 @@ prometheus-global-guardian/
 │   │   ├── test_api_routes.py
 │   │   └── test_result_semantics.py
 │   ├── main.py
+│   ├── security.py
 │   ├── requirements.txt
 │   ├── README.md
 │   ├── start.sh
