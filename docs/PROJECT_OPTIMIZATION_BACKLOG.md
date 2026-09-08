@@ -16,7 +16,7 @@
 - 地图渲染逻辑是项目亮点，但目前集中在一个组件里，后续维护和讲解成本较高。
 - TypeScript 前端和 Python 分析服务都有分析逻辑，但服务边界还不够明确。
 - 前端、BFF 和 Python 服务之间仍存在两套灾害数据字段约定，部分 Analytics/4D 请求当前不能按前端意图执行。
-- BFF 已经具备认证、代理和 AI 路由能力，但公开代理、请求体、频率和错误边界还没有形成安全契约。
+- BFF 已完成受限 DisasterAware 代理、请求大小/查询边界、单进程限流和脱敏错误契约；Python 管理面与多实例共享限流仍待治理。
 - 质量门禁已覆盖 BFF、Service、React 组件、关键 E2E 流程、lint、格式、类型检查和 build；Python 核心算法、Python 契约测试统一接入、视觉回归和 CI/CD 仍待补齐。
 
 ## 开发与交付约束
@@ -38,7 +38,7 @@
 | P0     | AI 助手智能路由                   | 已完成             | 由 LLM 判断普通模型与 RAG 工作流调用边界               | 第一批   |
 | P0     | BFF TypeScript 化                 | 已完成             | 统一项目技术栈，降低 JavaScript 与 TypeScript 混用成本 | 第一批   |
 | P0     | 统一灾害数据与 Analytics API 契约 | 已完成（第二阶段） | 修复分析字段丢失、4D 请求 422 和筛选参数失效           | 第一批   |
-| P0     | BFF 代理暴露面与请求边界治理      | 待开始             | 防止任意上游代理、请求体耗尽、鉴权滥用和敏感头转发     | 第一批   |
+| P0     | BFF 代理暴露面与请求边界治理      | 已完成（BFF）      | 防止任意上游代理、请求体耗尽、鉴权滥用和敏感头转发     | 第一批   |
 | P0     | 地图外部数据输出安全              | 待开始             | 防止灾害源文本通过 Mapbox Popup 注入 HTML              | 第一批   |
 | P0     | 报告下载闭环                      | 待开始             | 让“Save Report”从表单提交真正产出符合承诺的报告文件    | 第一批   |
 | P1     | 前端状态归属梳理                  | 待开始             | 降低耦合和无效重渲染                                   | 第二批   |
@@ -220,20 +220,19 @@ AIChatAssistant
 
 ## P0：BFF 代理暴露面与请求边界治理
 
-### 代码依据
+### 已完成（BFF）
 
-- `server.ts` 的通用 `app.use("/api", ...)` 会把任意 `/api` 路径和请求方法转发到 DisasterAware，并自动使用服务端 token。
-- 原始请求体通过 `getRawBody(req)` 读取，没有大小上限；代理转发头部也没有严格白名单。
-- `/api/authorize` 会强制刷新上游 token，`/api/ai/chat`、`/api/hazards` 和分析服务入口没有统一限流或滥用保护。
-- Python 服务的 `/metrics`、`/cache/clear` 和分析接口可直接访问，CORS、方法和来源策略由静态配置决定。
+- 用显式 allowlist 替换通用 `/api` 代理，只允许三条 DisasterAware `GET` 灾害接口；未知路径返回 `API_ROUTE_NOT_FOUND`，方法不匹配返回 `API_METHOD_NOT_ALLOWED`。
+- 非安全方法请求体限制为 64 KiB；query 限制为最多 20 项、键和值最多 256 字符，并拒绝数组和嵌套形状。
+- 仅转发 `accept`、`accept-language`；客户端 authorization、cookie、代理头和自定义头不会抵达上游，认证始终使用 BFF 服务端 token。
+- 为 DisasterAware 鉴权和代理接入有上限的超时；上游失败返回稳定、脱敏的 502/504 错误。`/api/authorize`、`/api/ai/chat` 及灾害查询拥有独立的单进程固定窗口限流。
+- 新增 BFF 边界测试，覆盖 allowlist、编码路径绕过、方法、请求体、query、请求头、限流、超时、token 缓存和错误脱敏。
 
-### 建议与验收
+### 剩余风险与后续工作
 
-- 对 DisasterAware 代理建立明确 allowlist，只开放产品实际使用的路径和 HTTP 方法；拒绝未知路径、危险方法和异常 query。
-- 给 BFF、AI、认证和 Python 分析接口增加请求体/数组/字符串/查询数量限制、限流、超时和必要的来源或身份校验。
-- 仅转发允许的请求头，禁止 cookie、代理头和客户端 authorization 影响上游请求；错误响应统一脱敏。
-- `/metrics`、缓存管理和运维接口分离为受保护的内部入口；Compose 默认不直接暴露 Python 管理面。
-- 验收：超限请求返回明确 4xx；未知代理路径不能访问上游；未授权用户不能清缓存或无限触发 provider / DisasterAware 请求。
+- 目前限流按 BFF 进程内存和直连 IP 工作；多实例部署需要在入口网关或共享存储实现统一限流，并按部署拓扑显式配置可信代理。
+- Python FastAPI 的 `/metrics`、`/cache/clear`、CORS、来源校验和端口暴露仍未纳入本次改造，应拆分为受保护的内部管理面。
+- AI Provider 的流式连接仍使用其独立的响应超时与生命周期逻辑；后续“AI 流式会话生命周期治理”应继续完善取消、连接中断和用量控制。
 
 ## P0：地图外部数据输出安全
 

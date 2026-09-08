@@ -184,9 +184,13 @@ VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
 ```dotenv
 DISASTERAWARE_USERNAME=your_username_here
 DISASTERAWARE_PASSWORD=your_password_here
+DISASTERAWARE_REQUEST_TIMEOUT_MS=10000
+BFF_AUTHORIZE_RATE_LIMIT_MAX=10
+BFF_AI_RATE_LIMIT_MAX=30
+BFF_HAZARD_RATE_LIMIT_MAX=120
 ```
 
-The Express BFF reads these credentials at runtime; browser assets never receive them. When unavailable, the application can still use public feed fallbacks where supported.
+The Express BFF reads these credentials at runtime; browser assets never receive them. It exposes only `GET /api/hazards/types`, `GET /api/hazards/active`, and `GET /api/hazards/active/category/:categoryId` to DisasterAware, always injects the server token, and forwards only `accept` and `accept-language`. `DISASTERAWARE_REQUEST_TIMEOUT_MS` is capped at 60 seconds. The `BFF_*_RATE_LIMIT_MAX` values are fixed-window limits per IP for each 60-second window and apply only within one BFF process; enforce shared limits at the deployment gateway for multi-instance deployments. When credentials are unavailable, the application can still use public feed fallbacks where supported.
 
 #### Optional Python Analytics Endpoint
 
@@ -265,6 +269,7 @@ pnpm test
 - `tests/ai-router.test.ts`: smart routing signals, live hazard context, forced provider modes, and fallback order.
 - `tests/ai-stream.test.ts`: Ark and Workflow SSE response conversion.
 - `tests/server-auth.test.ts`: BFF authorization, token injection, refresh, and local hazard aggregation.
+- `tests/request-boundaries.test.ts`: BFF path, query, timeout, rate-limit, and AI request-shape boundaries.
 - `tests/service-http.test.ts`, `tests/service-adapters.test.ts`, `tests/service-analytics.test.ts`, and `tests/service-ai.test.ts`: frontend Service-layer unit tests.
 - `tests/service-analytics-presentation.test.ts`: Analytics status, score, trend, recommendation, and quality-text presentation tests.
 - `tests/service-hazard-metrics.test.ts`: normalized magnitude priority, compatible fields, zero values, and missing-intensity behavior.
@@ -451,8 +456,10 @@ pnpm run start:static
 | `/api/hazards?source=USGS,NASA`      | `GET`  | Filters aggregation by source                                                                     |
 | `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET`  | Filters aggregation by hazard type                                                                |
 | `/api/ai/chat`                       | `POST` | Streams AI assistant responses through the Express BFF                                            |
-| `/api/hazards/*`                     | Any    | Proxies authenticated DisasterAware hazard requests through the BFF                               |
-| `/api/*`                             | Any    | Proxies other authenticated API calls to DisasterAware                                            |
+| `/api/hazards/types`                 | `GET`  | Proxies the authenticated DisasterAware hazard-type endpoint                                      |
+| `/api/hazards/active`                | `GET`  | Proxies the authenticated DisasterAware active-hazard endpoint                                    |
+| `/api/hazards/active/category/:id`   | `GET`  | Proxies the authenticated DisasterAware category endpoint                                         |
+| Other `/api/*`                       | Any    | Returns a stable 404 or 405 error; never proxies arbitrary upstream paths                         |
 
 #### Python Analytics API
 
@@ -497,7 +504,7 @@ pnpm run start:static
 - `.env` is ignored by git and must not be committed.
 - Variables prefixed with `VITE_` are exposed to browser assets; do not place production-only secrets there.
 - For production AI usage, prefer a server-side proxy for Volcengine Ark or other model providers.
-- Review proxy logging in `server.ts` before production deployment; current AI router logs omit message content and credentials, but deployment logging policies should still be checked.
+- The BFF allowlists DisasterAware routes and forwarding headers, applies a 64 KiB request-body limit, validates query shapes, and returns sanitized upstream errors. Rate limits are process-local; configure shared gateway limits before horizontal scaling.
 - DisasterAware credentials and model provider keys should be managed through deployment secret storage.
 
 ### Project Structure
@@ -813,9 +820,13 @@ VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
 ```dotenv
 DISASTERAWARE_USERNAME=your_username_here
 DISASTERAWARE_PASSWORD=your_password_here
+DISASTERAWARE_REQUEST_TIMEOUT_MS=10000
+BFF_AUTHORIZE_RATE_LIMIT_MAX=10
+BFF_AI_RATE_LIMIT_MAX=30
+BFF_HAZARD_RATE_LIMIT_MAX=120
 ```
 
-Express BFF 会在运行时读取这些凭据，浏览器构建产物不会包含它们。未配置 DisasterAware 凭据时，应用仍可在支持的场景下使用公共数据源降级。
+Express BFF 会在运行时读取这些凭据，浏览器构建产物不会包含它们。BFF 仅向 DisasterAware 暴露 `GET /api/hazards/types`、`GET /api/hazards/active` 和 `GET /api/hazards/active/category/:categoryId`，始终注入服务端 token，并且只转发 `accept`、`accept-language`。`DISASTERAWARE_REQUEST_TIMEOUT_MS` 最大为 60 秒。`BFF_*_RATE_LIMIT_MAX` 表示每个 IP 在每 60 秒固定窗口内的单进程限流；多实例部署时，应由入口网关提供共享限流。未配置 DisasterAware 凭据时，应用仍可在支持的场景下使用公共数据源降级。
 
 #### 可选 Python 分析服务地址
 
@@ -894,6 +905,7 @@ pnpm test
 - `tests/ai-router.test.ts`：智能路由信号、实时灾害上下文、强制 provider 模式和 fallback 顺序。
 - `tests/ai-stream.test.ts`：Ark 和 Workflow 的 SSE 响应转换。
 - `tests/server-auth.test.ts`：BFF 鉴权、token 注入、过期刷新和本地灾害聚合测试。
+- `tests/request-boundaries.test.ts`：BFF 路径、query、超时、限流和 AI 请求形状边界。
 - `tests/service-http.test.ts`：统一 HTTP 客户端的成功、超时、重试和错误测试。
 - `tests/service-adapters.test.ts`：USGS、NASA、GDACS 数据适配测试。
 - `tests/service-analytics.test.ts`：Analytics 数据格式化和时间戳回退测试。
@@ -1082,8 +1094,10 @@ pnpm run start:static
 | `/api/hazards?source=USGS,NASA`      | `GET`  | 按数据源筛选聚合结果                             |
 | `/api/hazards?type=EARTHQUAKE,FLOOD` | `GET`  | 按灾害类型筛选聚合结果                           |
 | `/api/ai/chat`                       | `POST` | 通过 Express BFF 流式返回 AI 助手响应            |
-| `/api/hazards/*`                     | Any    | 通过 BFF 代理已鉴权的 DisasterAware 灾害请求     |
-| `/api/*`                             | Any    | 通过 BFF 代理其他已鉴权的 DisasterAware API      |
+| `/api/hazards/types`                 | `GET`  | 通过 BFF 代理已鉴权的 DisasterAware 灾害类型接口 |
+| `/api/hazards/active`                | `GET`  | 通过 BFF 代理已鉴权的 DisasterAware 活跃灾害接口 |
+| `/api/hazards/active/category/:id`   | `GET`  | 通过 BFF 代理已鉴权的 DisasterAware 分类接口     |
+| 其他 `/api/*`                        | Any    | 返回稳定的 404 或 405，不会代理任意上游路径      |
 
 #### Python 分析 API
 
@@ -1128,7 +1142,7 @@ pnpm run start:static
 - `.env` 已被 git 忽略，不能提交。
 - 以 `VITE_` 开头的变量会暴露到浏览器构建产物中，不应放置生产级敏感密钥。
 - 生产环境使用 AI 服务时，建议通过服务端代理火山方舟或其他模型服务请求。
-- 生产部署前应审查 `server.ts` 的代理日志；当前 AI Router 日志不记录消息内容或凭据，但仍应检查部署平台的日志策略。
+- BFF 对 DisasterAware 路由和转发请求头实施白名单，限制请求体为 64 KiB、校验 query 形状，并返回已脱敏的上游错误。限流仅在单个进程内生效，水平扩容前应在入口网关配置共享限流。
 - DisasterAware 凭据和模型服务 Key 应由部署平台的密钥管理能力托管。
 
 ### 项目结构

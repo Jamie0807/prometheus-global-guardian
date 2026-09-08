@@ -1,17 +1,25 @@
-import type { Application, Request, Response } from 'express';
-import fetch from 'node-fetch';
-import { buildAIProviderRequest, resolveAIProviderMode, resolveServerAIProviderConfig, type DisasterContext, type ProviderName, type ServerAIProviderConfig } from './ai-provider.js';
-import { routeAIRequest, type AIRouteDecision } from './ai-router.js';
+import type { Application, Request, RequestHandler, Response } from "express";
+import fetch from "node-fetch";
+import { isValidAIRequest } from "../security/ai-request.js";
+import {
+  buildAIProviderRequest,
+  resolveAIProviderMode,
+  resolveServerAIProviderConfig,
+  type DisasterContext,
+  type ProviderName,
+  type ServerAIProviderConfig,
+} from "./ai-provider.js";
+import { routeAIRequest, type AIRouteDecision } from "./ai-router.js";
 import {
   createResponsesToChatCompletionsStream,
   createWorkflowToChatCompletionsStream,
   extractWorkflowResult,
   workflowResultToChatCompletionsSSE,
-} from './ai-stream.js';
+} from "./ai-stream.js";
 
 interface ProviderFailure {
   provider: ProviderName;
-  code: 'missing_config' | 'timeout' | 'network' | 'upstream';
+  code: "missing_config" | "timeout" | "network" | "upstream";
   status?: number;
 }
 
@@ -19,50 +27,52 @@ const parseJsonBody = (req: Request): Record<string, unknown> => {
   if (!req.rawBody || req.rawBody.length === 0) {
     return {};
   }
-  return JSON.parse(req.rawBody.toString('utf8'));
+  return JSON.parse(req.rawBody.toString("utf8"));
 };
 
-const getDisasterContext = (body: Record<string, unknown>): DisasterContext | undefined => (
-  body.disasterContext && typeof body.disasterContext === 'object'
-    ? body.disasterContext as DisasterContext
-    : undefined
-);
+const getDisasterContext = (body: Record<string, unknown>): DisasterContext | undefined =>
+  body.disasterContext && typeof body.disasterContext === "object"
+    ? (body.disasterContext as DisasterContext)
+    : undefined;
 
 function forcedRouteDecision(provider: ProviderName): AIRouteDecision {
   return {
     target: provider,
-    reason: 'general',
+    reason: "general",
     matchedSignals: [],
   };
 }
 
-export function buildProviderOrder(mode: ReturnType<typeof resolveAIProviderMode>, decision: AIRouteDecision): ProviderName[] {
-  if (mode !== 'router') {
-    return [mode === 'workflow' ? 'workflow' : 'volcengine'];
+export function buildProviderOrder(
+  mode: ReturnType<typeof resolveAIProviderMode>,
+  decision: AIRouteDecision,
+): ProviderName[] {
+  if (mode !== "router") {
+    return [mode === "workflow" ? "workflow" : "volcengine"];
   }
 
-  return [decision.target, decision.target === 'workflow' ? 'volcengine' : 'workflow'];
+  return [decision.target, decision.target === "workflow" ? "volcengine" : "workflow"];
 }
 
 function configurationError(config: ServerAIProviderConfig): { code: string; message: string } {
-  if (config.reason === 'missing_model') {
+  if (config.reason === "missing_model") {
     return {
-      code: 'AI_MODEL_MISSING',
-      message: 'AI provider model is not configured.',
+      code: "AI_MODEL_MISSING",
+      message: "AI provider model is not configured.",
     };
   }
 
   return {
-    code: 'AI_PROVIDER_NOT_CONFIGURED',
-    message: 'AI provider is not configured.',
+    code: "AI_PROVIDER_NOT_CONFIGURED",
+    message: "AI provider is not configured.",
   };
 }
 
-function setStreamHeaders(res: Response, contentType = 'text/event-stream; charset=utf-8'): void {
+function setStreamHeaders(res: Response, contentType = "text/event-stream; charset=utf-8"): void {
   res.status(200);
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
   res.flushHeaders?.();
 }
 
@@ -83,26 +93,30 @@ function logRouteResult({
   status: number;
   startedAt: number;
 }): void {
-  console.info('[AI Router]', JSON.stringify({
-    mode,
-    route: decision.target,
-    reason: decision.reason,
-    provider,
-    fallbackUsed,
-    attempts,
-    status,
-    success: status >= 200 && status < 300,
-    durationMs: Date.now() - startedAt,
-  }));
+  console.info(
+    "[AI Router]",
+    JSON.stringify({
+      mode,
+      route: decision.target,
+      reason: decision.reason,
+      provider,
+      fallbackUsed,
+      attempts,
+      status,
+      success: status >= 200 && status < 300,
+      durationMs: Date.now() - startedAt,
+    }),
+  );
 }
 
-export function registerAIChatRoute(app: Application): void {
-  app.post('/api/ai/chat', async (req, res) => {
+export function registerAIChatRoute(app: Application, middlewares: RequestHandler[] = []): void {
+  app.post("/api/ai/chat", ...middlewares, async (req, res) => {
     const startedAt = Date.now();
     const mode = resolveAIProviderMode();
-    let decision = mode === 'router'
-      ? routeAIRequest(undefined)
-      : forcedRouteDecision(mode === 'workflow' ? 'workflow' : 'volcengine');
+    let decision =
+      mode === "router"
+        ? routeAIRequest(undefined)
+        : forcedRouteDecision(mode === "workflow" ? "workflow" : "volcengine");
     let logged = false;
     let selectedProvider: ProviderName = decision.target;
     let attempts = 0;
@@ -122,8 +136,8 @@ export function registerAIChatRoute(app: Application): void {
       });
     };
 
-    res.once('finish', () => logOnce(res.statusCode));
-    res.once('close', () => {
+    res.once("finish", () => logOnce(res.statusCode));
+    res.once("close", () => {
       if (!res.writableFinished) logOnce(res.statusCode || 499);
     });
 
@@ -133,14 +147,23 @@ export function registerAIChatRoute(app: Application): void {
     } catch {
       res.status(400).json({
         success: false,
-        code: 'INVALID_JSON',
-        message: 'Request body must be valid JSON.',
+        code: "INVALID_JSON",
+        message: "Request body must be valid JSON.",
+      });
+      return;
+    }
+
+    if (!isValidAIRequest(body)) {
+      res.status(400).json({
+        success: false,
+        code: "INVALID_AI_REQUEST",
+        message: "Request body exceeds the allowed limits.",
       });
       return;
     }
 
     const disasterContext = getDisasterContext(body);
-    if (mode === 'router') {
+    if (mode === "router") {
       decision = routeAIRequest(body.messages, disasterContext);
     }
 
@@ -156,7 +179,7 @@ export function registerAIChatRoute(app: Application): void {
       selectedProvider = provider;
 
       if (!config.configured) {
-        failures.push({ provider, code: 'missing_config' });
+        failures.push({ provider, code: "missing_config" });
         continue;
       }
 
@@ -168,17 +191,22 @@ export function registerAIChatRoute(app: Application): void {
         language: body.language,
       });
 
-      const hasUserInput = request.protocol === 'responses'
-        ? request.payload.input.some(message => message.role === 'user' && message.content.trim().length > 0)
-        : request.protocol === 'workflow'
-          ? request.payload.inputs.user_input.trim().length > 0
-          : request.payload.messages.some(message => message.role === 'user' && message.content.trim().length > 0);
+      const hasUserInput =
+        request.protocol === "responses"
+          ? request.payload.input.some(
+              (message) => message.role === "user" && message.content.trim().length > 0,
+            )
+          : request.protocol === "workflow"
+            ? request.payload.inputs.user_input.trim().length > 0
+            : request.payload.messages.some(
+                (message) => message.role === "user" && message.content.trim().length > 0,
+              );
 
       if (!hasUserInput) {
         res.status(400).json({
           success: false,
-          code: 'AI_MESSAGE_REQUIRED',
-          message: 'At least one user message is required.',
+          code: "AI_MESSAGE_REQUIRED",
+          message: "At least one user message is required.",
         });
         return;
       }
@@ -191,13 +219,13 @@ export function registerAIChatRoute(app: Application): void {
         clientClosed = true;
         controller.abort();
       };
-      res.once('close', abortOnClose);
+      res.once("close", abortOnClose);
 
       try {
         const response = await fetch(request.apiUrl, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
           },
           body: JSON.stringify(request.payload),
@@ -206,9 +234,9 @@ export function registerAIChatRoute(app: Application): void {
 
         if (!response.ok) {
           await response.text();
-          failures.push({ provider, code: 'upstream', status: response.status });
+          failures.push({ provider, code: "upstream", status: response.status });
           clearTimeout(timeout);
-          res.off('close', abortOnClose);
+          res.off("close", abortOnClose);
           if (providers.length > 1) fallbackUsed = true;
           continue;
         }
@@ -221,19 +249,20 @@ export function registerAIChatRoute(app: Application): void {
         break;
       } catch (err: unknown) {
         clearTimeout(timeout);
-        res.off('close', abortOnClose);
+        res.off("close", abortOnClose);
 
         if (clientClosed) return;
 
-        const isTimeout = err instanceof Error && err.name === 'AbortError';
-        failures.push({ provider, code: isTimeout ? 'timeout' : 'network' });
+        const isTimeout = err instanceof Error && err.name === "AbortError";
+        failures.push({ provider, code: isTimeout ? "timeout" : "network" });
         if (providers.length > 1) fallbackUsed = true;
       }
     }
 
     if (!upstream || !selectedConfig || !providerRequest || !selectedController) {
       const primaryConfig = resolveServerAIProviderConfig(process.env, providers[0]);
-      const allMissing = failures.length > 0 && failures.every(failure => failure.code === 'missing_config');
+      const allMissing =
+        failures.length > 0 && failures.every((failure) => failure.code === "missing_config");
 
       if (allMissing) {
         const error = configurationError(primaryConfig);
@@ -242,11 +271,12 @@ export function registerAIChatRoute(app: Application): void {
       }
 
       const lastFailure = failures.at(-1);
-      const status = lastFailure?.code === 'timeout' ? 504 : 502;
-      const code = lastFailure?.code === 'timeout' ? 'AI_PROVIDER_TIMEOUT' : 'AI_PROVIDER_ERROR';
-      const message = lastFailure?.code === 'timeout'
-        ? 'AI provider request timed out.'
-        : 'AI provider request failed.';
+      const status = lastFailure?.code === "timeout" ? 504 : 502;
+      const code = lastFailure?.code === "timeout" ? "AI_PROVIDER_TIMEOUT" : "AI_PROVIDER_ERROR";
+      const message =
+        lastFailure?.code === "timeout"
+          ? "AI provider request timed out."
+          : "AI provider request failed.";
       res.status(status).json({
         success: false,
         code,
@@ -256,22 +286,22 @@ export function registerAIChatRoute(app: Application): void {
       return;
     }
 
-    res.once('close', () => selectedController?.abort());
+    res.once("close", () => selectedController?.abort());
 
-    if (providerRequest.protocol === 'workflow') {
-      const contentType = upstream.headers.get('content-type') ?? '';
-      if (contentType.includes('text/event-stream')) {
+    if (providerRequest.protocol === "workflow") {
+      const contentType = upstream.headers.get("content-type") ?? "";
+      if (contentType.includes("text/event-stream")) {
         if (!upstream.body) {
           res.status(502).json({
             success: false,
-            code: 'AI_WORKFLOW_STREAM_MISSING',
-            message: 'AI workflow returned an empty stream.',
+            code: "AI_WORKFLOW_STREAM_MISSING",
+            message: "AI workflow returned an empty stream.",
           });
           return;
         }
 
         setStreamHeaders(res);
-        upstream.body.on('error', () => {
+        upstream.body.on("error", () => {
           if (!res.writableEnded) res.end();
         });
         upstream.body.pipe(createWorkflowToChatCompletionsStream()).pipe(res);
@@ -284,8 +314,8 @@ export function registerAIChatRoute(app: Application): void {
       } catch {
         res.status(502).json({
           success: false,
-          code: 'AI_WORKFLOW_INVALID_RESPONSE',
-          message: 'AI workflow returned an invalid response.',
+          code: "AI_WORKFLOW_INVALID_RESPONSE",
+          message: "AI workflow returned an invalid response.",
         });
         return;
       }
@@ -294,8 +324,8 @@ export function registerAIChatRoute(app: Application): void {
       if (!workflowResult) {
         res.status(502).json({
           success: false,
-          code: 'AI_WORKFLOW_RESULT_MISSING',
-          message: 'AI workflow response did not include outputs.result.',
+          code: "AI_WORKFLOW_RESULT_MISSING",
+          message: "AI workflow response did not include outputs.result.",
         });
         return;
       }
@@ -305,17 +335,20 @@ export function registerAIChatRoute(app: Application): void {
       return;
     }
 
-    setStreamHeaders(res, upstream.headers.get('content-type') ?? 'text/event-stream; charset=utf-8');
+    setStreamHeaders(
+      res,
+      upstream.headers.get("content-type") ?? "text/event-stream; charset=utf-8",
+    );
     if (!upstream.body) {
       res.end();
       return;
     }
 
-    upstream.body.on('error', () => {
+    upstream.body.on("error", () => {
       if (!res.writableEnded) res.end();
     });
 
-    if (providerRequest.protocol === 'responses') {
+    if (providerRequest.protocol === "responses") {
       upstream.body.pipe(createResponsesToChatCompletionsStream()).pipe(res);
     } else {
       upstream.body.pipe(res);
