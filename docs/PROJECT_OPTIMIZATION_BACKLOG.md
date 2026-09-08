@@ -33,7 +33,7 @@
 | 优先级 | 优化领域                          | 状态               | 影响                                                   | 建议时机 |
 | ------ | --------------------------------- | ------------------ | ------------------------------------------------------ | -------- |
 | P0     | 地图模块拆分                      | 已完成             | 提升核心模块可维护性和性能可信度                       | 第一批   |
-| P0     | 分析页面拆分                      | 待开始             | 降低最大组件维护成本                                   | 第一批   |
+| P0     | 分析页面拆分                      | 已完成             | 降低最大组件维护成本                                   | 第一批   |
 | P0     | API / Service 层统一              | 已完成             | 提升稳定性和排查效率                                   | 第一批   |
 | P0     | AI 助手智能路由                   | 已完成             | 由 LLM 判断普通模型与 RAG 工作流调用边界               | 第一批   |
 | P0     | BFF TypeScript 化                 | 已完成             | 统一项目技术栈，降低 JavaScript 与 TypeScript 混用成本 | 第一批   |
@@ -436,53 +436,56 @@ src/features/map/
 
 ## P0：分析页面拆分
 
-### 当前状态
+### 当前实现状态
 
-`src/components/AnalyticsPage.tsx` 超过 1,700 行，混合了：
+分析页面拆分已经完成：
 
-- 页面布局。
-- 图表状态。
-- 弹窗状态。
-- 图表自定义。
-- 图表钻取。
-- Python 分析服务调用。
-- 数据转换。
-- 导出和报告行为。
+- `src/components/AnalyticsPage.tsx` 缩减为兼容转发入口。
+- `src/features/analytics/AnalyticsPage.tsx` 为 300 行以内的页面组合入口，只持有当前 Tab 状态。
+- Python 服务健康检查、自动分析、缓存、重试、手动重跑和 4D 分析编排统一进入 `useAnalyticsData`。
+- 灾害类型统计、有效强度序列和分析数据哈希进入纯转换模块。
+- 页头、摘要、服务控制区、Tab 导航、统计概览、图表、预测、风险和数据质量展示均拥有显式组件边界。
+- 现有 `ChartsPanel`、`ChartDrilldownModal` 和 `DataQualityMonitor` 继续复用，避免重复改造稳定模块。
 
-这是前端当前最大的可维护性风险。
-
-### 建议结构
+### 已落地结构
 
 ```text
 src/features/analytics/
   AnalyticsPage.tsx
+  styles.ts
+  types.ts
   components/
-    AnalyticsToolbar.tsx
+    AnalyticsHeader.tsx
     AnalyticsSummaryGrid.tsx
-    AnalyticsChartSection.tsx
-    AnalyticsInsightPanel.tsx
+    AnalyticsControlPanel.tsx
+    AnalyticsTabs.tsx
+    PredictionStatusBadge.tsx
+    RiskRecommendationLine.tsx
+    tabs/
+      AnalyticsChartsTab.tsx
+      AnalyticsQualityTab.tsx
+      OverviewTab.tsx
+      PredictionsTab.tsx
+      RiskTab.tsx
   hooks/
     useAnalyticsData.ts
-    useChartCustomization.ts
-    useChartDrilldown.ts
   utils/
     analyticsTransforms.ts
-    chartSeries.ts
 ```
 
-### 目标效果
+### 验收结果
 
-- 页面组件只负责页面级布局和组合。
-- 数据转换逻辑变成可测试的纯函数。
-- 图表配置状态独立管理。
-- 钻取逻辑可以单独修改，不需要触碰整个页面。
+- feature 页面入口为 84 行，兼容入口为 1 行。
+- `analytics-transforms.test.tsx` 覆盖类型回退、未分类、无效强度过滤、原始编号和哈希规则。
+- `use-analytics-data.test.tsx` 覆盖服务检查、分析链路、缓存、空数据和手动重跑。
+- `analytics-page.test.tsx` 覆盖兼容入口和五个 Tab 切换。
+- 主统计、预测、风险和 4D 分析链路只由 `useAnalyticsData` 调用 Analytics Service；复用的图表与质量组件保留独立请求边界。
+- 图表自定义和钻取继续由既有独立组件管理。
 
-### 验收标准
+### 后续可选优化
 
-- `AnalyticsPage.tsx` 控制在 300 行以内。
-- 数据转换函数有单元测试。
-- 图表弹窗组件只接收明确类型的 props。
-- Python 分析 API 调用统一走 service 模块。
+- `OverviewTab.tsx` 仍包含较多统计展示区块，可在需要独立演进 4D、关联性和趋势展示时继续按结果域拆分。
+- 本轮保持现有视觉和业务行为，不处理自动刷新竞态、异步卸载治理、国际化或视觉重构。
 
 ## P0：API / Service 层统一
 
@@ -500,7 +503,7 @@ src/features/analytics/
 
 验证命令为 `pnpm test`、`pnpm run lint`、`pnpm run format:check`、`pnpm run typecheck:client`、`pnpm run typecheck:server` 和 `pnpm run build`。
 
-遗留风险：Analytics 后端返回字段仍有版本差异，旧分析页面在展示边界使用动态 JSON 类型；后续可随着 FastAPI 响应契约稳定继续细化类型。
+遗留风险：Analytics 后端返回字段仍有版本差异，分析 feature 的展示边界暂时使用兼容响应类型；后续可随着 FastAPI 响应契约稳定继续细化类型。
 
 ### 迁移前问题
 
@@ -536,8 +539,8 @@ src/services/
 
 ### 当前遗留项
 
-- Analytics 后端字段仍有一定版本差异，旧分析页面展示边界暂时使用动态 JSON 类型。
-- `src/components/AnalyticsPage.tsx` 仍较大，后续由分析页面拆分任务继续处理。
+- Analytics 后端字段仍有一定版本差异，分析展示边界暂时使用兼容响应类型。
+- 分析页面已迁移到 `src/features/analytics/`；统计概览 Tab 可在后续按结果域继续细分。
 
 ### 验收结果
 
@@ -766,13 +769,13 @@ scripts/
 3. 修复地图 Popup 输出安全问题，并补齐报告下载闭环。
 4. 统一灾害数据入口，增加来源状态、自动刷新、取消和竞态保护。
 5. 抽离地图纯工具函数和测试，再将 `MapView.tsx` 拆成生命周期、LOD、Marker、Heatmap、3D Hooks。
-6. 从 `AnalyticsPage.tsx` 抽离数据转换和响应类型，再拆分分析页 UI 组件。
+6. 分析页面的数据转换、响应类型、数据 Hook 和 UI 组件已完成拆分；后续按需细化统计概览内部结果域。
 7. 使用自定义 Hook 梳理 app 级状态归属。
 8. 整理 Python 服务结构，补齐 API / 算法测试，并处理 CPU 密集任务的并发模型。
 9. 扩展 React 组件测试，补充 Playwright 移动端流程、视觉回归、Python 测试和 CI/CD 质量门禁。
 10. 最后处理包体积预算、依赖审计、可访问性、多语言和仓库结构迁移。
 
-已完成：AI 助手智能路由、BFF TypeScript 化、前端 API / Service 层统一，以及灾害数据与 Analytics API 契约前两阶段。后续执行从跨语言契约、CI 接入、地图和分析页面拆分继续。
+已完成：AI 助手智能路由、BFF TypeScript 化、前端 API / Service 层统一、灾害数据与 Analytics API 契约前两阶段、地图模块拆分和分析页面拆分。后续执行从跨语言契约、CI 接入、安全边界和前端状态归属继续。
 
 ## 第一轮优化的非目标
 

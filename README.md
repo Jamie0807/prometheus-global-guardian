@@ -268,6 +268,9 @@ pnpm test
 - `tests/service-http.test.ts`, `tests/service-adapters.test.ts`, `tests/service-analytics.test.ts`, and `tests/service-ai.test.ts`: frontend Service-layer unit tests.
 - `tests/service-analytics-presentation.test.ts`: Analytics status, score, trend, recommendation, and quality-text presentation tests.
 - `tests/service-hazard-metrics.test.ts`: normalized magnitude priority, compatible fields, zero values, and missing-intensity behavior.
+- `tests/component/analytics-transforms.test.tsx`: Analytics hazard grouping, intensity series, and cache-key transformation tests.
+- `tests/component/use-analytics-data.test.tsx`: Analytics service orchestration, cache, empty-data, and manual rerun Hook tests.
+- `tests/component/analytics-page.test.tsx`: Analytics compatibility entry and five-tab composition tests.
 
 Run the two unit-test groups independently with `pnpm run test:bff` and `pnpm run test:services`. These tests do not open a browser or exercise React components, page interactions, or visual layout.
 
@@ -516,7 +519,9 @@ prometheus-global-guardian/
 │       ├── 2026-09-04-analytics-contract-http-integration.md
 │       ├── 2026-09-04-analytics-result-semantics.md
 │       ├── 2026-09-04-analytics-presentation-phase2.md
-│       └── 2026-09-04-statistics-chart-axis-layout.md
+│       ├── 2026-09-04-statistics-chart-axis-layout.md
+│       ├── 2026-09-06-map-module-split.md
+│       └── 2026-09-08-analytics-page-split.md
 ├── public/
 │   └── assets/                  # Logo and static assets
 ├── scripts/
@@ -1172,6 +1177,15 @@ prometheus-global-guardian/
 │   ├── test_pivot_table.py
 │   └── test_service.py
 ├── src/
+│   ├── features/
+│   │   ├── analytics/           # 分析页面组合、Tab、数据 Hook 与纯转换
+│   │   │   ├── components/      # 页头、摘要、控制面板和五个分析 Tab
+│   │   │   ├── hooks/useAnalyticsData.ts
+│   │   │   ├── utils/analyticsTransforms.ts
+│   │   │   ├── AnalyticsPage.tsx
+│   │   │   ├── styles.ts
+│   │   │   └── types.ts
+│   │   └── map/                 # 地图页面、图层生命周期 Hook 与 GeoJSON 工具
 │   ├── services/                # 前端业务和网络 Service 层
 │   │   ├── ai/aiAssistantService.ts
 │   │   ├── analytics/
@@ -1209,9 +1223,14 @@ prometheus-global-guardian/
 │   └── express.d.ts
 ├── tests/
 │   ├── component/
-│   │   ├── setup.ts
+│   │   ├── analytics-page.test.tsx
+│   │   ├── analytics-transforms.test.tsx
 │   │   ├── data-quality-monitor.test.tsx
-│   │   └── status-panel.test.tsx
+│   │   ├── data-visualization.test.tsx
+│   │   ├── map-view.test.tsx
+│   │   ├── setup.ts
+│   │   ├── status-panel.test.tsx
+│   │   └── use-analytics-data.test.tsx
 │   ├── e2e/
 │   │   └── app-smoke.spec.ts
 │   ├── ai-provider.test.ts
