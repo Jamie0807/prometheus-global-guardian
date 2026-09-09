@@ -302,11 +302,10 @@ The baseline runs ESLint, Prettier check, client and server type checks, BFF and
 Run the Python API contract tests separately from the repository root:
 
 ```bash
-cd python-analytics-service
-python -m unittest discover -s tests -p 'test_*.py'
+pnpm run test:python
 ```
 
-These tests do not require a running analytics service. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, management-token boundaries, CORS policy, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation.
+These 26 tests do not require a running analytics service. They cover API contracts, FastAPI routes, and prediction, risk, and quality result semantics. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, management-token boundaries, CORS policy, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation.
 
 Run linting:
 

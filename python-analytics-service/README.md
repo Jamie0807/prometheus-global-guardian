@@ -212,7 +212,7 @@ Compose 默认将端口发布为 `127.0.0.1:8001`，供本机浏览器和健康�
 
 ## 测试
 
-Python 服务目前包含 API 契约自动化测试、打印式算法冒烟脚本和依赖已启动服务的手工集成脚本；Python 测试尚未纳入根目录 \`pnpm run test:baseline\`：
+Python 服务目前包含 API 契约自动化测试、打印式算法冒烟脚本和依赖已启动服务的手工集成脚本；Python API 测试通过根目录统一入口运行，但不纳入 \`pnpm run test:baseline\`：
 
 \`\`\`bash
 cd python-analytics-service
@@ -222,9 +222,10 @@ python test_pivot_table.py
 \`test_pivot_table.py\` 是打印式的透视表和算法冒烟脚本，不是 pytest 测试套件。
 
 ```bash
-cd python-analytics-service
-python -m unittest discover -s tests -p 'test_*.py'
+pnpm run test:python
 ```
+
+从仓库根目录执行 `pnpm run test:python`，无需启动服务。当前 26 项 unittest 覆盖 API 契约、FastAPI 路由，以及预测、风险和质量结果语义。
 
 `tests/test_api_contract.py` 是不依赖已启动服务、直接调用模型和路由函数的 API 契约单元测试，覆盖统一 `hazards` 请求体、4D 参数校验、端点参数传递和数值聚合行为。
 
@@ -242,7 +243,7 @@ python test_service.py
 
 \`test_service.py\` 是依赖已启动服务的手工集成脚本，会等待用户按回车后请求 \`8001\` 端点。它主要打印结果并汇总布尔状态，也不是 pytest 单元测试。
 
-现有 Python 自动化测试覆盖请求模型、FastAPI HTTP 路由，以及预测、风险和质量结果语义；仍缺少系统性的算法边界覆盖、pytest 迁移和 CI 接入。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
+现有 Python 自动化测试覆盖请求模型、FastAPI HTTP 路由，以及预测、风险和质量结果语义；仍缺少系统性的算法边界覆盖和 pytest 迁移。详细状态见根目录的 [项目待优化清单](../docs/PROJECT_OPTIMIZATION_BACKLOG.md)。
 
 ## 项目结构
 

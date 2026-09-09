@@ -14,6 +14,7 @@
 | `pnpm run test:services`  | Service 单元测试 | 运行 `tests/service-*.test.ts` 的 Vitest 测试                        |
 | `pnpm run test:component` | React 组件测试   | 使用 Vitest、React Testing Library 和 jsdom 测试用户可观察的组件行为 |
 | `pnpm run test:e2e`       | 浏览器冒烟测试   | 启动本地生产服务，用 Playwright 验证首页关键流程                     |
+| `pnpm run test:python`    | Python API 测试  | 运行分析服务的 unittest 测试集                                       |
 | `pnpm run test:baseline`  | 完整质量基线     | 依次执行 lint、格式、前后端类型检查、unit、component、e2e 和 build   |
 
 任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
@@ -24,11 +25,11 @@
 
 - BFF 单元测试：64 项。
 - Service 单元测试：36 项。
-- React 组件测试：19 项。
+- React 组件测试：21 项。
 - Playwright E2E：1 项。
-- 合计：120 项自动化测试。
+- 合计：122 项自动化测试。
 
-独立执行的 Python 自动化测试：22 项，其中模型和端点单元测试 10 项、FastAPI HTTP 路由测试 7 项、预测/风险/质量结果语义测试 5 项；它们目前不计入上述根目录基线总数。
+独立执行的 Python 自动化测试：26 项，覆盖 API 契约、FastAPI 路由与预测、风险和质量结果语义；它们不计入上述 Node 基线总数。
 
 ## 测试边界
 
@@ -36,7 +37,7 @@
 
 E2E 通过 Playwright route mock 隔离 DisasterAware、公开灾害源、Mapbox 和 AI provider，不访问真实第三方服务，也不要求本地配置真实账号或模型 Key。失败时保留截图，重试时保留 trace。
 
-当前尚未纳入完整基线的范围：Python 核心算法测试、Python 契约测试接入统一命令、桌面与移动端视觉回归、所有弹窗和路由流程、真实外部服务集成测试，以及 CI/CD 中的自动执行。
+当前尚未纳入完整基线的范围：Python 核心算法测试、桌面与移动端视觉回归、所有弹窗和路由流程，以及真实外部服务集成测试。CI 分别强制执行 `pnpm run test:baseline` 与 `pnpm run test:python`。
 
 ## 已知非阻塞提示
 
