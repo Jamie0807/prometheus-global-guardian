@@ -6,13 +6,15 @@ import StatusPanel from "./components/StatusPanel";
 import LegendPanel from "./components/LegendPanel";
 import MapView from "./features/map/MapView";
 import ErrorBoundary from "./components/ErrorBoundary";
-import type { Hazard, SaveReportPayload } from "./types";
+import { createClientLogger } from "./utils/logger";
+import type { Hazard } from "./types";
 
 // 使用 React.lazy() 懒加载大型组件
 const AnalyticsPage = lazy(() => import("./components/AnalyticsPage"));
 const SaveReportModal = lazy(() => import("./components/SaveReportModal"));
 const SettingsModal = lazy(() => import("./components/SettingsModal"));
 const AIChatAssistant = lazy(() => import("./components/AIChatAssistant"));
+const logger = createClientLogger("app");
 
 // 加载指示器组件
 const LoadingFallback = () => (
@@ -46,8 +48,8 @@ const App: React.FC = () => {
     (async () => {
       try {
         await authorize();
-      } catch (error) {
-        console.error("Initial authorization failed:", error);
+      } catch {
+        logger.warn("initial_authorization_failed");
         // App can still work with other data sources
       }
     })();
@@ -72,9 +74,9 @@ const App: React.FC = () => {
   };
 
   // Handle download report
-  const handleDownloadReport = (payload: SaveReportPayload) => {
+  const handleDownloadReport = () => {
     // 可以在这里添加下载逻辑，比如发送到后端或生成文件
-    console.log("Download report:", payload);
+    logger.debug("report_download_requested");
   };
 
   // Handle global key press for Escape to close modals

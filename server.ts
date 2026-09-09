@@ -11,6 +11,7 @@ import {
   type ServerHazard,
 } from "./server/hazards/hazard-source.js";
 import { loadLocalEnv } from "./server/env.js";
+import { createServerLogger } from "./server/logging.js";
 import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
 import {
   createForwardHeaders,
@@ -151,6 +152,7 @@ function readBoundedPositiveInteger(
 export function createApp(options: CreateAppOptions = {}): Application {
   const app = express();
   const serverEnv = options.env ?? process.env;
+  const logger = createServerLogger("bff", serverEnv);
   const upstreamFetch = options.fetchImpl ?? (fetch as unknown as UpstreamFetch);
   const fetchHazards = options.fetchHazards ?? fetchAllHazards;
   const now = options.now ?? (() => new Date());
@@ -403,7 +405,9 @@ export function createApp(options: CreateAppOptions = {}): Application {
       await getAccessToken();
       res.status(200).json({ authorized: true });
     } catch (error: unknown) {
-      console.error("Authorization failed.");
+      logger.error("authorization_failed", {
+        code: error instanceof RequestBoundaryError ? error.code : "UPSTREAM_UNAVAILABLE",
+      });
       if (error instanceof RequestBoundaryError && error.code === "UPSTREAM_TIMEOUT") {
         sendApiError(res, 504, error.code, error.message);
         return;
@@ -460,7 +464,9 @@ export function createApp(options: CreateAppOptions = {}): Application {
       }
       res.status(response.status).send(responseBody);
     } catch (error: unknown) {
-      console.error("DisasterAware proxy request failed.");
+      logger.error("disasteraware_proxy_failed", {
+        code: error instanceof RequestBoundaryError ? error.code : "UPSTREAM_UNAVAILABLE",
+      });
       if (error instanceof RequestBoundaryError && error.code === "UPSTREAM_TIMEOUT") {
         sendApiError(res, 504, error.code, error.message);
         return;
@@ -486,5 +492,6 @@ const isMainModule = process.argv[1] ? path.resolve(process.argv[1]) === __filen
 if (isMainModule) {
   loadLocalEnv();
   const port = process.env.PORT || 8080;
-  createApp().listen(port, () => console.log(`Server running on ${port}`));
+  const logger = createServerLogger("bff");
+  createApp().listen(port, () => logger.info("server_started", { port: Number(port) }));
 }

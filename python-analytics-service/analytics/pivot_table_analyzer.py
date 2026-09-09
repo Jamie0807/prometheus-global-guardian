@@ -15,7 +15,6 @@ from scipy.stats import linregress
 from typing import Dict, List, Any, Tuple, Optional, Union
 import logging
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

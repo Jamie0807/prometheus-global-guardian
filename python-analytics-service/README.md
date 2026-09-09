@@ -63,9 +63,13 @@ ANALYTICS_ADMIN_TOKEN=replace-with-a-long-random-secret
 # 可选：逗号分隔的浏览器来源白名单
 
 ANALYTICS_CORS_ORIGINS=https://app.example
+APP_ENV=production
+LOG_LEVEL=info
 \`\`\`
 
 `ANALYTICS_ADMIN_TOKEN` 只能作为服务端环境变量使用，不能使用 `VITE_` 前缀，也不能写入前端代码、日志或响应。未配置令牌时，`GET /metrics` 和 `POST /cache/clear` 均返回 `404`；配置后，调用方必须携带 `X-Analytics-Admin-Token`。默认 CORS 只允许 `http://localhost:5173`、`http://localhost:3000` 和 `http://localhost:8080`，不允许 Cookie 凭据；需要额外来源时使用 `ANALYTICS_CORS_ORIGINS` 显式覆盖。
+
+日志级别使用 `LOG_LEVEL`（`debug`、`info`、`warn`、`error` 或 `silent`）。`APP_ENV=production` 时默认 `info`，其他环境默认 `debug`；非法值使用环境默认值。日志只记录稳定事件名及安全上下文，不记录令牌、请求头、请求/响应正文、异常文本或堆栈。
 
 ### Docker 启动
 

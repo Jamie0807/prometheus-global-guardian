@@ -3,6 +3,9 @@ import { fetchHazardTypes } from "../services/hazards/hazardService";
 import { checkHealth } from "../services/analytics/analyticsService";
 import type { HazardType } from "../types";
 import DISPLAYED_TYPES from "../config/displayedTypes";
+import { createClientLogger } from "../utils/logger";
+
+const logger = createClientLogger("status-panel");
 
 interface StatusPanelProps {
   filter: string;
@@ -29,8 +32,8 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
           DISPLAYED_TYPES.map((item) => item.type_id).includes(item.type_id),
         ),
       );
-    } catch (error) {
-      console.error("Failed to fetch hazard types:", error);
+    } catch {
+      logger.warn("hazard_types_load_failed");
     } finally {
       setIsLoading(false);
     }

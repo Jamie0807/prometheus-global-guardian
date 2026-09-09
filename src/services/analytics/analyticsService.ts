@@ -12,10 +12,12 @@
 import { requestRaw } from "../http/httpClient";
 import type { Hazard } from "../../types";
 import type { AnalysisRequest, AnalyticsResponse, HazardData } from "./analyticsTypes";
+import { createClientLogger } from "../../utils/logger";
 
 const API_BASE_URL = import.meta.env.VITE_PYTHON_API_URL ?? "http://localhost:8001";
 const REQUEST_TIMEOUT = 30000; // 30秒超时
 const MAX_RETRIES = 3;
+const logger = createClientLogger("analytics-service");
 
 type AnalyticsResult<T = unknown> = Omit<AnalyticsResponse<T>, "data"> & { data: T };
 type HazardProperties = Record<string, unknown>;
@@ -55,7 +57,7 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   try {
     return await requestRaw(url, options, { timeoutMs: timeout });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof Error && error.message === "Request timed out") {
       throw new Error("请求超时，请检查网络连接或稍后重试");
     }
@@ -101,7 +103,7 @@ async function fetchWithRetry(
 
       // 指数退避：等待 2^i 秒后重试
       const delay = Math.min(1000 * Math.pow(2, i), 10000);
-      console.log(`请求失败，${delay}ms后重试... (${i + 1}/${retries})`);
+      logger.warn("request_retry_scheduled", { attempt: i + 1, delay, retries });
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
@@ -118,8 +120,8 @@ export async function checkHealth(): Promise<boolean> {
   try {
     const response = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 5000);
     return response.ok;
-  } catch (error) {
-    console.error("Health check failed:", error);
+  } catch {
+    logger.debug("health_check_failed");
     return false;
   }
 }
@@ -132,8 +134,8 @@ export async function getServiceInfo(): Promise<AnalyticsResult> {
     const response = await fetchWithTimeout(`${API_BASE_URL}/`);
     if (!response.ok) throw new Error("Failed to fetch service info");
     return await response.json();
-  } catch (error) {
-    console.error("Service info fetch failed:", error);
+  } catch (error: unknown) {
+    logger.error("service_info_fetch_failed");
     throw error;
   }
 }
@@ -162,9 +164,9 @@ export async function getStatistics(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Statistics fetch failed:", error);
-    throw new Error(`统计分析请求失败: ${(error as Error).message}`);
+  } catch {
+    logger.error("statistics_fetch_failed");
+    throw new Error("统计分析请求失败");
   }
 }
 
@@ -198,9 +200,9 @@ export async function getPredictions(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Predictions fetch failed:", error);
-    throw new Error(`预测分析请求失败: ${(error as Error).message}`);
+  } catch {
+    logger.error("predictions_fetch_failed");
+    throw new Error("预测分析请求失败");
   }
 }
 
@@ -222,8 +224,8 @@ export async function processETL(hazards: readonly HazardInput[]): Promise<Analy
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("ETL processing failed:", error);
+  } catch (error: unknown) {
+    logger.error("etl_processing_failed");
     throw error;
   }
 }
@@ -252,9 +254,9 @@ export async function getRiskAssessment(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Risk assessment failed:", error);
-    throw new Error(`风险评估请求失败: ${(error as Error).message}`);
+  } catch {
+    logger.error("risk_assessment_failed");
+    throw new Error("风险评估请求失败");
   }
 }
 
@@ -284,8 +286,8 @@ export async function getComprehensiveAnalysis(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Comprehensive analysis failed:", error);
+  } catch (error: unknown) {
+    logger.error("comprehensive_analysis_failed");
     throw error;
   }
 }
@@ -322,9 +324,9 @@ export async function assessDataQuality(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Quality assessment failed:", error);
-    throw new Error(`质量评估请求失败: ${(error as Error).message}`);
+  } catch {
+    logger.error("quality_assessment_failed");
+    throw new Error("质量评估请求失败");
   }
 }
 
@@ -356,9 +358,9 @@ export async function transformToUnifiedModel(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Unified model transformation failed:", error);
-    throw new Error(`统一模型转换请求失败: ${(error as Error).message}`);
+  } catch {
+    logger.error("unified_model_transformation_failed");
+    throw new Error("统一模型转换请求失败");
   }
 }
 
@@ -387,9 +389,9 @@ export async function mergeMultiSourceData(
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Multi-source merge failed:", error);
-    throw new Error(`多数据源合并请求失败: ${(error as Error).message}`);
+  } catch {
+    logger.error("multi_source_merge_failed");
+    throw new Error("多数据源合并请求失败");
   }
 }
 
@@ -404,7 +406,7 @@ export async function getQualityThresholds(): Promise<AnalyticsResult<Record<str
     }
     return await response.json();
   } catch (error) {
-    console.error("Quality thresholds fetch failed:", error);
+    logger.error("quality_thresholds_fetch_failed");
     throw error;
   }
 }
@@ -424,7 +426,7 @@ export async function getQualityHistory(limit: number = 10): Promise<AnalyticsRe
     }
     return await response.json();
   } catch (error) {
-    console.error("Quality history fetch failed:", error);
+    logger.error("quality_history_fetch_failed");
     throw error;
   }
 }
@@ -523,7 +525,7 @@ export async function create4DPivotTable(
 
     return await response.json();
   } catch (error) {
-    console.error("4D pivot table creation failed:", error);
+    logger.error("pivot_table_creation_failed");
     throw error;
   }
 }
@@ -562,7 +564,7 @@ export async function multiDimensionalQuery(
 
     return await response.json();
   } catch (error) {
-    console.error("Multi-dimensional query failed:", error);
+    logger.error("multi_dimensional_query_failed");
     throw error;
   }
 }
@@ -593,7 +595,7 @@ export async function analyze4DTrends(
 
     return await response.json();
   } catch (error) {
-    console.error("4D trend analysis failed:", error);
+    logger.error("trend_analysis_failed");
     throw error;
   }
 }
@@ -624,7 +626,7 @@ export async function calculate4DRiskScores(
 
     return await response.json();
   } catch (error) {
-    console.error("4D risk scoring failed:", error);
+    logger.error("risk_scoring_failed");
     throw error;
   }
 }
@@ -651,7 +653,7 @@ export async function get4DSummary(hazards: readonly HazardInput[]): Promise<Ana
 
     return await response.json();
   } catch (error) {
-    console.error("4D summary fetch failed:", error);
+    logger.error("summary_fetch_failed");
     throw error;
   }
 }

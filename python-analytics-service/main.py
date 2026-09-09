@@ -26,6 +26,10 @@ import uuid
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+from log_config import configure_logging
+
+configure_logging()
+
 from analytics.statistical_algorithms import StatisticalAnalyzer
 from analytics.prediction_models import PredictionEngine
 from analytics.etl_processor import ETLProcessor
@@ -33,8 +37,6 @@ from analytics.risk_assessment import RiskAssessor
 from analytics.pivot_table_analyzer import FourDimensionalPivotTable
 from security import AdminAccess, get_cors_origins
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 初始化FastAPI应用
@@ -162,7 +164,10 @@ async def attach_request_id(request: Request, call_next):
 
 
 def raise_analysis_internal_error(request: Request) -> None:
-    logger.exception("Analysis request failed [request_id=%s]", request.state.request_id)
+    logger.error(
+        "analysis.request_failed",
+        extra={"request_id": request.state.request_id},
+    )
     raise HTTPException(
         status_code=500,
         detail={
@@ -444,7 +449,7 @@ async def assess_data_quality(request: QualityCheckRequest):
             "data": quality_report
         }
     except Exception as e:
-        logger.error(f"Quality assessment error: {str(e)}")
+        logger.error("quality.assessment_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/unified-model/transform")
@@ -472,7 +477,7 @@ async def transform_to_unified_model(request: QualityCheckRequest):
             }
         }
     except Exception as e:
-        logger.error(f"Unified model transformation error: {str(e)}")
+        logger.error("unified_model.transformation_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/unified-model/merge")
@@ -509,7 +514,7 @@ async def merge_multi_source(request: UnifiedDataRequest):
             }
         }
     except Exception as e:
-        logger.error(f"Multi-source merge error: {str(e)}")
+        logger.error("unified_model.merge_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/quality/thresholds")
@@ -533,7 +538,7 @@ async def get_quality_history(limit: int = Query(default=10, ge=1, le=100)):
             }
         }
     except Exception as e:
-        logger.error(f"Quality history error: {str(e)}")
+        logger.error("quality.history_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== 4维数据透视表API端点 ====================
@@ -590,7 +595,7 @@ async def create_4d_pivot_table(request: AnalysisRequest):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"4D pivot creation error: {str(e)}")
+        logger.error("pivot_table.creation_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/pivot/query")
@@ -648,7 +653,7 @@ async def multi_dimensional_query(request: AnalysisRequest):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"Multi-dimensional query error: {str(e)}")
+        logger.error("pivot_table.query_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/pivot/trend-analysis")
@@ -707,7 +712,7 @@ async def analyze_4d_trends(request: AnalysisRequest):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"4D trend analysis error: {str(e)}")
+        logger.error("pivot_table.trend_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/pivot/risk-score")
@@ -762,7 +767,7 @@ async def calculate_4d_risk_scores(request: AnalysisRequest):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"4D risk scoring error: {str(e)}")
+        logger.error("pivot_table.risk_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/pivot/summary")
@@ -784,7 +789,7 @@ async def get_4d_summary(request: AnalysisRequest):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"4D summary error: {str(e)}")
+        logger.error("pivot_table.summary_request_failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== 结束 4维数据透视表API ====================

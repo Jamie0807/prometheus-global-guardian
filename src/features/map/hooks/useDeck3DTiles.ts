@@ -7,6 +7,9 @@ import type { IControl, Map } from "mapbox-gl";
 
 import { config } from "../../../config";
 import { MAP_LAYER_IDS, MAP_LOD_THRESHOLDS } from "../utils/mapLayerIds";
+import { createClientLogger } from "../../../utils/logger";
+
+const logger = createClientLogger("deck-3d-tiles");
 
 export function useDeck3DTiles(mapRef: MutableRefObject<Map | null>, mapRevision: number) {
   const overlayRef = useRef<MapboxOverlay | null>(null);
@@ -71,8 +74,8 @@ export function useDeck3DTiles(mapRef: MutableRefObject<Map | null>, mapRevision
         },
         "waterway-label",
       );
-    } catch (error) {
-      console.warn("[3D Buildings] fill-extrusion loading failed:", error);
+    } catch {
+      logger.warn("fill_extrusion_loading_failed");
     }
   }, [mapRef, mapRevision]);
 }

@@ -16,6 +16,7 @@ import {
   extractWorkflowResult,
   workflowResultToChatCompletionsSSE,
 } from "./ai-stream.js";
+import { createServerLogger } from "../logging.js";
 
 interface ProviderFailure {
   provider: ProviderName;
@@ -93,20 +94,25 @@ function logRouteResult({
   status: number;
   startedAt: number;
 }): void {
-  console.info(
-    "[AI Router]",
-    JSON.stringify({
-      mode,
-      route: decision.target,
-      reason: decision.reason,
-      provider,
-      fallbackUsed,
-      attempts,
-      status,
-      success: status >= 200 && status < 300,
-      durationMs: Date.now() - startedAt,
-    }),
-  );
+  const logger = createServerLogger("ai_router");
+  const context = {
+    mode,
+    route: decision.target,
+    reason: decision.reason,
+    provider,
+    fallbackUsed,
+    attempts,
+    status,
+    success: status >= 200 && status < 300,
+    durationMs: Date.now() - startedAt,
+  };
+  if (status >= 500) {
+    logger.error("ai_request_finished", context);
+  } else if (status >= 400) {
+    logger.warn("ai_request_finished", context);
+  } else {
+    logger.info("ai_request_finished", context);
+  }
 }
 
 export function registerAIChatRoute(app: Application, middlewares: RequestHandler[] = []): void {

@@ -1,5 +1,9 @@
-import { Component } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
+import { Component } from "react";
+import type { ErrorInfo, ReactNode } from "react";
+import { createClientLogger } from "../utils/logger";
+import { getErrorBoundaryDisplay } from "../utils/errorBoundaryDisplay";
+
+const logger = createClientLogger("error-boundary");
 
 interface Props {
   children: ReactNode;
@@ -16,7 +20,7 @@ class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
-    errorInfo: null
+    errorInfo: null,
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -24,10 +28,10 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error("render_failed", { hasComponentStack: Boolean(errorInfo.componentStack) });
     this.setState({
       error,
-      errorInfo
+      errorInfo,
     });
   }
 
@@ -35,7 +39,7 @@ class ErrorBoundary extends Component<Props, State> {
     this.setState({
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
     });
   };
 
@@ -44,6 +48,12 @@ class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback;
       }
+
+      const display = getErrorBoundaryDisplay(
+        this.state.error ?? new Error("Unknown render error"),
+        this.state.errorInfo?.componentStack ?? null,
+        import.meta.env.PROD,
+      );
 
       return (
         <div className="error-boundary">
@@ -64,23 +74,15 @@ class ErrorBoundary extends Component<Props, State> {
               />
             </svg>
             <h2>Something went wrong</h2>
-            <p className="error-message">
-              {this.state.error && this.state.error.toString()}
-            </p>
-            <details className="error-details">
-              <summary>Error Details</summary>
-              <pre>
-                {this.state.errorInfo && this.state.errorInfo.componentStack}
-              </pre>
-            </details>
+            <p className="error-message">{display.message}</p>
+            {display.details && (
+              <details className="error-details">
+                <summary>Error Details</summary>
+                <pre>{display.details}</pre>
+              </details>
+            )}
             <button className="error-reset-btn" onClick={this.handleReset}>
-              <svg
-                width="20"
-                height="20"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

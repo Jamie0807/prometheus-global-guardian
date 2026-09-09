@@ -19,6 +19,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import ChartDrilldownModal from "./ChartDrilldownModal";
+import { createClientLogger } from "../utils/logger";
+
+const logger = createClientLogger("charts-panel");
 
 type ChartHazard = Hazard & {
   properties?: {
@@ -103,9 +106,9 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
     data: ChartClickData,
     drilldownType: "type" | "severity" | "source" | "date",
   ) => {
-    console.log("Chart clicked:", data, drilldownType);
+    logger.debug("chart_clicked", { drilldownType });
     if (!data || !data.name) {
-      console.warn("Invalid data for drilldown:", data);
+      logger.warn("chart_drilldown_invalid");
       return;
     }
 
@@ -142,12 +145,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
         title = `全部数据 (${filtered.length}条)`;
     }
 
-    console.log("Setting drilldown data:", {
-      title,
-      filtered: filtered.length,
-      drilldownType,
-      value,
-    });
+    logger.debug("chart_drilldown_opened", { filteredCount: filtered.length, drilldownType });
     setDrilldownData({
       title,
       filteredHazards: filtered,
@@ -169,9 +167,9 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
       } else {
         setChartError("统计数据加载失败");
       }
-    } catch (error) {
-      console.error("Failed to load Python statistics:", error);
-      setChartError((error as Error).message || "加载统计数据时出错");
+    } catch {
+      logger.error("statistics_load_failed");
+      setChartError("加载统计数据时出错");
     } finally {
       setLoading(false);
     }
@@ -318,8 +316,8 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             </h4>
             <ResponsiveContainer width="100%" height={350}>
               <PieChart
-                onClick={(e) => {
-                  console.log("PieChart clicked:", e);
+                onClick={() => {
+                  logger.debug("pie_chart_clicked");
                 }}
               >
                 <Pie
@@ -333,8 +331,8 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                   outerRadius={120}
                   fill="#8884d8"
                   dataKey="value"
-                  onClick={(data, index, e) => {
-                    console.log("Pie segment clicked:", { data, index, e });
+                  onClick={(data, index) => {
+                    logger.debug("pie_segment_clicked", { index });
                     handleChartClick(data, "type");
                   }}
                   style={{ cursor: "pointer" }}
@@ -385,7 +383,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                   fill="#FF9800"
                   name="数量"
                   onClick={(data, index) => {
-                    console.log("Bar clicked:", { data, index });
+                    logger.debug("bar_clicked", { index });
                     handleChartClick(data, "type");
                   }}
                   cursor="pointer"
@@ -458,7 +456,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                   fillOpacity={0.6}
                   name="数量"
                   onClick={(data, index) => {
-                    console.log("Area clicked:", { data, index });
+                    logger.debug("area_clicked", { index });
                     handleChartClick(data, "severity");
                   }}
                   cursor="pointer"
@@ -573,14 +571,10 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
       {/* 钻取弹窗 */}
       {isDrilldownOpen && drilldownData ? (
         <>
-          {(() => {
-            console.log("Rendering modal:", { isDrilldownOpen, drilldownData });
-            return null;
-          })()}
           <ChartDrilldownModal
             isOpen={isDrilldownOpen}
             onClose={() => {
-              console.log("Closing modal");
+              logger.debug("chart_drilldown_closed");
               setIsDrilldownOpen(false);
             }}
             title={drilldownData.title}
@@ -589,15 +583,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             drilldownValue={drilldownData.drilldownValue}
           />
         </>
-      ) : (
-        (() => {
-          console.log("Modal not rendered:", {
-            isDrilldownOpen,
-            hasDrilldownData: !!drilldownData,
-          });
-          return null;
-        })()
-      )}
+      ) : null}
     </div>
   );
 };

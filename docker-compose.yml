@@ -8,8 +8,10 @@ services:
         VITE_PYTHON_API_URL: ${VITE_PYTHON_API_URL:-http://localhost:8001}
         VITE_3D_TILES_URL: ${VITE_3D_TILES_URL:-}
         VITE_CESIUM_ION_TOKEN: ${VITE_CESIUM_ION_TOKEN:-}
+        VITE_LOG_LEVEL: ${VITE_LOG_LEVEL:-warn}
     environment:
       PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       DISASTERAWARE_USERNAME: ${DISASTERAWARE_USERNAME:-}
       DISASTERAWARE_PASSWORD: ${DISASTERAWARE_PASSWORD:-}
       AI_PROVIDER: ${AI_PROVIDER:-router}
@@ -34,6 +36,8 @@ services:
     environment:
       ANALYTICS_ADMIN_TOKEN: ${ANALYTICS_ADMIN_TOKEN:-}
       ANALYTICS_CORS_ORIGINS: ${ANALYTICS_CORS_ORIGINS:-}
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     healthcheck:
       test:
         [

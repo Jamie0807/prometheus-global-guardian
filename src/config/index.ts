@@ -1,9 +1,13 @@
+import { createClientLogger } from "../utils/logger";
+
+const logger = createClientLogger("config");
+
 function validateEnv() {
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
   // Mapbox token is required - provide a default for demo purposes
   if (!mapboxToken) {
-    console.warn("VITE_MAPBOX_TOKEN not set. Using default public token for demo.");
+    logger.warn("mapbox_token_missing");
   }
 
   return {

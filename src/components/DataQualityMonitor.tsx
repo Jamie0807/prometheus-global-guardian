@@ -7,6 +7,9 @@ import {
   normalizeQualityScore,
 } from "../services/analytics/analyticsPresentation";
 import type { Hazard } from "../types";
+import { createClientLogger } from "../utils/logger";
+
+const logger = createClientLogger("data-quality-monitor");
 
 // 添加旋转动画样式
 const spinKeyframes = `
@@ -47,8 +50,8 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
       if (result.success) {
         setThresholds((result.data as QualityThresholds | undefined) ?? null);
       }
-    } catch (err) {
-      console.error("Failed to load thresholds:", err);
+    } catch {
+      logger.warn("quality_thresholds_load_failed");
     }
   }, []);
 
@@ -60,9 +63,9 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
       if (result.success && result.data) {
         setQualityReport(normalizeQualityReport(result.data));
       }
-    } catch (err) {
-      setError((err as Error).message);
-      console.error("Quality assessment failed:", err);
+    } catch {
+      setError("质量评估暂时不可用，请稍后重试。");
+      logger.error("quality_assessment_failed");
     } finally {
       setLoading(false);
     }

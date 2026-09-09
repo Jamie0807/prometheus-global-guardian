@@ -3,6 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { config } from "../../../config";
 import { fetchHazardFeed } from "../../../services/hazards/hazardService";
 import type { Hazard, HazardFeedResponse } from "../../../types";
+import { createClientLogger } from "../../../utils/logger";
+
+const logger = createClientLogger("hazard-data");
 
 type RefreshReason = "automatic" | "manual";
 
@@ -103,7 +106,7 @@ export function useHazardData(filter: string, onDataUpdate: (hazards: Hazard[]) 
           onDataUpdate(cleaned);
         } catch (error: unknown) {
           if (!isAbortError(error)) {
-            console.error("Hazard feed refresh failed:", error);
+            logger.error("hazard_feed_refresh_failed");
           }
         }
       })();

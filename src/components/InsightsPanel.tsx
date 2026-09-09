@@ -1,6 +1,9 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { getRiskAssessment } from "../services/analytics/analyticsService";
 import type { Hazard } from "../types";
+import { createClientLogger } from "../utils/logger";
+
+const logger = createClientLogger("insights-panel");
 
 type InsightsHazard = Hazard & {
   properties?: {
@@ -29,8 +32,8 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
       if (result.success) {
         setRiskData((result.data as RiskData | undefined) ?? null);
       }
-    } catch (error) {
-      console.error("Failed to load risk assessment:", error);
+    } catch {
+      logger.error("risk_assessment_load_failed");
     } finally {
       setLoading(false);
     }

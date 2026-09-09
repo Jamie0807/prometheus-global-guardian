@@ -177,6 +177,7 @@ cp .env.example .env
 
 ```dotenv
 VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
+VITE_LOG_LEVEL=debug
 ```
 
 #### Optional DisasterAware Credentials (server-side)
@@ -191,6 +192,12 @@ BFF_HAZARD_RATE_LIMIT_MAX=120
 ```
 
 The Express BFF reads these credentials at runtime; browser assets never receive them. It exposes only `GET /api/hazards/types`, `GET /api/hazards/active`, and `GET /api/hazards/active/category/:categoryId` to DisasterAware, always injects the server token, and forwards only `accept` and `accept-language`. `DISASTERAWARE_REQUEST_TIMEOUT_MS` is capped at 60 seconds. The `BFF_*_RATE_LIMIT_MAX` values are fixed-window limits per IP for each 60-second window and apply only within one BFF process; enforce shared limits at the deployment gateway for multi-instance deployments. When credentials are unavailable, the application can still use public feed fallbacks where supported.
+
+#### Logging and diagnostic output
+
+Set `VITE_LOG_LEVEL` for browser logs and `LOG_LEVEL` for Express and Python logs. Supported values are `debug`, `info`, `warn`, `error`, and `silent`; invalid values use the environment default. Browser development defaults to `debug` and production defaults to `warn`; BFF and Python development default to `debug` and production defaults to `info`. Docker Compose sets production defaults explicitly. `VITE_LOG_LEVEL` is compiled into browser assets, so rebuild the frontend after changing it.
+
+Logs use static event names and limited safe context such as status, duration, count, and request ID. They do not record credentials, tokens, request headers, request or response bodies, exception messages, or stacks. The UI shows safe user-facing messages in production; React diagnostic details are visible only in development.
 
 #### Optional Python Analytics Endpoint
 

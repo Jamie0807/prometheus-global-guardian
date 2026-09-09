@@ -9,6 +9,7 @@ import {
   getStatistics,
 } from "../../../services/analytics/analyticsService";
 import { notify } from "../../../utils/notifications";
+import { createClientLogger } from "../../../utils/logger";
 import type {
   AnalyticsHazard,
   AnalyticsRecord,
@@ -17,6 +18,8 @@ import type {
   ServiceStatus,
 } from "../types";
 import { buildAnalyticsDataHash } from "../utils/analyticsTransforms";
+
+const logger = createClientLogger("analytics-data");
 
 export interface AnalyticsDataState {
   serviceStatus: ServiceStatus;
@@ -45,11 +48,11 @@ export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState
   const [lastAnalyzedDataHash, setLastAnalyzedDataHash] = useState("");
 
   useEffect(() => {
-    console.log("🔍 pivot4DTrends状态更新:", pivot4DTrends);
+    logger.debug("pivot_trends_updated", { hasData: pivot4DTrends !== null });
   }, [pivot4DTrends]);
 
   useEffect(() => {
-    console.log("🔍 pivot4DRiskScores状态更新:", pivot4DRiskScores);
+    logger.debug("pivot_risk_scores_updated", { hasData: pivot4DRiskScores !== null });
   }, [pivot4DRiskScores]);
 
   const checkServiceStatus = async () => {
@@ -103,29 +106,29 @@ export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState
 
       try {
         const pivotData = await create4DPivotTable(analysisData);
-        console.log("✅ 4D透视表创建成功:", pivotData);
+        logger.debug("pivot_table_created", { success: pivotData.success });
 
         const trendsResult = await analyze4DTrends(analysisData);
-        console.log("✅ 趋势分析完成:", trendsResult);
+        logger.debug("trend_analysis_completed", { success: Boolean(trendsResult?.success) });
         if (trendsResult?.success) {
           const trendsData = trendsResult.data || { message: "时间窗口内数据不足" };
-          console.log("🎯 设置趋势数据:", trendsData);
+          logger.debug("trend_data_updated");
           setPivot4DTrends(trendsData as PivotTrendRecord);
         } else {
-          console.warn("⚠️ 趋势分析失败或无数据");
+          logger.warn("trend_analysis_unavailable");
         }
 
         const riskScoresResult = await calculate4DRiskScores(analysisData);
-        console.log("✅ 风险评分完成:", riskScoresResult);
+        logger.debug("risk_scoring_completed", { success: Boolean(riskScoresResult?.success) });
         if (riskScoresResult?.success) {
           const riskData = riskScoresResult.data || { message: "时间窗口内数据不足" };
-          console.log("🎯 设置风险数据:", riskData);
+          logger.debug("risk_score_data_updated");
           setPivot4DRiskScores(riskData as PivotRiskRecord);
         } else {
-          console.warn("⚠️ 风险评分失败或无数据");
+          logger.warn("risk_scoring_unavailable");
         }
-      } catch (pivotError) {
-        console.warn("4D增强分析失败，使用基础版本:", pivotError);
+      } catch {
+        logger.warn("enhanced_analysis_fallback");
       }
 
       notify.success(
@@ -133,7 +136,8 @@ export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState
         "综合分析成功完成！包含统计分析、预测模型、风险评估和4维透视表增强",
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : "分析失败";
+      logger.error("analysis_execution_failed");
       setErrorMessage(errorMessage);
 
       if (retryCount < 3 && !isRetry) {
