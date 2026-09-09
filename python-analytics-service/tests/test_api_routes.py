@@ -2,7 +2,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -226,6 +226,40 @@ class RequestBoundaryHttpRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
 
+    def test_analysis_failures_hide_exceptions_and_return_request_ids(self):
+        routes = [
+            "/api/v1/analyze",
+            "/api/v1/statistics",
+            "/api/v1/predictions",
+            "/api/v1/etl/process",
+            "/api/v1/risk-assessment",
+        ]
+
+        for route in routes:
+            with self.subTest(route=route), patch.object(
+                api.etl_processor,
+                "convert_to_dataframe",
+                side_effect=RuntimeError("secret path"),
+            ):
+                response = self.client.post(
+                    route,
+                    json={"hazards": [HAZARD]},
+                    headers={"X-Request-Id": "valid-request-id"},
+                )
+
+            self.assertEqual(response.status_code, 500)
+            self.assertEqual(response.json()["detail"]["code"], "ANALYSIS_INTERNAL_ERROR")
+            self.assertEqual(
+                response.json()["detail"]["message"],
+                "Analysis service failed to process the request.",
+            )
+            self.assertNotIn("secret path", response.text)
+            self.assertEqual(response.headers["X-Request-Id"], "valid-request-id")
+            self.assertEqual(
+                response.headers["X-Request-Id"],
+                response.json()["detail"]["requestId"],
+            )
+
 
 class PythonManagementBoundaryTests(unittest.TestCase):
     @classmethod
@@ -312,6 +346,176 @@ class PythonManagementBoundaryTests(unittest.TestCase):
                 ["https://app.example", "https://ops.example"],
             )
 
+
+class AnalysisThreadDispatchHttpRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(api.app)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.close()
+
+    def setUp(self):
+        api.GLOBAL_CACHE.clear()
+        api.REQUEST_METRICS.update(
+            total_requests=0,
+            cache_hits=0,
+            cache_misses=0,
+            avg_processing_time=0,
+        )
+
+    def test_comprehensive_analysis_dispatches_work_outside_event_loop(self):
+        dataframe = pd.DataFrame([HAZARD])
+        with patch.object(
+            api.asyncio, "to_thread", new=AsyncMock(return_value={
+                "statistics": {},
+                "predictions": {},
+                "riskAssessment": {},
+                "dataQuality": {},
+                "processingInfo": {"totalRecords": 1, "timeRange": 30, "analysisType": "comprehensive"},
+            })
+        ) as to_thread:
+            response = self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+
+        self.assertEqual(response.status_code, 200)
+        to_thread.assert_awaited_once()
+
+    def test_statistics_dispatches_work_outside_event_loop(self):
+        with patch.object(api.asyncio, "to_thread", new=AsyncMock(return_value={"ok": True})) as to_thread:
+            response = self.client.post("/api/v1/statistics", json={"hazards": [HAZARD]})
+
+        self.assertEqual(response.status_code, 200)
+        to_thread.assert_awaited_once()
+
+    def test_predictions_dispatches_work_outside_event_loop(self):
+        with patch.object(api.asyncio, "to_thread", new=AsyncMock(return_value={"ok": True})) as to_thread:
+            response = self.client.post("/api/v1/predictions", json={"hazards": [HAZARD]})
+
+        self.assertEqual(response.status_code, 200)
+        to_thread.assert_awaited_once()
+
+    def test_etl_dispatches_work_outside_event_loop(self):
+        with patch.object(api.asyncio, "to_thread", new=AsyncMock(return_value={"ok": True})) as to_thread:
+            response = self.client.post("/api/v1/etl/process", json={"hazards": [HAZARD]})
+
+        self.assertEqual(response.status_code, 200)
+        to_thread.assert_awaited_once()
+
+    def test_risk_assessment_dispatches_work_outside_event_loop(self):
+        with patch.object(api.asyncio, "to_thread", new=AsyncMock(return_value={"ok": True})) as to_thread:
+            response = self.client.post("/api/v1/risk-assessment", json={"hazards": [HAZARD]})
+
+        self.assertEqual(response.status_code, 200)
+        to_thread.assert_awaited_once()
+
+
+class ComprehensiveAnalysisCacheHttpRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(api.app)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.close()
+
+    def setUp(self):
+        api.GLOBAL_CACHE.clear()
+        api.REQUEST_METRICS.update(
+            total_requests=0,
+            cache_hits=0,
+            cache_misses=0,
+            avg_processing_time=0,
+        )
+
+    def successful_analysis_dependencies(self):
+        dataframe = pd.DataFrame([HAZARD])
+        return (
+            patch.object(api.etl_processor, "convert_to_dataframe", return_value=dataframe),
+            patch.object(
+                api.statistical_analyzer,
+                "run_comprehensive_analysis",
+                return_value={"summary": "statistics"},
+            ),
+            patch.object(
+                api.prediction_engine,
+                "generate_predictions",
+                return_value={"summary": "predictions"},
+            ),
+            patch.object(
+                api.risk_assessor,
+                "calculate_comprehensive_risk",
+                return_value={"summary": "risk"},
+            ),
+            patch.object(
+                api.etl_processor,
+                "assess_data_quality",
+                return_value={"score": 1.0},
+            ),
+        )
+
+    def test_comprehensive_analysis_caches_only_identical_complete_requests(self):
+        dependencies = self.successful_analysis_dependencies()
+        with dependencies[0] as convert, dependencies[1], dependencies[2], dependencies[3], dependencies[4]:
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            self.client.post(
+                "/api/v1/analyze",
+                json={"hazards": [{**HAZARD, "title": "Different event"}]},
+            )
+
+        self.assertEqual(convert.call_count, 2)
+
+    def test_failed_comprehensive_analysis_results_are_not_cached(self):
+        with patch.object(
+            api.etl_processor,
+            "convert_to_dataframe",
+            side_effect=RuntimeError("analysis failed"),
+        ) as convert:
+            first_response = self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            second_response = self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+
+        self.assertEqual(first_response.status_code, 500)
+        self.assertEqual(second_response.status_code, 500)
+        self.assertEqual(convert.call_count, 2)
+        self.assertEqual(api.GLOBAL_CACHE, {})
+
+    def test_metrics_report_cache_hits_and_misses_from_comprehensive_analysis(self):
+        dependencies = self.successful_analysis_dependencies()
+        with dependencies[0], dependencies[1], dependencies[2], dependencies[3], dependencies[4]:
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            self.client.post(
+                "/api/v1/analyze",
+                json={"hazards": [{**HAZARD, "title": "Different event"}]},
+            )
+
+        with patch.dict(os.environ, {"ANALYTICS_ADMIN_TOKEN": "test-admin-token"}):
+            response = self.client.get(
+                "/metrics",
+                headers={"X-Analytics-Admin-Token": "test-admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["cacheHits"], 1)
+        self.assertEqual(response.json()["cacheMisses"], 2)
+        self.assertEqual(response.json()["cacheSize"], 2)
+
+    def test_clear_cache_forces_comprehensive_analysis_to_recompute(self):
+        dependencies = self.successful_analysis_dependencies()
+        with dependencies[0] as convert, dependencies[1], dependencies[2], dependencies[3], dependencies[4], patch.dict(
+            os.environ, {"ANALYTICS_ADMIN_TOKEN": "test-admin-token"}
+        ):
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+            clear_response = self.client.post(
+                "/cache/clear",
+                headers={"X-Analytics-Admin-Token": "test-admin-token"},
+            )
+            self.client.post("/api/v1/analyze", json={"hazards": [HAZARD]})
+
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertEqual(convert.call_count, 2)
 
 if __name__ == "__main__":
     unittest.main()

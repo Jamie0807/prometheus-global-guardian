@@ -216,12 +216,7 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Earthquake prediction failed: {e}")
-            return {
-                **self._prediction_status(
-                    "EARTHQUAKE", "model_error", "model_execution_failed", 0, 5
-                ),
-                "error": str(e),
-            }
+            return self._prediction_status("EARTHQUAKE", "failed", "model_error", 0, 5)
     
     def _volcano_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """火山预测模型 - 关联地震数据分析"""
@@ -272,10 +267,7 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Volcano prediction failed: {e}")
-            return {
-                **self._prediction_status("VOLCANO", "model_error", "model_execution_failed", 0, 3),
-                "error": str(e),
-            }
+            return self._prediction_status("VOLCANO", "failed", "model_error", 0, 3)
     
     def _storm_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """风暴预测模型 - 季节性分解"""
@@ -328,10 +320,7 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Storm prediction failed: {e}")
-            return {
-                **self._prediction_status("STORM", "model_error", "model_execution_failed", 0, 5),
-                "error": str(e),
-            }
+            return self._prediction_status("STORM", "failed", "model_error", 0, 5)
     
     def _flood_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """洪水预测模型 - 级联灾害建模"""
@@ -382,10 +371,7 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Flood prediction failed: {e}")
-            return {
-                **self._prediction_status("FLOOD", "model_error", "model_execution_failed", 0, 3),
-                "error": str(e),
-            }
+            return self._prediction_status("FLOOD", "failed", "model_error", 0, 3)
     
     def _wildfire_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
         """野火预测模型 - 多因子回归"""
@@ -431,10 +417,7 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Wildfire prediction failed: {e}")
-            return {
-                **self._prediction_status("WILDFIRE", "model_error", "model_execution_failed", 0, 3),
-                "error": str(e),
-            }
+            return self._prediction_status("WILDFIRE", "failed", "model_error", 0, 3)
     
     def _aggregate_risk_assessment(
         self, df: pd.DataFrame, accuracies: List[float] | None = None
@@ -477,7 +460,16 @@ class PredictionEngine:
             
         except Exception as e:
             self.logger.error(f"Risk assessment failed: {e}")
-            return {"error": str(e)}
+            return {
+                "status": "failed",
+                "reason": "model_error",
+                "overallRiskScore": None,
+                "riskLevel": "UNKNOWN",
+                "averageAccuracy": None,
+                "confidence": None,
+                "modelWeights": {},
+                "recommendation": "",
+            }
     
     def _calculate_confidence_interval(self, y: np.ndarray, confidence: float = 0.95) -> Dict[str, float]:
         """计算预测置信区间"""

@@ -109,6 +109,29 @@ class AnalysisRequestContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             api.QualityCheckRequest(hazards=[HAZARD], source=" ")
 
+    def test_analysis_cache_key_uses_the_complete_request_semantics(self):
+        request = api.AnalysisRequest(hazards=[HAZARD])
+        same_request = api.AnalysisRequest(hazards=[HAZARD])
+        changed_hazard = api.AnalysisRequest(
+            hazards=[{**HAZARD, "title": "Different event"}]
+        )
+        changed_analysis_type = api.AnalysisRequest(
+            hazards=[HAZARD], analysisType="forecast"
+        )
+
+        self.assertEqual(
+            api.get_analysis_cache_key(request),
+            api.get_analysis_cache_key(same_request),
+        )
+        self.assertNotEqual(
+            api.get_analysis_cache_key(request),
+            api.get_analysis_cache_key(changed_hazard),
+        )
+        self.assertNotEqual(
+            api.get_analysis_cache_key(request),
+            api.get_analysis_cache_key(changed_analysis_type),
+        )
+
 
 class FourDimensionalEndpointContractTests(unittest.TestCase):
     def make_request(self, **overrides):

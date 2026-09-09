@@ -2,7 +2,9 @@ import sys
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 
 
@@ -13,6 +15,7 @@ if str(SERVICE_ROOT) not in sys.path:
 from analytics.prediction_models import PredictionEngine
 from analytics.quality_monitor import DataQualityMonitor
 from analytics.risk_assessment import RiskAssessor
+from analytics.statistical_algorithms import StatisticalAnalyzer, clean_for_json
 
 
 def make_hazard_frame(count=1, hazard_type="EARTHQUAKE"):
@@ -68,6 +71,44 @@ class PredictionResultSemanticsTests(unittest.TestCase):
         self.assertGreaterEqual(earthquake["confidence"], 0)
         self.assertLessEqual(earthquake["confidence"], 1)
 
+    def test_model_exception_returns_stable_failed_result(self):
+        with patch(
+            "analytics.prediction_models.LinearRegression.fit",
+            side_effect=ValueError("model detail"),
+        ):
+            result = PredictionEngine()._earthquake_prediction_model(
+                make_hazard_frame(count=5)
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["reason"], "model_error")
+        self.assertNotIn("error", result)
+        self.assertNotIn("model detail", str(result))
+
+    def test_aggregate_risk_exception_returns_stable_failed_result(self):
+        engine = PredictionEngine()
+        with patch.object(engine, "_get_risk_level", side_effect=ValueError("secret detail")):
+            result = engine._aggregate_risk_assessment(make_hazard_frame(count=5), [0.8])
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["reason"], "model_error")
+        self.assertIsNone(result["confidence"])
+        self.assertNotIn("error", result)
+        self.assertNotIn("secret detail", str(result))
+
+
+class StatisticalResultSemanticsTests(unittest.TestCase):
+    def test_clean_for_json_converts_nested_numpy_non_finite_values(self):
+        result = clean_for_json({"values": [np.float64("nan"), np.float64("inf")]})
+
+        self.assertEqual(result, {"values": [None, None]})
+
+    def test_statistics_missing_required_column_raises_stable_error(self):
+        frame = pd.DataFrame({"timestamp": [datetime.now(timezone.utc).isoformat()]})
+
+        with self.assertRaisesRegex(ValueError, "Missing required columns: \\['type'\\]"):
+            StatisticalAnalyzer().run_comprehensive_analysis(frame)
+
 
 class RiskResultSemanticsTests(unittest.TestCase):
     def test_risk_result_exposes_structured_recommendation_rules(self):
@@ -81,6 +122,10 @@ class RiskResultSemanticsTests(unittest.TestCase):
             self.assertIn("severity", recommendation)
             self.assertIn("metrics", recommendation)
             self.assertIn("message", recommendation)
+
+    def test_risk_empty_data_raises_stable_error(self):
+        with self.assertRaisesRegex(ValueError, "Invalid dataframe for risk assessment"):
+            RiskAssessor().calculate_comprehensive_risk(pd.DataFrame())
 
 
 class QualityResultSemanticsTests(unittest.TestCase):

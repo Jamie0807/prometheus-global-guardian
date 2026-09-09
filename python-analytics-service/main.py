@@ -22,8 +22,9 @@ from datetime import datetime, timedelta
 import logging
 import hashlib
 import json
-from functools import wraps
+import uuid
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from analytics.statistical_algorithms import StatisticalAnalyzer
 from analytics.prediction_models import PredictionEngine
@@ -150,63 +151,127 @@ REQUEST_METRICS = {
     "avg_processing_time": 0
 }
 
-def get_cache_key(data: List[Dict]) -> str:
-    """生成请求数据的缓存键"""
-    if not data:
-        return "empty"
-    # 使用数据长度、类型分布和时间戳范围生成键
-    types = [d.get('type', 'unknown') for d in data[:10]]
-    key_str = f"{len(data)}_{sorted(types)}_{data[0].get('timestamp', '')}_{data[-1].get('timestamp', '')}"
-    return hashlib.md5(key_str.encode()).hexdigest()
 
-def cache_response(ttl: int = CACHE_TTL):
-    """缓存装饰器"""
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            # 从request中提取hazards数据生成缓存键
-            request = kwargs.get('request') or (args[0] if args else None)
-            if not request or not hasattr(request, 'hazards'):
-                return await func(*args, **kwargs)
-            
-            cache_key = get_cache_key([h.model_dump() for h in request.hazards])
-            
-            # 检查缓存
-            if cache_key in GLOBAL_CACHE:
-                cache_entry = GLOBAL_CACHE[cache_key]
-                if (datetime.now() - cache_entry['timestamp']).seconds < ttl:
-                    REQUEST_METRICS["cache_hits"] += 1
-                    logger.info(f"Cache hit for {func.__name__}: {cache_key[:8]}...")
-                    return cache_entry['data']
-                else:
-                    # 缓存过期
-                    del GLOBAL_CACHE[cache_key]
-            
-            REQUEST_METRICS["cache_misses"] += 1
-            
-            # 执行函数
-            result = await func(*args, **kwargs)
-            
-            # 保存到缓存
-            if len(GLOBAL_CACHE) >= CACHE_MAX_SIZE:
-                # 删除最旧的条目
-                oldest_key = min(GLOBAL_CACHE, key=lambda k: GLOBAL_CACHE[k]['timestamp'])
-                del GLOBAL_CACHE[oldest_key]
-            
-            GLOBAL_CACHE[cache_key] = {
-                'data': result,
-                'timestamp': datetime.now()
-            }
-            
-            return result
-        return wrapper
-    return decorator
+@app.middleware("http")
+async def attach_request_id(request: Request, call_next):
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    return response
+
+
+def raise_analysis_internal_error(request: Request) -> None:
+    logger.exception("Analysis request failed [request_id=%s]", request.state.request_id)
+    raise HTTPException(
+        status_code=500,
+        detail={
+            "code": "ANALYSIS_INTERNAL_ERROR",
+            "message": "Analysis service failed to process the request.",
+            "requestId": request.state.request_id,
+        },
+    )
+
+def get_analysis_cache_key(request: AnalysisRequest) -> str:
+    payload = request.model_dump(mode="json")
+    serialized = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def get_cached_analysis(key: str) -> Optional[AnalysisResponse]:
+    cache_entry = GLOBAL_CACHE.get(key)
+    if cache_entry is None:
+        return None
+
+    if datetime.now() - cache_entry["timestamp"] >= timedelta(seconds=CACHE_TTL):
+        del GLOBAL_CACHE[key]
+        return None
+
+    return cache_entry["data"]
+
+
+def save_cached_analysis(key: str, response: AnalysisResponse) -> None:
+    if len(GLOBAL_CACHE) >= CACHE_MAX_SIZE:
+        oldest_key = min(GLOBAL_CACHE, key=lambda cache_key: GLOBAL_CACHE[cache_key]["timestamp"])
+        del GLOBAL_CACHE[oldest_key]
+
+    GLOBAL_CACHE[key] = {"data": response, "timestamp": datetime.now()}
 
 # 初始化分析引擎
 statistical_analyzer = StatisticalAnalyzer()
 prediction_engine = PredictionEngine()
 etl_processor = ETLProcessor()
 risk_assessor = RiskAssessor()
+
+
+def run_comprehensive_analysis(request: AnalysisRequest) -> Dict[str, Any]:
+    dataframe = etl_processor.convert_to_dataframe(
+        [hazard.model_dump() for hazard in request.hazards]
+    )
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        statistical_task = executor.submit(
+            statistical_analyzer.run_comprehensive_analysis, dataframe
+        )
+        prediction_task = executor.submit(
+            prediction_engine.generate_predictions, dataframe
+        )
+        risk_task = executor.submit(
+            risk_assessor.calculate_comprehensive_risk, dataframe
+        )
+        statistical_results = statistical_task.result()
+        prediction_results = prediction_task.result()
+        risk_results = risk_task.result()
+
+    return {
+        "statistics": statistical_results,
+        "predictions": prediction_results,
+        "riskAssessment": risk_results,
+        "dataQuality": etl_processor.assess_data_quality(dataframe),
+        "processingInfo": {
+            "totalRecords": len(dataframe),
+            "timeRange": request.timeRange,
+            "analysisType": request.analysisType,
+        },
+    }
+
+
+def run_statistics(request: AnalysisRequest) -> Dict[str, Any]:
+    dataframe = etl_processor.convert_to_dataframe(
+        [hazard.model_dump() for hazard in request.hazards]
+    )
+    return statistical_analyzer.run_comprehensive_analysis(dataframe)
+
+
+def run_predictions(request: AnalysisRequest) -> Dict[str, Any]:
+    dataframe = etl_processor.convert_to_dataframe(
+        [hazard.model_dump() for hazard in request.hazards]
+    )
+    return prediction_engine.generate_predictions(dataframe)
+
+
+def run_etl(request: AnalysisRequest) -> Dict[str, Any]:
+    dataframe = etl_processor.convert_to_dataframe(
+        [hazard.model_dump() for hazard in request.hazards]
+    )
+    processed_data = etl_processor.process_data(dataframe)
+    quality_metrics = etl_processor.assess_data_quality(processed_data)
+    processed_data_clean = processed_data.replace({np.nan: None})
+
+    return {
+        "processedData": processed_data_clean.to_dict("records"),
+        "qualityMetrics": quality_metrics,
+        "recordsProcessed": len(processed_data),
+    }
+
+
+def run_risk_assessment(request: AnalysisRequest) -> Dict[str, Any]:
+    dataframe = etl_processor.convert_to_dataframe(
+        [hazard.model_dump() for hazard in request.hazards]
+    )
+    return risk_assessor.calculate_comprehensive_risk(dataframe)
 
 @app.get("/")
 async def root():
@@ -249,7 +314,7 @@ async def clear_cache(_: AdminAccess):
     return {"success": True, "message": "Cache cleared"}
 
 @app.post("/api/v1/analyze", response_model=AnalysisResponse)
-async def comprehensive_analysis(request: AnalysisRequest):
+async def comprehensive_analysis(request: AnalysisRequest, http_request: Request):
     """综合数据分析接口 - 替代TypeScript的23种统计算法
     
     优化：
@@ -259,34 +324,16 @@ async def comprehensive_analysis(request: AnalysisRequest):
     """
     start_time = datetime.now()
     REQUEST_METRICS["total_requests"] += 1
+    cache_key = get_analysis_cache_key(request)
+    cached_response = get_cached_analysis(cache_key)
+    if cached_response is not None:
+        REQUEST_METRICS["cache_hits"] += 1
+        return cached_response
+
+    REQUEST_METRICS["cache_misses"] += 1
     
     try:
-        # 转换数据格式
-        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
-        
-        # 并行执行三个分析任务（使用asyncio）
-        loop = asyncio.get_event_loop()
-        statistical_task = loop.run_in_executor(None, statistical_analyzer.run_comprehensive_analysis, df)
-        prediction_task = loop.run_in_executor(None, prediction_engine.generate_predictions, df)
-        risk_task = loop.run_in_executor(None, risk_assessor.calculate_comprehensive_risk, df)
-        
-        # 等待所有任务完成
-        statistical_results, prediction_results, risk_results = await asyncio.gather(
-            statistical_task, prediction_task, risk_task
-        )
-        
-        # 组合结果
-        analysis_data = {
-            "statistics": statistical_results,
-            "predictions": prediction_results,
-            "riskAssessment": risk_results,
-            "dataQuality": etl_processor.assess_data_quality(df),
-            "processingInfo": {
-                "totalRecords": len(df),
-                "timeRange": request.timeRange,
-                "analysisType": request.analysisType
-            }
-        }
+        analysis_data = await asyncio.to_thread(run_comprehensive_analysis, request)
         
         processing_time = (datetime.now() - start_time).total_seconds()
         processing_time_ms = processing_time * 1000
@@ -300,74 +347,57 @@ async def comprehensive_analysis(request: AnalysisRequest):
         # 添加性能指标到响应
         analysis_data["performance"] = {
             "processingTimeMs": round(processing_time_ms, 2),
-            "recordsProcessed": len(df),
+            "recordsProcessed": analysis_data["processingInfo"]["totalRecords"],
             "parallelExecution": True,
             "cacheEnabled": True
         }
         
-        return AnalysisResponse(
+        response = AnalysisResponse(
             success=True,
             data=analysis_data,
             processingTime=processing_time,
             timestamp=datetime.now().isoformat()
         )
+        save_cached_analysis(cache_key, response)
+        return response
         
-    except Exception as e:
-        logger.error(f"Analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+    except Exception:
+        raise_analysis_internal_error(http_request)
 
 @app.post("/api/v1/statistics")
-async def statistical_analysis(request: AnalysisRequest):
+async def statistical_analysis(request: AnalysisRequest, http_request: Request):
     """专门的统计分析接口 - 23种算法"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
-        results = statistical_analyzer.run_comprehensive_analysis(df)
+        results = await asyncio.to_thread(run_statistics, request)
         return {"success": True, "data": results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise_analysis_internal_error(http_request)
 
 @app.post("/api/v1/predictions")
-async def prediction_analysis(request: AnalysisRequest):
+async def prediction_analysis(request: AnalysisRequest, http_request: Request):
     """专门的预测分析接口 - 5个回归模型"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
-        results = prediction_engine.generate_predictions(df)
+        results = await asyncio.to_thread(run_predictions, request)
         return {"success": True, "data": results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise_analysis_internal_error(http_request)
 
 @app.post("/api/v1/etl/process")
-async def etl_processing(request: AnalysisRequest):
+async def etl_processing(request: AnalysisRequest, http_request: Request):
     """ETL数据处理接口"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
-        processed_data = etl_processor.process_data(df)
-        quality_metrics = etl_processor.assess_data_quality(processed_data)
-        
-        # 将NaN替换为None以便JSON序列化
-        processed_data_clean = processed_data.replace({np.nan: None})
-        
-        return {
-            "success": True, 
-            "data": {
-                "processedData": processed_data_clean.to_dict('records'),
-                "qualityMetrics": quality_metrics,
-                "recordsProcessed": len(processed_data)
-            }
-        }
-    except Exception as e:
-        logger.error(f"ETL processing error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"success": True, "data": await asyncio.to_thread(run_etl, request)}
+    except Exception:
+        raise_analysis_internal_error(http_request)
 
 @app.post("/api/v1/risk-assessment")
-async def risk_assessment(request: AnalysisRequest):
+async def risk_assessment(request: AnalysisRequest, http_request: Request):
     """风险评估接口"""
     try:
-        df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
-        risk_results = risk_assessor.calculate_comprehensive_risk(df)
+        risk_results = await asyncio.to_thread(run_risk_assessment, request)
         return {"success": True, "data": risk_results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise_analysis_internal_error(http_request)
 
 # ========== 新增：统一数据模型和质量监控API ==========
 

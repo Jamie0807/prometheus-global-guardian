@@ -16,16 +16,12 @@ def clean_for_json(obj):
         return {k: clean_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [clean_for_json(item) for item in obj]
-    elif isinstance(obj, float):
-        if np.isnan(obj) or np.isinf(obj):
+    elif isinstance(obj, (float, np.floating)):
+        if not np.isfinite(obj):
             return None
-        return obj
+        return float(obj) if isinstance(obj, np.floating) else obj
     elif isinstance(obj, np.integer):
         return int(obj)
-    elif isinstance(obj, np.floating):
-        if np.isnan(obj) or np.isinf(obj):
-            return None
-        return float(obj)
     return obj
 
 class RiskAssessor:
