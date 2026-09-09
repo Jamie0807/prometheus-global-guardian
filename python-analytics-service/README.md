@@ -229,7 +229,7 @@ python test_pivot_table.py
 pnpm run test:python
 ```
 
-从仓库根目录执行 `pnpm run test:python`，无需启动服务。当前 26 项 unittest 覆盖 API 契约、FastAPI 路由，以及预测、风险和质量结果语义。
+从仓库根目录执行 `pnpm run test:python`，无需启动服务。当前 34 项 unittest 覆盖应用工厂隔离、API 契约、FastAPI 路由，以及预测、风险和质量结果语义。
 
 `tests/test_api_contract.py` 是不依赖已启动服务、直接调用模型和路由函数的 API 契约单元测试，覆盖统一 `hazards` 请求体、4D 参数校验、端点参数传递和数值聚合行为。
 
@@ -253,14 +253,21 @@ python test_service.py
 
 \`\`\`text
 python-analytics-service/
-├── main.py # FastAPI 应用、请求模型和路由
+├── main.py # 兼容入口：app 与直接启动
+├── app/
+│ ├── main.py # 应用工厂与路由注册
+│ ├── core/ # 应用状态、请求 ID 和 HTTP 错误转换
+│ ├── schemas/ # Pydantic 请求与响应模型
+│ ├── services/ # 分析、质量和透视业务调度
+│ └── routes/ # HTTP 输入输出与服务委托
 ├── security.py # 管理令牌依赖与 CORS 来源解析
 ├── requirements.txt # Python 依赖
 ├── Dockerfile # Python 3.13 镜像
 ├── start.sh # 服务目录内启动脚本
 ├── tests/
-│ ├── test_api_contract.py # API 契约单元测试
-│ ├── test_api_routes.py # FastAPI HTTP 路由契约测试
+│ ├── test_app_factory.py # 应用工厂隔离与兼容入口测试
+│ ├── test_api_contract.py # schema 与服务契约测试
+│ ├── test_api_routes.py # FastAPI HTTP 路由委托测试
 │ └── test_result_semantics.py # 预测、风险和质量结果语义测试
 ├── test_service.py # 手工集成测试脚本
 ├── test_pivot_table.py # 打印式透视算法测试脚本
@@ -278,7 +285,6 @@ python-analytics-service/
 ## 已知限制与后续方向
 
 - 统一前端顶层 \`Hazard\`、Python \`HazardData\` 和数据源 adapter 的字段契约，避免标题、时间、震级、严重性和来源丢失。
-- 将路由、Pydantic schema、分析 service 和配置从 \`main.py\` 中拆分。
 - 为预测的样本不足、模型失败、空时间序列和置信区间建立稳定响应。
 - 统一类型、严重程度和来源枚举的大小写与别名，并限制质量分数范围。
 - 为统计、预测、风险、质量和四维接口增加 pytest 单元测试与 API 契约测试。
