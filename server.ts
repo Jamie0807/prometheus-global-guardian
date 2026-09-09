@@ -4,6 +4,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
   fetchAllHazards,
+  type CachedHazardSource,
+  type HazardSourceId,
+  type HazardSourceLoadResult,
   type HazardSourceStatus,
   type ServerHazard,
 } from "./server/hazards/hazard-source.js";
@@ -31,7 +34,10 @@ interface CreateAppOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: UpstreamFetch;
   fetchHazards?: typeof fetchAllHazards;
+  now?: () => Date;
 }
+
+const HAZARD_SOURCE_CACHE_TTL_MS = 300_000;
 
 interface DisasterAwareTokenResponse {
   accessToken?: string;
@@ -147,11 +153,18 @@ export function createApp(options: CreateAppOptions = {}): Application {
   const serverEnv = options.env ?? process.env;
   const upstreamFetch = options.fetchImpl ?? (fetch as unknown as UpstreamFetch);
   const fetchHazards = options.fetchHazards ?? fetchAllHazards;
+  const now = options.now ?? (() => new Date());
   const upstreamTimeoutMs = readBoundedPositiveInteger(
     serverEnv,
     "DISASTERAWARE_REQUEST_TIMEOUT_MS",
     10_000,
     60_000,
+  );
+  const sourceTimeoutMs = readBoundedPositiveInteger(
+    serverEnv,
+    "HAZARD_SOURCE_TIMEOUT_MS",
+    8_000,
+    30_000,
   );
   const authorizeRateLimit = createRateLimitMiddleware({
     maxRequests: readBoundedPositiveInteger(serverEnv, "BFF_AUTHORIZE_RATE_LIMIT_MAX", 10, 1_000),
@@ -164,6 +177,51 @@ export function createApp(options: CreateAppOptions = {}): Application {
   });
   let accessToken = "";
   let authorizationRequest: Promise<string> | undefined;
+  const sourceCache = new Map<HazardSourceId, CachedHazardSource>();
+
+  const loadSource = async (
+    source: HazardSourceId,
+    load: () => Promise<ServerHazard[]>,
+  ): Promise<HazardSourceLoadResult> => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const hazards = await load();
+        const fetchedAt = now().toISOString();
+        sourceCache.set(source, { hazards, fetchedAt });
+        return {
+          hazards,
+          status: {
+            id: source,
+            status: hazards.length > 0 ? "success" : "empty",
+            count: hazards.length,
+            fetchedAt,
+          },
+        };
+      } catch {
+        // A second attempt and a cached response are handled below without exposing upstream details.
+      }
+    }
+
+    const cached = sourceCache.get(source);
+    const fetchedAtMs = cached ? Date.parse(cached.fetchedAt) : Number.NaN;
+    if (
+      cached &&
+      Number.isFinite(fetchedAtMs) &&
+      now().getTime() - fetchedAtMs <= HAZARD_SOURCE_CACHE_TTL_MS
+    ) {
+      return {
+        hazards: cached.hazards,
+        status: {
+          id: source,
+          status: "stale",
+          count: cached.hazards.length,
+          fetchedAt: cached.fetchedAt,
+        },
+      };
+    }
+
+    return { hazards: [], status: { id: source, status: "unavailable", count: 0 } };
+  };
 
   app.disable("x-powered-by");
   // This BFF is directly addressable in development. Configure trusted proxy hops at deployment time.
@@ -224,7 +282,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
         upstreamFetch,
         `${disasterAwareBaseUrl}/hazards/active`,
         { method: "GET", headers: createForwardHeaders(request, token) },
-        upstreamTimeoutMs,
+        sourceTimeoutMs,
       );
 
     let response = await requestUpstream(await getAccessToken());
@@ -279,28 +337,26 @@ export function createApp(options: CreateAppOptions = {}): Application {
         ? new Set(typeParam.split(",").map((type) => type.trim().toUpperCase()))
         : null;
 
-    let primaryStatus: HazardSourceStatus;
     let hazards: ServerHazard[];
     let fallbackSources: HazardSourceStatus[];
     let fallbackUsed = false;
 
-    try {
-      hazards = await fetchDisasterAwareActive(req);
-      primaryStatus = {
-        id: "disasteraware",
-        status: hazards.length > 0 ? "success" : "empty",
-        count: hazards.length,
-      };
-    } catch {
-      hazards = [];
-      primaryStatus = { id: "disasteraware", status: "unavailable", count: 0 };
-    }
+    const primary = await loadSource("disasteraware", () => fetchDisasterAwareActive(req));
+    hazards = primary.hazards;
+    const primaryStatus = primary.status;
 
-    if (hazards.length === 0) {
+    if (primaryStatus.status !== "success") {
       fallbackUsed = true;
       try {
-        const fallback = await fetchHazards({ sources });
-        hazards = fallback.hazards;
+        const fallback = await fetchHazards({
+          sources,
+          sourceFetch: (url) => fetchWithTimeout(upstreamFetch, url, {}, sourceTimeoutMs),
+          loadSource,
+        });
+        hazards =
+          primaryStatus.status === "stale"
+            ? [...primary.hazards, ...fallback.hazards]
+            : fallback.hazards;
         fallbackSources = completeFallbackSourceStatuses(fallback.sources, "fallback");
       } catch {
         fallbackSources = completeFallbackSourceStatuses(
@@ -323,9 +379,12 @@ export function createApp(options: CreateAppOptions = {}): Application {
       );
     }
 
+    const uniqueHazards = [
+      ...new Map(hazards.map((hazard) => [`${hazard.source}:${hazard.id}`, hazard])).values(),
+    ];
     const filtered = typeFilter
-      ? hazards.filter((hazard) => typeFilter.has(hazard.type.toUpperCase()))
-      : hazards;
+      ? uniqueHazards.filter((hazard) => typeFilter.has(hazard.type.toUpperCase()))
+      : uniqueHazards;
 
     res.status(200).json({
       hazards: filtered,
@@ -334,6 +393,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
         fallbackUsed,
         generatedAt: new Date().toISOString(),
         sources: [primaryStatus, ...fallbackSources],
+        stale: [primaryStatus, ...fallbackSources].some((source) => source.status === "stale"),
       },
     });
   });

@@ -17,6 +17,7 @@ const feed = {
   meta: {
     primary: "disasteraware",
     fallbackUsed: false,
+    stale: false,
     generatedAt: "2026-09-09T00:00:00.000Z",
     sources: [
       { id: "disasteraware", status: "success", count: 1 },

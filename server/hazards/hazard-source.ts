@@ -1,7 +1,7 @@
 // Multi-source hazard aggregation for the backend /api/hazards endpoint.
 // Sources: USGS earthquakes, NASA EONET events, and GDACS disaster alerts.
 
-import fetch from "node-fetch";
+import fetch, { type Response as FetchResponse } from "node-fetch";
 
 const USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
 const NASA_URL = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300";
@@ -26,14 +26,32 @@ export interface ServerHazard {
 }
 
 export type HazardSourceId = "disasteraware" | "usgs" | "nasa-eonet" | "gdacs";
-export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback";
+export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback" | "stale";
 
 export interface HazardSourceStatus {
   id: HazardSourceId;
   status: HazardSourceState;
   count: number;
+  fetchedAt?: string;
   message?: string;
 }
+
+export interface CachedHazardSource {
+  hazards: ServerHazard[];
+  fetchedAt: string;
+}
+
+export type HazardSourceFetch = (url: string) => Promise<FetchResponse>;
+
+export interface HazardSourceLoadResult {
+  hazards: ServerHazard[];
+  status: HazardSourceStatus;
+}
+
+export type HazardSourceLoader = (
+  source: HazardSourceId,
+  load: () => Promise<ServerHazard[]>,
+) => Promise<HazardSourceLoadResult>;
 
 interface USGSFeature {
   id: string;
@@ -111,8 +129,10 @@ export function detectHazardTypeFromTitle(title: string): string {
   return "UNKNOWN";
 }
 
-export async function fetchUSGSEarthquakes(): Promise<ServerHazard[]> {
-  const response = await fetch(USGS_URL);
+export async function fetchUSGSEarthquakes(
+  sourceFetch: HazardSourceFetch = fetch,
+): Promise<ServerHazard[]> {
+  const response = await sourceFetch(USGS_URL);
   if (!response.ok) {
     throw new Error("USGS response was unavailable");
   }
@@ -143,8 +163,10 @@ export async function fetchUSGSEarthquakes(): Promise<ServerHazard[]> {
   });
 }
 
-export async function fetchNASAEONET(): Promise<ServerHazard[]> {
-  const response = await fetch(NASA_URL);
+export async function fetchNASAEONET(
+  sourceFetch: HazardSourceFetch = fetch,
+): Promise<ServerHazard[]> {
+  const response = await sourceFetch(NASA_URL);
   if (!response.ok) {
     throw new Error("NASA EONET response was unavailable");
   }
@@ -173,8 +195,8 @@ export async function fetchNASAEONET(): Promise<ServerHazard[]> {
     .filter((hazard): hazard is ServerHazard => Boolean(hazard));
 }
 
-export async function fetchGDACS(): Promise<ServerHazard[]> {
-  const response = await fetch(GDACS_URL);
+export async function fetchGDACS(sourceFetch: HazardSourceFetch = fetch): Promise<ServerHazard[]> {
+  const response = await sourceFetch(GDACS_URL);
   if (!response.ok) {
     throw new Error("GDACS response was unavailable");
   }
@@ -216,6 +238,8 @@ export async function fetchGDACS(): Promise<ServerHazard[]> {
 
 export interface FetchAllHazardsOptions {
   sources?: string[];
+  sourceFetch?: HazardSourceFetch;
+  loadSource?: HazardSourceLoader;
 }
 
 export interface FetchAllHazardsResult {
@@ -230,12 +254,26 @@ export async function fetchAllHazards(
     source.toUpperCase(),
   );
 
-  const tasks: Array<[HazardSourceId, Promise<ServerHazard[]>]> = [];
-  if (requested.includes("USGS")) tasks.push(["usgs", fetchUSGSEarthquakes()]);
-  if (requested.includes("NASA")) tasks.push(["nasa-eonet", fetchNASAEONET()]);
-  if (requested.includes("GDACS")) tasks.push(["gdacs", fetchGDACS()]);
+  const sourceFetch = options.sourceFetch;
+  const loadSource =
+    options.loadSource ??
+    (async (source, load) => {
+      const hazards = await load();
+      return {
+        hazards,
+        status: {
+          id: source,
+          status: hazards.length > 0 ? "success" : "empty",
+          count: hazards.length,
+        },
+      };
+    });
+  const tasks: Array<[HazardSourceId, () => Promise<ServerHazard[]>]> = [];
+  if (requested.includes("USGS")) tasks.push(["usgs", () => fetchUSGSEarthquakes(sourceFetch)]);
+  if (requested.includes("NASA")) tasks.push(["nasa-eonet", () => fetchNASAEONET(sourceFetch)]);
+  if (requested.includes("GDACS")) tasks.push(["gdacs", () => fetchGDACS(sourceFetch)]);
 
-  const settled = await Promise.allSettled(tasks.map(([, promise]) => promise));
+  const settled = await Promise.allSettled(tasks.map(([source, load]) => loadSource(source, load)));
   const hazards: ServerHazard[] = [];
   const sources: HazardSourceStatus[] = [];
 
@@ -243,12 +281,8 @@ export async function fetchAllHazards(
     const source = tasks[index]?.[0];
     if (!source) return;
     if (result.status === "fulfilled") {
-      hazards.push(...result.value);
-      sources.push({
-        id: source,
-        status: result.value.length > 0 ? "success" : "empty",
-        count: result.value.length,
-      });
+      hazards.push(...result.value.hazards);
+      sources.push(result.value.status);
     } else {
       sources.push({ id: source, status: "unavailable", count: 0 });
     }

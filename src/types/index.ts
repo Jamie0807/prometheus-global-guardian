@@ -60,12 +60,13 @@ export interface DisasterAwareAuthResponse {
 }
 
 export type HazardSourceId = "disasteraware" | "usgs" | "nasa-eonet" | "gdacs";
-export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback";
+export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback" | "stale";
 
 export interface HazardSourceStatus {
   id: HazardSourceId;
   status: HazardSourceState;
   count: number;
+  fetchedAt?: string;
   message?: string;
 }
 
@@ -74,6 +75,7 @@ export interface HazardFeedResponse {
   meta: {
     primary: HazardSourceId;
     fallbackUsed: boolean;
+    stale: boolean;
     generatedAt: string;
     sources: HazardSourceStatus[];
   };

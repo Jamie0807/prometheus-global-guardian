@@ -129,6 +129,7 @@ describe("MapView", () => {
       meta: {
         primary: "disasteraware",
         fallbackUsed: false,
+        stale: false,
         generatedAt: "2026-09-09T00:00:00Z",
         sources: [
           { id: "disasteraware", status: "success", count: 1 },
@@ -169,6 +170,7 @@ describe("MapView", () => {
       meta: {
         primary: "disasteraware",
         fallbackUsed,
+        stale: false,
         generatedAt: "2026-09-09T00:00:00Z",
         sources: [
           { id: "disasteraware", status, count: 0 },
@@ -186,5 +188,39 @@ describe("MapView", () => {
     expect(mapMocks.fetchUSGSEarthquakes).not.toHaveBeenCalled();
     expect(mapMocks.fetchNASAEONET).not.toHaveBeenCalled();
     expect(mapMocks.fetchGDACS).not.toHaveBeenCalled();
+  });
+
+  it("shows the earliest stale source success time", async () => {
+    mapMocks.fetchHazardFeed.mockResolvedValueOnce({
+      hazards: [],
+      meta: {
+        primary: "disasteraware",
+        fallbackUsed: false,
+        stale: true,
+        generatedAt: "2026-09-09T00:10:00.000Z",
+        sources: [
+          {
+            id: "disasteraware",
+            status: "stale",
+            count: 1,
+            fetchedAt: "2026-09-09T00:00:00.000Z",
+          },
+          {
+            id: "usgs",
+            status: "stale",
+            count: 1,
+            fetchedAt: "2026-09-09T00:05:00.000Z",
+          },
+          { id: "nasa-eonet", status: "fallback", count: 0 },
+          { id: "gdacs", status: "fallback", count: 0 },
+        ],
+      },
+    });
+
+    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("数据可能已过期");
+    expect(status).toHaveTextContent(new Date("2026-09-09T00:00:00.000Z").toLocaleString("zh-CN"));
   });
 });

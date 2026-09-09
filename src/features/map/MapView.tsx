@@ -78,6 +78,19 @@ const MapView = ({ filter, mapStyle, onDataUpdate, onRefreshReady }: MapViewProp
 };
 
 function getSourceStatusLabel(meta: HazardFeedResponse["meta"]): string {
+  if (meta.stale) {
+    const earliestStaleSourceTime = meta.sources
+      .filter((source) => source.status === "stale" && source.fetchedAt)
+      .map((source) => Date.parse(source.fetchedAt as string))
+      .filter(Number.isFinite)
+      .sort((first, second) => first - second)[0];
+    const lastSuccessTime = earliestStaleSourceTime
+      ? new Date(earliestStaleSourceTime).toLocaleString("zh-CN")
+      : undefined;
+
+    return lastSuccessTime ? `数据可能已过期 · 最近成功时间：${lastSuccessTime}` : "数据可能已过期";
+  }
+
   const primaryStatus = meta.sources.find((source) => source.id === meta.primary)?.status;
   if (primaryStatus === "empty" && meta.fallbackUsed) return "暂无数据 · 已显示备用数据";
   if (primaryStatus === "unavailable" && meta.fallbackUsed) return "暂不可用 · 已显示备用数据";
