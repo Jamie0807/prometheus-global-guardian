@@ -195,6 +195,38 @@ class FourDimensionalHttpRouteTests(unittest.TestCase):
         self.assertEqual(response.json()["data"]["time_window"], 14)
 
 
+class RequestBoundaryHttpRouteTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(api.app)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.close()
+
+    def test_rejects_excessive_hazards_before_analysis_starts(self):
+        with patch.object(api.etl_processor, "convert_to_dataframe") as convert:
+            response = self.client.post("/api/v1/analyze", json={"hazards": [HAZARD] * 1001})
+
+        self.assertEqual(response.status_code, 422)
+        convert.assert_not_called()
+
+    def test_rejects_excessive_quality_hazards(self):
+        response = self.client.post("/api/v1/quality/assess", json={"hazards": [HAZARD] * 1001})
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejects_an_excessive_unified_source(self):
+        response = self.client.post("/api/v1/unified-model/merge", json={"usgs_data": [{}] * 1001})
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_rejects_an_out_of_range_quality_history_limit(self):
+        response = self.client.get("/api/v1/quality/history?limit=101")
+
+        self.assertEqual(response.status_code, 422)
+
+
 class PythonManagementBoundaryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

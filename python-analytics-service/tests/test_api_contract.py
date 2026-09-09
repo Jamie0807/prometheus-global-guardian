@@ -77,6 +77,38 @@ class AnalysisRequestContractTests(unittest.TestCase):
                 with self.assertRaises(ValidationError):
                     api.AnalysisRequest(hazards=[HAZARD], **overrides)
 
+    def test_rejects_excessive_or_invalid_request_values(self):
+        invalid_requests = [
+            {"hazards": [HAZARD] * 1001},
+            {"hazards": [{**HAZARD, "coordinates": [181, 91]}]},
+            {
+                "hazards": [HAZARD],
+                "time_range": ["2026-09-03T00:00:00.000Z", "2026-09-01T00:00:00.000Z"],
+            },
+            {"hazards": [HAZARD], "timeRange": 0},
+            {"hazards": [HAZARD], "timeRange": 3651},
+            {"hazards": [HAZARD], "time_window": 366},
+            {"hazards": [HAZARD], "regions": ["Asia"] * 101},
+            {"hazards": [HAZARD], "regions": [" "]},
+            {"hazards": [{**HAZARD, "source": " "}]},
+            {"hazards": [{**HAZARD, "title": "x" * 257}]},
+            {"hazards": [{**HAZARD, "magnitude": float("inf")}]},
+            {"hazards": [{**HAZARD, "populationExposed": -1}]},
+        ]
+
+        for payload in invalid_requests:
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValidationError):
+                    api.AnalysisRequest(**payload)
+
+    def test_rejects_an_excessive_single_unified_source(self):
+        with self.assertRaises(ValidationError):
+            api.UnifiedDataRequest(usgs_data=[{}] * 1001)
+
+    def test_rejects_a_blank_quality_source(self):
+        with self.assertRaises(ValidationError):
+            api.QualityCheckRequest(hazards=[HAZARD], source=" ")
+
 
 class FourDimensionalEndpointContractTests(unittest.TestCase):
     def make_request(self, **overrides):

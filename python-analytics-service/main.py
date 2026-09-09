@@ -11,10 +11,11 @@ Prometheus Global Guardian - Python Analytics Service
 - 性能监控
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import List, Dict, Any, Literal, Optional, Tuple
+from typing import Annotated, List, Dict, Any, Literal, Optional, Tuple
+import math
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -52,31 +53,58 @@ app.add_middleware(
 )
 
 # 数据模型定义
+MAX_HAZARDS = 1_000
+MAX_FILTER_VALUES = 100
+MAX_SOURCE_RECORDS = 1_000
+MAX_FILTER_TEXT_LENGTH = 128
+
+FilterText = Annotated[str, Field(min_length=1, max_length=MAX_FILTER_TEXT_LENGTH)]
+
+
 class HazardData(BaseModel):
-    id: str
-    type: str = "unknown"
-    title: str = "Unknown Event"
-    coordinates: List[float] = [0.0, 0.0]
-    timestamp: str
-    magnitude: Optional[float] = None
-    severity: Optional[str] = None
-    source: str = "DisasterAWARE"
-    populationExposed: Optional[int] = None
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=128)
+    type: str = Field(default="unknown", min_length=1, max_length=64)
+    title: str = Field(default="Unknown Event", min_length=1, max_length=256)
+    coordinates: List[float] = Field(default_factory=lambda: [0.0, 0.0], min_length=2, max_length=2)
+    timestamp: str = Field(min_length=1, max_length=64)
+    magnitude: Optional[float] = Field(default=None, ge=-20, le=20, allow_inf_nan=False)
+    severity: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    source: str = Field(default="DisasterAWARE", min_length=1, max_length=64)
+    populationExposed: Optional[int] = Field(default=None, ge=0, le=1_000_000_000)
+
+    @field_validator("id", "type", "title", "timestamp", "severity", "source")
+    @classmethod
+    def validate_text_fields(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and not value.strip():
+            raise ValueError("text fields must not be blank")
+        return value
+
+    @field_validator("coordinates")
+    @classmethod
+    def validate_coordinates(cls, value: List[float]) -> List[float]:
+        longitude, latitude = value
+        if not all(math.isfinite(coordinate) for coordinate in value):
+            raise ValueError("coordinates must contain finite numbers")
+        if not -180 <= longitude <= 180 or not -90 <= latitude <= 90:
+            raise ValueError("coordinates must be [longitude, latitude] within valid ranges")
+        return value
 
 class AnalysisRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    hazards: List[HazardData]
+    hazards: List[HazardData] = Field(min_length=1, max_length=MAX_HAZARDS)
     analysisType: str = "comprehensive"
-    timeRange: int = 30  # days
+    timeRange: int = Field(default=30, ge=1, le=3_650)  # days
     time_dim: Literal["year", "quarter", "month", "week", "day", "date_only"] = "month"
     geo_dim: Literal["region", "continent", "geo_grid"] = "region"
     aggfunc: Literal["count", "sum", "mean"] = "count"
     time_range: Optional[Tuple[str, str]] = None
-    regions: Optional[List[str]] = None
-    types: Optional[List[str]] = None
-    severities: Optional[List[str]] = None
-    time_window: int = Field(default=7, gt=0)
+    regions: Optional[List[FilterText]] = Field(default=None, max_length=MAX_FILTER_VALUES)
+    types: Optional[List[FilterText]] = Field(default=None, max_length=MAX_FILTER_VALUES)
+    severities: Optional[List[FilterText]] = Field(default=None, max_length=MAX_FILTER_VALUES)
+    time_window: int = Field(default=7, ge=1, le=365)
 
     @field_validator("time_range")
     @classmethod
@@ -84,12 +112,23 @@ class AnalysisRequest(BaseModel):
         if value is None:
             return None
 
+        parsed_timestamps = []
         for timestamp in value:
             try:
-                datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                parsed_timestamps.append(datetime.fromisoformat(timestamp.replace("Z", "+00:00")))
             except ValueError as exc:
                 raise ValueError("time_range must contain ISO 8601 timestamps") from exc
 
+        if parsed_timestamps[0] > parsed_timestamps[1]:
+            raise ValueError("time_range start must not be after its end")
+
+        return value
+
+    @field_validator("regions", "types", "severities")
+    @classmethod
+    def validate_filter_values(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is not None and any(not item.strip() for item in value):
+            raise ValueError("filter values must not be blank")
         return value
 
 class AnalysisResponse(BaseModel):
@@ -222,11 +261,6 @@ async def comprehensive_analysis(request: AnalysisRequest):
     REQUEST_METRICS["total_requests"] += 1
     
     try:
-        # 数据验证和限制
-        if len(request.hazards) > 1000:
-            logger.warning(f"Large dataset detected: {len(request.hazards)} records, limiting to 1000")
-            request.hazards = request.hazards[:1000]
-        
         # 转换数据格式
         df = etl_processor.convert_to_dataframe([hazard.model_dump() for hazard in request.hazards])
         
@@ -339,14 +373,25 @@ async def risk_assessment(request: AnalysisRequest):
 
 class UnifiedDataRequest(BaseModel):
     """统一模型数据请求"""
-    usgs_data: Optional[List[Dict]] = None
-    nasa_data: Optional[List[Dict]] = None
-    gdacs_data: Optional[List[Dict]] = None
+    model_config = ConfigDict(extra="forbid")
+
+    usgs_data: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=MAX_SOURCE_RECORDS)
+    nasa_data: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=MAX_SOURCE_RECORDS)
+    gdacs_data: Optional[List[Dict[str, Any]]] = Field(default=None, max_length=MAX_SOURCE_RECORDS)
 
 class QualityCheckRequest(BaseModel):
     """质量检查请求"""
-    hazards: List[HazardData]
-    source: str = "unknown"
+    model_config = ConfigDict(extra="forbid")
+
+    hazards: List[HazardData] = Field(min_length=1, max_length=MAX_HAZARDS)
+    source: str = Field(default="unknown", min_length=1, max_length=64)
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("source must not be blank")
+        return value
 
 @app.post("/api/v1/quality/assess")
 async def assess_data_quality(request: QualityCheckRequest):
@@ -446,7 +491,7 @@ async def get_quality_thresholds():
     }
 
 @app.get("/api/v1/quality/history")
-async def get_quality_history(limit: int = 10):
+async def get_quality_history(limit: int = Query(default=10, ge=1, le=100)):
     """获取质量评估历史记录"""
     try:
         history = etl_processor.quality_monitor.get_quality_trend(limit)
