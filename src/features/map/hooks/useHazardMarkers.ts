@@ -3,6 +3,7 @@ import mapboxgl from "mapbox-gl";
 
 import { HAZARD_COLORS, defaultColor } from "../../../config/hazardColors";
 import type { Hazard } from "../../../types";
+import { createHazardPopupContent } from "../utils/hazardPopupContent";
 
 export function useHazardMarkers(
   mapRef: React.MutableRefObject<mapboxgl.Map | null>,
@@ -42,8 +43,8 @@ export function useHazardMarkers(
         border: "2px solid white",
         display: hidden ? "none" : "block",
       });
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
-        `<div class="popup-title">${hazard.title}</div><div class="popup-info"><strong>Type:</strong> ${hazard.type.replace(/_/g, " ")}<br><strong>Severity:</strong> ${hazard.severity}<br><strong>Description:</strong> ${hazard.description}<br><strong>Platform:</strong> Prometheus Global Guardian</div>`,
+      const popup = new mapboxgl.Popup({ offset: 25 }).setDOMContent(
+        createHazardPopupContent(hazard),
       );
       markersRef.current.push(
         new mapboxgl.Marker(element).setLngLat([longitude, latitude]).setPopup(popup).addTo(map),
