@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import type { HazardFeedResponse, MapViewProps } from "../../types";
 import { useDeck3DTiles } from "./hooks/useDeck3DTiles";
@@ -15,13 +15,6 @@ const MapView = ({ filter, mapStyle, onDataUpdate, onRefreshReady }: MapViewProp
   const { setVisible } = useHazardMarkers(mapRef, disasters, filter, showHeatmap, mapRevision);
   useDeck3DTiles(mapRef, mapRevision);
   useHazardLodLayers(mapRef, disasters, mapRevision, showHeatmap, setVisible);
-
-  const hasLoadedData = useRef(false);
-  useEffect(() => {
-    if (mapRevision === 0 || hasLoadedData.current) return;
-    hasLoadedData.current = true;
-    void refresh();
-  }, [mapRevision, refresh]);
 
   useEffect(() => {
     onRefreshReady?.(() => {

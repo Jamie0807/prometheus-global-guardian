@@ -21,11 +21,14 @@ export {
   mapNASACategoryToType,
 };
 
-export async function fetchHazardFeed(filter?: string): Promise<HazardFeedResponse> {
+export async function fetchHazardFeed(
+  filter?: string,
+  signal?: AbortSignal,
+): Promise<HazardFeedResponse> {
   const params = new URLSearchParams();
   if (filter && filter !== "ALL") params.set("type", filter);
   const query = params.toString();
-  return requestJson<HazardFeedResponse>(`/api/hazards${query ? `?${query}` : ""}`);
+  return requestJson<HazardFeedResponse>(`/api/hazards${query ? `?${query}` : ""}`, { signal });
 }
 
 export async function fetchUSGSEarthquakes(): Promise<Hazard[]> {

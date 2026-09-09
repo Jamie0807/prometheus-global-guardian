@@ -82,6 +82,40 @@ describe("HTTP service client", () => {
     });
   });
 
+  it("passes caller aborts through without retrying or classifying them as timeouts", async () => {
+    const fetchMock = vi.fn().mockImplementation(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Request aborted", "AbortError")),
+            { once: true },
+          );
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    const request = requestText("/api/test", { signal: controller.signal }, { retries: 2 });
+
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops a scheduled retry when the caller aborts", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    const request = requestText("/api/test", { signal: controller.signal }, { retries: 2 });
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("retries retryable failures up to the configured total attempts", async () => {
     const fetchMock = vi
       .fn()

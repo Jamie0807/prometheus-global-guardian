@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const { requestJsonMock } = vi.hoisted(() => ({ requestJsonMock: vi.fn() }));
+
+vi.mock("../src/services/http/httpClient", () => ({ requestJson: requestJsonMock }));
+
 import { fetchHazardFeed } from "../src/services/hazards/hazardService";
 import type { HazardFeedResponse } from "../src/types";
 
@@ -30,19 +34,26 @@ const feed = {
 
 describe("hazard feed service", () => {
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   it("returns hazards and source metadata from the unified BFF endpoint", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify(feed), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    requestJsonMock.mockResolvedValue(feed);
 
     await expect(fetchHazardFeed("FLOOD")).resolves.toEqual(feed);
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/hazards?type=FLOOD",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
+    expect(requestJsonMock).toHaveBeenCalledWith("/api/hazards?type=FLOOD", {
+      signal: undefined,
+    });
+  });
+
+  it("forwards the caller cancellation signal to the unified BFF request", async () => {
+    requestJsonMock.mockResolvedValue(feed);
+    const controller = new AbortController();
+
+    await expect(fetchHazardFeed("FLOOD", controller.signal)).resolves.toEqual(feed);
+
+    expect(requestJsonMock).toHaveBeenCalledWith("/api/hazards?type=FLOOD", {
+      signal: controller.signal,
+    });
   });
 });

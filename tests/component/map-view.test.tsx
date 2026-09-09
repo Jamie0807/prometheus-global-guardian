@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mapMocks = vi.hoisted(() => ({
   addSource: vi.fn(),
@@ -110,9 +110,18 @@ vi.mock("../../src/services/hazards/hazardService", () => ({
 
 import MapView from "../../src/features/map/MapView";
 
+function pendingHazardFeed() {
+  let resolve: (value: unknown) => void = () => undefined;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe("MapView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
     mapMocks.fetchHazardFeed.mockResolvedValue({
       hazards: [
         {
@@ -139,6 +148,11 @@ describe("MapView", () => {
         ],
       },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("renders the map container and toggles heatmap mode", async () => {
@@ -222,5 +236,109 @@ describe("MapView", () => {
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent("数据可能已过期");
     expect(status).toHaveTextContent(new Date("2026-09-09T00:00:00.000Z").toLocaleString("zh-CN"));
+  });
+
+  it("deduplicates matching manual refresh requests", async () => {
+    const pending = pendingHazardFeed();
+    const onRefreshReady = vi.fn();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
+    render(
+      <MapView
+        filter="ALL"
+        mapStyle="dark-v11"
+        onDataUpdate={vi.fn()}
+        onRefreshReady={onRefreshReady}
+      />,
+    );
+
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
+    const refresh = onRefreshReady.mock.calls.at(-1)?.[0] as () => void;
+    refresh();
+    refresh();
+
+    expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels an obsolete filter request", async () => {
+    const pending = pendingHazardFeed();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
+    const onDataUpdate = vi.fn();
+    const view = render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={onDataUpdate} />);
+
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
+    const firstSignal = mapMocks.fetchHazardFeed.mock.calls[0]?.[1] as AbortSignal;
+    view.rerender(<MapView filter="FLOOD" mapStyle="dark-v11" onDataUpdate={onDataUpdate} />);
+
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(2));
+    expect(firstSignal.aborted).toBe(true);
+    const updatesAfterNewFilter = onDataUpdate.mock.calls.length;
+    pending.resolve({ hazards: [], meta: null });
+    await Promise.resolve();
+    expect(onDataUpdate).toHaveBeenCalledTimes(updatesAfterNewFilter);
+  });
+
+  it("cancels a manual request when the filter changes while hidden", async () => {
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    const pending = pendingHazardFeed();
+    const onRefreshReady = vi.fn();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
+    const view = render(
+      <MapView
+        filter="ALL"
+        mapStyle="dark-v11"
+        onDataUpdate={vi.fn()}
+        onRefreshReady={onRefreshReady}
+      />,
+    );
+
+    const refresh = onRefreshReady.mock.calls.at(-1)?.[0] as () => void;
+    refresh();
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
+    const signal = mapMocks.fetchHazardFeed.mock.calls[0]?.[1] as AbortSignal;
+    view.rerender(
+      <MapView
+        filter="FLOOD"
+        mapStyle="dark-v11"
+        onDataUpdate={vi.fn()}
+        onRefreshReady={onRefreshReady}
+      />,
+    );
+
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("pauses the refresh interval while hidden and refreshes immediately when visible", async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(2);
+
+    Object.defineProperty(document, "hidden", { configurable: true, value: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(2);
+
+    Object.defineProperty(document, "hidden", { configurable: true, value: false });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(4);
+  });
+
+  it("aborts the active request when unmounted", async () => {
+    const pending = pendingHazardFeed();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
+    const view = render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
+    const signal = mapMocks.fetchHazardFeed.mock.calls[0]?.[1] as AbortSignal;
+    view.unmount();
+
+    expect(signal.aborted).toBe(true);
   });
 });

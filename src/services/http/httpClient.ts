@@ -33,6 +33,10 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+function callerAbortError(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("Request aborted", "AbortError");
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -47,15 +51,25 @@ async function requestResponse(
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     let timedOut = false;
-    const markTimeout = (): void => {
+    const timeout = setTimeout(() => {
       timedOut = true;
-    };
-    controller.signal.addEventListener("abort", markTimeout, { once: true });
+      controller.abort();
+    }, timeoutMs);
+    const callerSignal = init.signal;
+    const abortForCaller = (): void => controller.abort();
+
+    if (callerSignal?.aborted) {
+      abortForCaller();
+    } else {
+      callerSignal?.addEventListener("abort", abortForCaller, { once: true });
+    }
 
     try {
       const response = await fetch(input, { ...init, signal: controller.signal });
+      if (callerSignal?.aborted) {
+        throw callerAbortError(callerSignal);
+      }
       if (response.ok) {
         return response;
       }
@@ -69,11 +83,18 @@ async function requestResponse(
 
       if (attempt < attempts && isRetryable(error)) {
         await delay(RETRY_DELAY_MS);
+        if (callerSignal?.aborted) {
+          throw callerAbortError(callerSignal);
+        }
         continue;
       }
 
       throw error;
     } catch (error: unknown) {
+      if (callerSignal?.aborted) {
+        throw callerAbortError(callerSignal);
+      }
+
       const serviceError =
         error instanceof ServiceError
           ? error
@@ -81,13 +102,16 @@ async function requestResponse(
 
       if (attempt < attempts && isRetryable(serviceError)) {
         await delay(RETRY_DELAY_MS);
+        if (callerSignal?.aborted) {
+          throw callerAbortError(callerSignal);
+        }
         continue;
       }
 
       throw serviceError;
     } finally {
       clearTimeout(timeout);
-      controller.signal.removeEventListener("abort", markTimeout);
+      callerSignal?.removeEventListener("abort", abortForCaller);
     }
   }
 
