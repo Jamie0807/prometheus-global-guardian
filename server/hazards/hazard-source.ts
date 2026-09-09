@@ -25,6 +25,16 @@ export interface ServerHazard {
   url?: string;
 }
 
+export type HazardSourceId = "disasteraware" | "usgs" | "nasa-eonet" | "gdacs";
+export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback";
+
+export interface HazardSourceStatus {
+  id: HazardSourceId;
+  status: HazardSourceState;
+  count: number;
+  message?: string;
+}
+
 interface USGSFeature {
   id: string;
   properties: {
@@ -102,115 +112,106 @@ export function detectHazardTypeFromTitle(title: string): string {
 }
 
 export async function fetchUSGSEarthquakes(): Promise<ServerHazard[]> {
-  try {
-    const response = await fetch(USGS_URL);
-    if (!response.ok) return [];
-
-    const data = (await response.json()) as USGSResponse;
-    return (data.features ?? []).map((feature) => {
-      const magnitude = feature.properties.mag;
-      return {
-        id: feature.id,
-        title: feature.properties.title || feature.properties.place || "Unknown Event",
-        type: "EARTHQUAKE",
-        severity:
-          magnitude && magnitude >= 6.0
-            ? "WARNING"
-            : magnitude && magnitude >= 5.0
-              ? "WATCH"
-              : "ADVISORY",
-        description: `Magnitude ${magnitude ?? "N/A"} earthquake - ${
-          feature.properties.place ?? "Unknown location"
-        }`,
-        geometry: feature.geometry,
-        magnitude,
-        timestamp: feature.properties.time
-          ? new Date(feature.properties.time).toISOString()
-          : undefined,
-        source: "USGS",
-      } satisfies ServerHazard;
-    });
-  } catch (error) {
-    console.error("USGS fetch error:", error);
-    return [];
+  const response = await fetch(USGS_URL);
+  if (!response.ok) {
+    throw new Error("USGS response was unavailable");
   }
+
+  const data = (await response.json()) as USGSResponse;
+  return (data.features ?? []).map((feature) => {
+    const magnitude = feature.properties.mag;
+    return {
+      id: feature.id,
+      title: feature.properties.title || feature.properties.place || "Unknown Event",
+      type: "EARTHQUAKE",
+      severity:
+        magnitude && magnitude >= 6.0
+          ? "WARNING"
+          : magnitude && magnitude >= 5.0
+            ? "WATCH"
+            : "ADVISORY",
+      description: `Magnitude ${magnitude ?? "N/A"} earthquake - ${
+        feature.properties.place ?? "Unknown location"
+      }`,
+      geometry: feature.geometry,
+      magnitude,
+      timestamp: feature.properties.time
+        ? new Date(feature.properties.time).toISOString()
+        : undefined,
+      source: "USGS",
+    } satisfies ServerHazard;
+  });
 }
 
 export async function fetchNASAEONET(): Promise<ServerHazard[]> {
-  try {
-    const response = await fetch(NASA_URL);
-    if (!response.ok) return [];
-
-    const data = (await response.json()) as NASAResponse;
-    return (data.events ?? [])
-      .map((event): ServerHazard | null => {
-        const category = event.categories?.[0]?.title || "UNKNOWN";
-        const hazardType = mapNASACategoryToType(category);
-        const geom = event.geometry?.length ? event.geometry[event.geometry.length - 1] : undefined;
-        if (!geom) return null;
-        return {
-          id: event.id,
-          title: event.title,
-          type: hazardType,
-          severity: "ADVISORY",
-          description: `${category} - ${event.title}`,
-          geometry: {
-            type: geom.type,
-            coordinates: geom.coordinates,
-          },
-          timestamp: geom.date ? new Date(geom.date).toISOString() : undefined,
-          source: "NASA EONET",
-        };
-      })
-      .filter((hazard): hazard is ServerHazard => Boolean(hazard));
-  } catch (error) {
-    console.error("NASA EONET fetch error:", error);
-    return [];
+  const response = await fetch(NASA_URL);
+  if (!response.ok) {
+    throw new Error("NASA EONET response was unavailable");
   }
+
+  const data = (await response.json()) as NASAResponse;
+  return (data.events ?? [])
+    .map((event): ServerHazard | null => {
+      const category = event.categories?.[0]?.title || "UNKNOWN";
+      const hazardType = mapNASACategoryToType(category);
+      const geom = event.geometry?.length ? event.geometry[event.geometry.length - 1] : undefined;
+      if (!geom) return null;
+      return {
+        id: event.id,
+        title: event.title,
+        type: hazardType,
+        severity: "ADVISORY",
+        description: `${category} - ${event.title}`,
+        geometry: {
+          type: geom.type,
+          coordinates: geom.coordinates,
+        },
+        timestamp: geom.date ? new Date(geom.date).toISOString() : undefined,
+        source: "NASA EONET",
+      };
+    })
+    .filter((hazard): hazard is ServerHazard => Boolean(hazard));
 }
 
 export async function fetchGDACS(): Promise<ServerHazard[]> {
-  try {
-    const response = await fetch(GDACS_URL);
-    if (!response.ok) return [];
-
-    const geojson = (await response.json()) as GDACSResponse;
-    const results: ServerHazard[] = [];
-
-    for (const feature of geojson.features ?? []) {
-      const geometry = feature.geometry;
-      const properties = feature.properties;
-      if (!geometry?.coordinates || !properties) continue;
-
-      const title = properties.name || properties.eventname || "Unknown Event";
-      const description = properties.description || properties.htmldescription || "";
-      const hazardType = detectHazardTypeFromTitle(
-        title.concat(" ", description, " ", properties.severitydata?.severitytext || ""),
-      );
-      const severity =
-        properties.alertlevel === "Red"
-          ? "WARNING"
-          : properties.alertlevel === "Orange"
-            ? "WATCH"
-            : "ADVISORY";
-
-      results.push({
-        id: `gdacs-${properties.eventid || Date.now()}`,
-        title,
-        type: hazardType,
-        severity,
-        description,
-        geometry,
-        source: "GDACS",
-        url: properties.url?.report || undefined,
-      });
-    }
-
-    return results;
-  } catch (error) {
-    console.error("GDACS fetch error:", error);
-    return [];
+  const response = await fetch(GDACS_URL);
+  if (!response.ok) {
+    throw new Error("GDACS response was unavailable");
   }
+
+  const geojson = (await response.json()) as GDACSResponse;
+  const results: ServerHazard[] = [];
+
+  for (const feature of geojson.features ?? []) {
+    const geometry = feature.geometry;
+    const properties = feature.properties;
+    if (!geometry?.coordinates || !properties) continue;
+
+    const title = properties.name || properties.eventname || "Unknown Event";
+    const description = properties.description || properties.htmldescription || "";
+    const hazardType = detectHazardTypeFromTitle(
+      title.concat(" ", description, " ", properties.severitydata?.severitytext || ""),
+    );
+    const severity =
+      properties.alertlevel === "Red"
+        ? "WARNING"
+        : properties.alertlevel === "Orange"
+          ? "WATCH"
+          : "ADVISORY";
+
+    results.push({
+      id: `gdacs-${properties.eventid || Date.now()}`,
+      title,
+      type: hazardType,
+      severity,
+      description,
+      geometry,
+      source: "GDACS",
+      url: properties.url?.report || undefined,
+    });
+  }
+
+  return results;
 }
 
 export interface FetchAllHazardsOptions {
@@ -219,12 +220,7 @@ export interface FetchAllHazardsOptions {
 
 export interface FetchAllHazardsResult {
   hazards: ServerHazard[];
-  meta: {
-    total: number;
-    perSource: Record<string, number>;
-    errors: Array<{ source: string; message: string }>;
-    generatedAt: string;
-  };
+  sources: HazardSourceStatus[];
 }
 
 export async function fetchAllHazards(
@@ -234,34 +230,29 @@ export async function fetchAllHazards(
     source.toUpperCase(),
   );
 
-  const tasks: Array<[string, Promise<ServerHazard[]>]> = [];
-  if (requested.includes("USGS")) tasks.push(["USGS", fetchUSGSEarthquakes()]);
-  if (requested.includes("NASA")) tasks.push(["NASA", fetchNASAEONET()]);
-  if (requested.includes("GDACS")) tasks.push(["GDACS", fetchGDACS()]);
+  const tasks: Array<[HazardSourceId, Promise<ServerHazard[]>]> = [];
+  if (requested.includes("USGS")) tasks.push(["usgs", fetchUSGSEarthquakes()]);
+  if (requested.includes("NASA")) tasks.push(["nasa-eonet", fetchNASAEONET()]);
+  if (requested.includes("GDACS")) tasks.push(["gdacs", fetchGDACS()]);
 
   const settled = await Promise.allSettled(tasks.map(([, promise]) => promise));
   const hazards: ServerHazard[] = [];
-  const perSource: Record<string, number> = {};
-  const errors: Array<{ source: string; message: string }> = [];
+  const sources: HazardSourceStatus[] = [];
 
   settled.forEach((result, index) => {
-    const sourceName = tasks[index]?.[0] ?? "UNKNOWN";
+    const source = tasks[index]?.[0];
+    if (!source) return;
     if (result.status === "fulfilled") {
-      perSource[sourceName] = result.value.length;
       hazards.push(...result.value);
+      sources.push({
+        id: source,
+        status: result.value.length > 0 ? "success" : "empty",
+        count: result.value.length,
+      });
     } else {
-      perSource[sourceName] = 0;
-      errors.push({ source: sourceName, message: String(result.reason) });
+      sources.push({ id: source, status: "unavailable", count: 0 });
     }
   });
 
-  return {
-    hazards,
-    meta: {
-      total: hazards.length,
-      perSource,
-      errors,
-      generatedAt: new Date().toISOString(),
-    },
-  };
+  return { hazards, sources };
 }

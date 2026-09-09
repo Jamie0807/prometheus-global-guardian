@@ -18,6 +18,11 @@ const mapMocks = vi.hoisted(() => ({
   removeControl: vi.fn(),
   setStyle: vi.fn(),
   popupSetDOMContent: vi.fn(),
+  fetchHazardFeed: vi.fn(),
+  fetchHazardsActive: vi.fn(),
+  fetchUSGSEarthquakes: vi.fn(),
+  fetchNASAEONET: vi.fn(),
+  fetchGDACS: vi.fn(),
 }));
 
 class WorkerMock {
@@ -96,22 +101,11 @@ vi.mock("mapbox-gl", () => ({
 }));
 
 vi.mock("../../src/services/hazards/hazardService", () => ({
-  fetchHazardsActive: vi.fn(async () => [
-    {
-      hazard_ID: 1,
-      hazard_Name: "<script>window.__xss = true</script>",
-      type_ID: '<img src=x onerror="window.__xss = true">',
-      latitude: 30,
-      longitude: 120,
-      description: '<img src=x onerror="window.__xss = true">',
-      creator: "test",
-      severity_ID: 'HIGH <a href="javascript:alert(1)">link</a>',
-      create_Date: "2026-09-09T00:00:00Z",
-    },
-  ]),
-  fetchUSGSEarthquakes: vi.fn(async () => []),
-  fetchNASAEONET: vi.fn(async () => []),
-  fetchGDACS: vi.fn(async () => []),
+  fetchHazardFeed: mapMocks.fetchHazardFeed,
+  fetchHazardsActive: mapMocks.fetchHazardsActive,
+  fetchUSGSEarthquakes: mapMocks.fetchUSGSEarthquakes,
+  fetchNASAEONET: mapMocks.fetchNASAEONET,
+  fetchGDACS: mapMocks.fetchGDACS,
 }));
 
 import MapView from "../../src/features/map/MapView";
@@ -119,6 +113,31 @@ import MapView from "../../src/features/map/MapView";
 describe("MapView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mapMocks.fetchHazardFeed.mockResolvedValue({
+      hazards: [
+        {
+          id: "hazard-1",
+          title: "<script>window.__xss = true</script>",
+          type: '<img src=x onerror="window.__xss = true">',
+          geometry: { type: "Point", coordinates: [120, 30] },
+          description: '<img src=x onerror="window.__xss = true">',
+          source: "test",
+          severity: 'HIGH <a href="javascript:alert(1)">link</a>',
+          timestamp: "2026-09-09T00:00:00Z",
+        },
+      ],
+      meta: {
+        primary: "disasteraware",
+        fallbackUsed: false,
+        generatedAt: "2026-09-09T00:00:00Z",
+        sources: [
+          { id: "disasteraware", status: "success", count: 1 },
+          { id: "usgs", status: "fallback", count: 0 },
+          { id: "nasa-eonet", status: "fallback", count: 0 },
+          { id: "gdacs", status: "fallback", count: 0 },
+        ],
+      },
+    });
   });
 
   it("renders the map container and toggles heatmap mode", async () => {
@@ -138,5 +157,34 @@ describe("MapView", () => {
     const content = mapMocks.popupSetDOMContent.mock.calls[0]?.[0] as HTMLDivElement;
     expect(content.querySelector(".popup-title")?.textContent).toContain("<script>");
     expect(content.querySelectorAll("script, img, a")).toHaveLength(0);
+  });
+
+  it.each([
+    ["success", false, "已更新"],
+    ["empty", true, "暂无数据 · 已显示备用数据"],
+    ["unavailable", true, "暂不可用 · 已显示备用数据"],
+  ] as const)("shows %s primary source status", async (status, fallbackUsed, label) => {
+    mapMocks.fetchHazardFeed.mockResolvedValueOnce({
+      hazards: [],
+      meta: {
+        primary: "disasteraware",
+        fallbackUsed,
+        generatedAt: "2026-09-09T00:00:00Z",
+        sources: [
+          { id: "disasteraware", status, count: 0 },
+          { id: "usgs", status: "fallback", count: 0 },
+          { id: "nasa-eonet", status: "fallback", count: 0 },
+          { id: "gdacs", status: "fallback", count: 0 },
+        ],
+      },
+    });
+
+    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(label);
+    expect(mapMocks.fetchHazardsActive).not.toHaveBeenCalled();
+    expect(mapMocks.fetchUSGSEarthquakes).not.toHaveBeenCalled();
+    expect(mapMocks.fetchNASAEONET).not.toHaveBeenCalled();
+    expect(mapMocks.fetchGDACS).not.toHaveBeenCalled();
   });
 });

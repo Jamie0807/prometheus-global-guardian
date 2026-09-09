@@ -1,4 +1,4 @@
-import type { ActiveHazard, Hazard, HazardType } from "../../types";
+import type { ActiveHazard, Hazard, HazardFeedResponse, HazardType } from "../../types";
 import { requestJson } from "../http/httpClient";
 import {
   adaptGDACSResponse,
@@ -20,6 +20,13 @@ export {
   detectHazardTypeFromTitle,
   mapNASACategoryToType,
 };
+
+export async function fetchHazardFeed(filter?: string): Promise<HazardFeedResponse> {
+  const params = new URLSearchParams();
+  if (filter && filter !== "ALL") params.set("type", filter);
+  const query = params.toString();
+  return requestJson<HazardFeedResponse>(`/api/hazards${query ? `?${query}` : ""}`);
+}
 
 export async function fetchUSGSEarthquakes(): Promise<Hazard[]> {
   try {

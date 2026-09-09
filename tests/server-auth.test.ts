@@ -6,6 +6,7 @@ import test from "node:test";
 import { Headers, Response, type HeadersInit } from "node-fetch";
 
 import { createApp, type UpstreamFetch } from "../server.js";
+import { fetchAllHazards } from "../server/hazards/hazard-source.js";
 import {
   createForwardHeaders,
   createRateLimitMiddleware,
@@ -33,22 +34,22 @@ async function readErrorCode(response: { json: () => Promise<unknown> }): Promis
   return body.code;
 }
 
-async function startTestApp(fetchImpl: UpstreamFetch, envOverrides: NodeJS.ProcessEnv = {}) {
+async function startTestApp(
+  fetchImpl: UpstreamFetch,
+  envOverrides: NodeJS.ProcessEnv = {},
+  fetchHazards: typeof fetchAllHazards = async () => ({
+    hazards: [],
+    sources: [
+      { id: "usgs", status: "empty", count: 0 },
+      { id: "nasa-eonet", status: "empty", count: 0 },
+      { id: "gdacs", status: "empty", count: 0 },
+    ],
+  }),
+) {
   const app = createApp({
     env: { ...serverEnv, ...envOverrides },
     fetchImpl,
-    fetchHazards: async () => ({
-      hazards: [],
-      meta: {
-        requestedSources: [],
-        successfulSources: [],
-        failedSources: [],
-        total: 0,
-        perSource: {},
-        errors: [],
-        generatedAt: new Date(0).toISOString(),
-      },
-    }),
+    fetchHazards,
   });
   const server = app.listen(0);
 
@@ -139,70 +140,201 @@ test("protected hazard proxy injects its token and refreshes once after an upstr
   assert.deepEqual(authorizationHeaders, ["Bearer token-1", "Bearer token-2"]);
 });
 
-test("GET /api/hazards remains the local public aggregation route", async (t) => {
-  let upstreamCalls = 0;
-  const app = createApp({
-    env: serverEnv,
-    fetchImpl: async () => {
-      upstreamCalls += 1;
-      return new Response("unexpected upstream call", { status: 500 });
+test("GET /api/hazards prefers DisasterAWARE and does not request fallback sources", async (t) => {
+  const urls: string[] = [];
+  let fallbackCalls = 0;
+  const testApp = await startTestApp(
+    async (url) => {
+      urls.push(url);
+      if (url.endsWith("/authorize")) return new Response(JSON.stringify({ accessToken: "token" }));
+      return new Response(
+        JSON.stringify([
+          {
+            hazard_ID: 1,
+            hazard_Name: "Primary flood",
+            type_ID: "FLOOD",
+            latitude: 31.23,
+            longitude: 121.47,
+            creator: "DisasterAWARE",
+            description: "Primary fixture",
+            severity_ID: "HIGH",
+            create_Date: "2026-09-09T00:00:00.000Z",
+          },
+        ]),
+        { headers: { "content-type": "application/json" } },
+      );
     },
-    fetchHazards: async () => ({
-      hazards: [
-        {
-          id: "public-1",
-          title: "Public flood",
-          type: "FLOOD",
-          description: "Public flood fixture",
-          geometry: { type: "Point", coordinates: [0, 0] },
-          source: "GDACS",
-        },
-      ],
-      meta: {
-        requestedSources: ["GDACS"],
-        successfulSources: ["GDACS"],
-        failedSources: [],
-        total: 1,
-        perSource: { GDACS: 1 },
-        errors: [],
-        generatedAt: new Date(0).toISOString(),
-      },
-    }),
-  });
-  const server = app.listen(0);
-  t.after(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-      }),
+    {},
+    async () => {
+      fallbackCalls += 1;
+      return { hazards: [], sources: [] };
+    },
   );
-  await new Promise<void>((resolve, reject) => {
-    server.once("listening", resolve);
-    server.once("error", reject);
-  });
-  const address = server.address() as AddressInfo;
+  t.after(testApp.close);
 
-  const response = await fetch(`http://127.0.0.1:${address.port}/api/hazards`);
-
+  const response = await fetch(`${testApp.baseUrl}/api/hazards`);
   assert.equal(response.status, 200);
   const body = (await response.json()) as {
-    success: boolean;
-    data: Array<{ id: string }>;
-    meta: { returned: number };
+    hazards: Array<{ id: string }>;
+    meta: {
+      primary: string;
+      fallbackUsed: boolean;
+      generatedAt: string;
+      sources: Array<{ id: string; status: string; count: number }>;
+    };
   };
-  assert.equal(body.success, true);
-  assert.deepEqual(body.data, [
+  assert.deepEqual(body.hazards, [
     {
-      id: "public-1",
-      title: "Public flood",
+      id: "1",
+      title: "Primary flood",
       type: "FLOOD",
-      description: "Public flood fixture",
-      geometry: { type: "Point", coordinates: [0, 0] },
-      source: "GDACS",
+      geometry: { type: "Point", coordinates: [121.47, 31.23] },
+      description: "Primary fixture",
+      source: "DisasterAWARE",
+      severity: "HIGH",
+      timestamp: "2026-09-09T00:00:00.000Z",
     },
   ]);
-  assert.equal(body.meta.returned, 1);
-  assert.equal(upstreamCalls, 0);
+  assert.deepEqual(body.meta, {
+    primary: "disasteraware",
+    fallbackUsed: false,
+    generatedAt: body.meta.generatedAt,
+    sources: [
+      { id: "disasteraware", status: "success", count: 1 },
+      { id: "usgs", status: "fallback", count: 0 },
+      { id: "nasa-eonet", status: "fallback", count: 0 },
+      { id: "gdacs", status: "fallback", count: 0 },
+    ],
+  });
+  assert.match(body.meta.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(urls, [
+    "https://api.disasteraware.com/authorize",
+    "https://api.disasteraware.com/hazards/active",
+  ]);
+  assert.equal(fallbackCalls, 0);
+});
+
+for (const primaryResponse of ["empty", "unavailable"] as const) {
+  test(`GET /api/hazards uses fallback sources when DisasterAWARE is ${primaryResponse}`, async (t) => {
+    let fallbackCalls = 0;
+    const secret = "private-url?token=do-not-expose";
+    const testApp = await startTestApp(
+      async (url) => {
+        if (url.endsWith("/authorize"))
+          return new Response(JSON.stringify({ accessToken: "token" }));
+        if (primaryResponse === "unavailable") return new Response(secret, { status: 502 });
+        return new Response("[]", { headers: { "content-type": "application/json" } });
+      },
+      {},
+      async () => {
+        fallbackCalls += 1;
+        return {
+          hazards: [
+            {
+              id: "public-1",
+              title: "Public flood",
+              type: "FLOOD",
+              description: "Public fixture",
+              geometry: { type: "Point", coordinates: [0, 0] },
+              source: "GDACS",
+            },
+          ],
+          sources: [
+            { id: "usgs", status: "empty", count: 0 },
+            { id: "nasa-eonet", status: "unavailable", count: 0 },
+            { id: "gdacs", status: "success", count: 1 },
+          ],
+        };
+      },
+    );
+    t.after(testApp.close);
+
+    const response = await fetch(`${testApp.baseUrl}/api/hazards?type=FLOOD`);
+    assert.equal(response.status, 200);
+    const body = (await response.json()) as {
+      hazards: Array<{ id: string }>;
+      meta: {
+        fallbackUsed: boolean;
+        sources: Array<{ id: string; status: string; count: number }>;
+      };
+    };
+    assert.deepEqual(
+      body.hazards.map((hazard) => hazard.id),
+      ["public-1"],
+    );
+    assert.equal(body.meta.fallbackUsed, true);
+    assert.deepEqual(body.meta.sources, [
+      { id: "disasteraware", status: primaryResponse, count: 0 },
+      { id: "usgs", status: "empty", count: 0 },
+      { id: "nasa-eonet", status: "unavailable", count: 0 },
+      { id: "gdacs", status: "success", count: 1 },
+    ]);
+    assert.equal(fallbackCalls, 1);
+    assert.equal(JSON.stringify(body).includes(secret), false);
+  });
+}
+
+test("GET /api/hazards forwards source selection only to its fallback aggregator", async (t) => {
+  let requestedSources: string[] | undefined;
+  const testApp = await startTestApp(
+    async (url) => {
+      if (url.endsWith("/authorize")) return new Response(JSON.stringify({ accessToken: "token" }));
+      return new Response("[]", { headers: { "content-type": "application/json" } });
+    },
+    {},
+    async (options) => {
+      requestedSources = options?.sources;
+      return {
+        hazards: [],
+        sources: [{ id: "usgs", status: "empty", count: 0 }],
+      };
+    },
+  );
+  t.after(testApp.close);
+
+  const response = await fetch(`${testApp.baseUrl}/api/hazards?source=USGS`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(requestedSources, ["USGS"]);
+  const body = (await response.json()) as {
+    meta: { sources: Array<{ id: string; status: string; count: number }> };
+  };
+  assert.deepEqual(body.meta.sources, [
+    { id: "disasteraware", status: "empty", count: 0 },
+    { id: "usgs", status: "empty", count: 0 },
+    { id: "nasa-eonet", status: "fallback", count: 0 },
+    { id: "gdacs", status: "fallback", count: 0 },
+  ]);
+});
+
+test("GET /api/hazards returns an empty successful feed when every source is unavailable", async (t) => {
+  const secret = "private-url?token=do-not-expose";
+  const testApp = await startTestApp(
+    async (url) => {
+      if (url.endsWith("/authorize")) return new Response(JSON.stringify({ accessToken: "token" }));
+      return new Response(secret, { status: 502 });
+    },
+    {},
+    async () => {
+      throw new Error(secret);
+    },
+  );
+  t.after(testApp.close);
+
+  const response = await fetch(`${testApp.baseUrl}/api/hazards`);
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as {
+    hazards: unknown[];
+    meta: { fallbackUsed: boolean; sources: Array<{ id: string; status: string; count: number }> };
+  };
+  assert.deepEqual(body.hazards, []);
+  assert.equal(body.meta.fallbackUsed, true);
+  assert.deepEqual(body.meta.sources, [
+    { id: "disasteraware", status: "unavailable", count: 0 },
+    { id: "usgs", status: "unavailable", count: 0 },
+    { id: "nasa-eonet", status: "unavailable", count: 0 },
+    { id: "gdacs", status: "unavailable", count: 0 },
+  ]);
+  assert.equal(JSON.stringify(body).includes(secret), false);
 });
 
 test("proxy rejects paths outside the DisasterAware allowlist before authenticating upstream", async (t) => {
@@ -504,7 +636,7 @@ test("hazard aggregation and proxy share their configured rate limit", async (t)
   const response = await fetch(`${testApp.baseUrl}/api/hazards/active`);
   assert.equal(response.status, 429);
   assert.equal(await readErrorCode(response), "RATE_LIMITED");
-  assert.equal(calls, 0);
+  assert.equal(calls, 1);
 });
 
 for (const phase of ["authorize", "proxy"] as const) {

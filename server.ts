@@ -2,7 +2,11 @@ import express, { type Application, type NextFunction, type Request, type Respon
 import fetch, { type Response as FetchResponse } from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
-import { fetchAllHazards } from "./server/hazards/hazard-source.js";
+import {
+  fetchAllHazards,
+  type HazardSourceStatus,
+  type ServerHazard,
+} from "./server/hazards/hazard-source.js";
 import { loadLocalEnv } from "./server/env.js";
 import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
 import {
@@ -31,6 +35,67 @@ interface CreateAppOptions {
 
 interface DisasterAwareTokenResponse {
   accessToken?: string;
+}
+
+type DisasterAwareHazard = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(record: DisasterAwareHazard, key: string, fallback = ""): string {
+  const value = record[key];
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function readFiniteNumber(record: DisasterAwareHazard, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function adaptDisasterAwareHazards(payload: unknown): ServerHazard[] {
+  if (!Array.isArray(payload)) return [];
+
+  return payload.filter(isRecord).map((hazard, index) => {
+    const latitude = readFiniteNumber(hazard, "latitude");
+    const longitude = readFiniteNumber(hazard, "longitude");
+    const hazardId = hazard.hazard_ID;
+    const timestamp = readString(hazard, "create_Date");
+    const severity = readString(hazard, "severity_ID");
+
+    return {
+      id:
+        typeof hazardId === "number" || typeof hazardId === "string"
+          ? String(hazardId)
+          : `da-${index}`,
+      title: readString(hazard, "hazard_Name", "Unknown Hazard"),
+      type: readString(hazard, "type_ID", "UNKNOWN"),
+      geometry: {
+        type: "Point",
+        coordinates:
+          latitude === undefined || longitude === undefined ? [0, 0] : [longitude, latitude],
+      },
+      description: readString(
+        hazard,
+        "description",
+        readString(hazard, "hazard_Name", "No description available"),
+      ),
+      source: readString(hazard, "creator", "DisasterAWARE"),
+      ...(severity ? { severity } : {}),
+      ...(timestamp ? { timestamp } : {}),
+    } satisfies ServerHazard;
+  });
+}
+
+const fallbackSourceIds = ["usgs", "nasa-eonet", "gdacs"] as const;
+
+function completeFallbackSourceStatuses(
+  sources: readonly HazardSourceStatus[],
+  defaultStatus: HazardSourceStatus["status"],
+): HazardSourceStatus[] {
+  return fallbackSourceIds.map(
+    (id) => sources.find((source) => source.id === id) ?? { id, status: defaultStatus, count: 0 },
+  );
 }
 
 function readToken(payload: unknown): string {
@@ -153,6 +218,26 @@ export function createApp(options: CreateAppOptions = {}): Application {
     return authorizationRequest;
   };
 
+  const fetchDisasterAwareActive = async (request: Request): Promise<ServerHazard[]> => {
+    const requestUpstream = async (token: string): Promise<FetchResponse> =>
+      fetchWithTimeout(
+        upstreamFetch,
+        `${disasterAwareBaseUrl}/hazards/active`,
+        { method: "GET", headers: createForwardHeaders(request, token) },
+        upstreamTimeoutMs,
+      );
+
+    let response = await requestUpstream(await getAccessToken());
+    if (response.status === 401 || response.status === 403) {
+      response = await requestUpstream(await getAccessToken(true));
+    }
+    if (!response.ok) {
+      throw new Error("DisasterAware active hazards request was unavailable");
+    }
+
+    return adaptDisasterAwareHazards(await readJsonResponse(response));
+  };
+
   app.use(createRawBodyMiddleware());
 
   registerAIChatRoute(app, [aiRateLimit]);
@@ -180,41 +265,77 @@ export function createApp(options: CreateAppOptions = {}): Application {
   });
 
   app.get("/api/hazards", hazardRateLimit, validateQuery, async (req: Request, res: Response) => {
+    const sourcesParam = req.query.source ?? req.query.sources;
+    const sources =
+      typeof sourcesParam === "string" && sourcesParam.trim().length > 0
+        ? sourcesParam
+            .split(",")
+            .map((source) => source.trim())
+            .filter(Boolean)
+        : undefined;
+    const typeParam = req.query.type;
+    const typeFilter =
+      typeof typeParam === "string" && typeParam.trim().length > 0
+        ? new Set(typeParam.split(",").map((type) => type.trim().toUpperCase()))
+        : null;
+
+    let primaryStatus: HazardSourceStatus;
+    let hazards: ServerHazard[];
+    let fallbackSources: HazardSourceStatus[];
+    let fallbackUsed = false;
+
     try {
-      const sourcesParam = req.query.source ?? req.query.sources;
-      const sources =
-        typeof sourcesParam === "string" && sourcesParam.trim().length > 0
-          ? sourcesParam
-              .split(",")
-              .map((source) => source.trim())
-              .filter(Boolean)
-          : undefined;
-
-      const typeParam = req.query.type;
-      const typeFilter =
-        typeof typeParam === "string" && typeParam.trim().length > 0
-          ? new Set(typeParam.split(",").map((type) => type.trim().toUpperCase()))
-          : null;
-
-      const { hazards, meta } = await fetchHazards({ sources });
-      const filtered = typeFilter
-        ? hazards.filter((hazard) => typeFilter.has(String(hazard.type).toUpperCase()))
-        : hazards;
-
-      res.status(200).json({
-        success: true,
-        data: filtered,
-        meta: { ...meta, returned: filtered.length },
-      });
+      hazards = await fetchDisasterAwareActive(req);
+      primaryStatus = {
+        id: "disasteraware",
+        status: hazards.length > 0 ? "success" : "empty",
+        count: hazards.length,
+      };
     } catch {
-      console.error("Hazard aggregation failed.");
-      sendApiError(
-        res,
-        502,
-        "HAZARD_AGGREGATION_UNAVAILABLE",
-        "Hazard aggregation is unavailable.",
+      hazards = [];
+      primaryStatus = { id: "disasteraware", status: "unavailable", count: 0 };
+    }
+
+    if (hazards.length === 0) {
+      fallbackUsed = true;
+      try {
+        const fallback = await fetchHazards({ sources });
+        hazards = fallback.hazards;
+        fallbackSources = completeFallbackSourceStatuses(fallback.sources, "fallback");
+      } catch {
+        fallbackSources = completeFallbackSourceStatuses(
+          [
+            { id: "usgs", status: "unavailable", count: 0 },
+            { id: "nasa-eonet", status: "unavailable", count: 0 },
+            { id: "gdacs", status: "unavailable", count: 0 },
+          ],
+          "unavailable",
+        );
+      }
+    } else {
+      fallbackSources = completeFallbackSourceStatuses(
+        [
+          { id: "usgs", status: "fallback", count: 0 },
+          { id: "nasa-eonet", status: "fallback", count: 0 },
+          { id: "gdacs", status: "fallback", count: 0 },
+        ],
+        "fallback",
       );
     }
+
+    const filtered = typeFilter
+      ? hazards.filter((hazard) => typeFilter.has(hazard.type.toUpperCase()))
+      : hazards;
+
+    res.status(200).json({
+      hazards: filtered,
+      meta: {
+        primary: "disasteraware",
+        fallbackUsed,
+        generatedAt: new Date().toISOString(),
+        sources: [primaryStatus, ...fallbackSources],
+      },
+    });
   });
 
   app.post("/api/authorize", authorizeRateLimit, async (_req: Request, res: Response) => {
