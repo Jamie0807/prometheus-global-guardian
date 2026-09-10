@@ -11,12 +11,9 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import DOMPurify from "dompurify";
-import {
-  streamChatMessage,
-  type ChatMessage,
-  type DisasterContext,
-} from "../services/ai/aiAssistantService";
-import { generateMessageId, formatTime, QUICK_PROMPTS } from "../utils/aiAssistant";
+import type { ChatMessage, DisasterContext } from "../services/ai/aiAssistantService";
+import { formatTime, QUICK_PROMPTS } from "../utils/aiAssistant";
+import { useAIChatSession } from "../hooks/useAIChatSession";
 import type { Hazard } from "../types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -124,6 +121,7 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
           )}
         </div>
         <span className="ai-ts">{formatTime(msg.timestamp)}</span>
+        {msg.isCancelled && <span className="ai-ts">已停止</span>}
       </div>
     </div>
   );
@@ -132,16 +130,10 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
 
 const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, hazards }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [showQuickPrompts, setShowQuickPrompts] = useState(true);
   const [contextEnabled, setContextEnabled] = useState(true);
-  const [errorText, setErrorText] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const streamingIdRef = useRef<string | null>(null);
 
   // 构建灾害上下文
   const disasterContext = useMemo<DisasterContext>(() => {
@@ -163,6 +155,20 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
     };
   }, [hazards]);
 
+  const {
+    messages,
+    input,
+    errorText,
+    isStreaming,
+    canRetry,
+    setInput,
+    send,
+    stop,
+    clear,
+    retry,
+    close,
+  } = useAIChatSession(isOpen, onClose, contextEnabled ? disasterContext : undefined);
+
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -182,92 +188,22 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
   // ESC 关闭
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) onClose();
+      if (e.key === "Escape" && isOpen) close();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, onClose]);
-
-  // ─── 发送消息核心逻辑 ───────────────────────────────────────────────────────
-
-  const sendMessage = useCallback(
-    async (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || isStreaming) return;
-
-      setErrorText("");
-      setShowQuickPrompts(false);
-
-      const userMsg: ChatMessage = {
-        id: generateMessageId(),
-        role: "user",
-        content: trimmed,
-        timestamp: new Date().toISOString(),
-      };
-
-      const assistantId = generateMessageId();
-      streamingIdRef.current = assistantId;
-
-      const assistantMsg: ChatMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        timestamp: new Date().toISOString(),
-        isStreaming: true,
-      };
-
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setInput("");
-      setIsStreaming(true);
-
-      // 取历史消息（不含当前流式助手消息，不含 system 消息）
-      const history = [...messages, userMsg].filter((m) => m.role !== "system");
-
-      await streamChatMessage(
-        history,
-        contextEnabled ? disasterContext : undefined,
-        // onChunk: 追加字符到流式消息
-        (chunk) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m)),
-          );
-        },
-        // onDone: 结束流式状态
-        () => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, isStreaming: false } : m)),
-          );
-          setIsStreaming(false);
-          streamingIdRef.current = null;
-        },
-        // onError
-        (err) => {
-          setErrorText(err);
-          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-          setIsStreaming(false);
-          streamingIdRef.current = null;
-        },
-      );
-    },
-    [messages, isStreaming, contextEnabled, disasterContext],
-  );
+  }, [close, isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    sendMessage(input);
+    void send(input);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage(input);
+      void send(input);
     }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-    setShowQuickPrompts(true);
-    setErrorText("");
   };
 
   if (!isOpen) return null;
@@ -275,7 +211,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
   return (
     <>
       {/* 遮罩层（半透明） */}
-      <div className="ai-overlay" onClick={onClose} />
+      <div className="ai-overlay" onClick={close} />
 
       {/* 面板主体 */}
       <div className="ai-panel">
@@ -303,13 +239,19 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
 
             {/* 清空 */}
             {messages.length > 0 && (
-              <button className="ai-clear-btn" onClick={clearChat} title="清空对话">
+              <button className="ai-clear-btn" onClick={clear} title="清空对话">
                 🗑️
               </button>
             )}
 
+            {isStreaming && (
+              <button className="ai-clear-btn" onClick={stop} type="button">
+                停止
+              </button>
+            )}
+
             {/* 关闭 */}
-            <button className="ai-close-btn" onClick={onClose}>
+            <button className="ai-close-btn" onClick={close} aria-label="关闭 AI 助手">
               <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -340,7 +282,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
           {errorText && (
             <div className="ai-error">
               <span>⚠️ {errorText}</span>
-              <button onClick={() => setErrorText("")}>✕</button>
+              {canRetry && <button onClick={() => void retry()}>重试</button>}
             </div>
           )}
 
@@ -348,7 +290,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
         </div>
 
         {/* ── 快捷提问（首次展示） ── */}
-        {showQuickPrompts && (
+        {messages.length === 0 && (
           <div className="ai-quick-prompts">
             <p className="ai-quick-label">💡 快捷分析</p>
             <div className="ai-quick-grid">
@@ -356,7 +298,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
                 <button
                   key={i}
                   className="ai-quick-btn"
-                  onClick={() => sendMessage(p.text)}
+                  onClick={() => void send(p.text)}
                   disabled={isStreaming}
                 >
                   {p.label}

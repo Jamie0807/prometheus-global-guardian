@@ -179,6 +179,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
     let providerRequest: ReturnType<typeof buildAIProviderRequest> | undefined;
     let upstream: Awaited<ReturnType<typeof fetch>> | undefined;
     let selectedController: AbortController | undefined;
+    let selectedCleanup: (() => void) | undefined;
 
     for (const provider of providers) {
       const config = resolveServerAIProviderConfig(process.env, provider);
@@ -247,11 +248,14 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
           continue;
         }
 
-        clearTimeout(timeout);
         selectedConfig = config;
         providerRequest = request;
         upstream = response;
         selectedController = controller;
+        selectedCleanup = () => {
+          clearTimeout(timeout);
+          res.off("close", abortOnClose);
+        };
         break;
       } catch (err: unknown) {
         clearTimeout(timeout);
@@ -292,12 +296,22 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
       return;
     }
 
-    res.once("close", () => selectedController?.abort());
+    const finishSelectedRequest = (): void => {
+      selectedCleanup?.();
+      selectedCleanup = undefined;
+      res.off("close", abortSelectedRequest);
+    };
+    function abortSelectedRequest(): void {
+      selectedController?.abort();
+      finishSelectedRequest();
+    }
+    res.once("close", abortSelectedRequest);
 
     if (providerRequest.protocol === "workflow") {
       const contentType = upstream.headers.get("content-type") ?? "";
       if (contentType.includes("text/event-stream")) {
         if (!upstream.body) {
+          finishSelectedRequest();
           res.status(502).json({
             success: false,
             code: "AI_WORKFLOW_STREAM_MISSING",
@@ -308,8 +322,10 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
 
         setStreamHeaders(res);
         upstream.body.on("error", () => {
+          finishSelectedRequest();
           if (!res.writableEnded) res.end();
         });
+        upstream.body.on("end", finishSelectedRequest);
         upstream.body.pipe(createWorkflowToChatCompletionsStream()).pipe(res);
         return;
       }
@@ -318,6 +334,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
       try {
         workflowResponse = await upstream.json();
       } catch {
+        finishSelectedRequest();
         res.status(502).json({
           success: false,
           code: "AI_WORKFLOW_INVALID_RESPONSE",
@@ -328,6 +345,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
 
       const workflowResult = extractWorkflowResult(workflowResponse);
       if (!workflowResult) {
+        finishSelectedRequest();
         res.status(502).json({
           success: false,
           code: "AI_WORKFLOW_RESULT_MISSING",
@@ -338,6 +356,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
 
       setStreamHeaders(res);
       res.end(workflowResultToChatCompletionsSSE(workflowResult));
+      finishSelectedRequest();
       return;
     }
 
@@ -347,12 +366,15 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
     );
     if (!upstream.body) {
       res.end();
+      finishSelectedRequest();
       return;
     }
 
     upstream.body.on("error", () => {
+      finishSelectedRequest();
       if (!res.writableEnded) res.end();
     });
+    upstream.body.on("end", finishSelectedRequest);
 
     if (providerRequest.protocol === "responses") {
       upstream.body.pipe(createResponsesToChatCompletionsStream()).pipe(res);

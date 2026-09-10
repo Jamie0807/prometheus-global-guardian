@@ -17,6 +17,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   isStreaming?: boolean;
+  isComplete?: boolean;
+  isCancelled?: boolean;
 }
 
 export interface DisasterContext {
@@ -35,18 +37,116 @@ const AI_CHAT_ENDPOINT = "/api/ai/chat";
 
 const DEMO_FALLBACK_CODES = new Set(["AI_PROVIDER_NOT_CONFIGURED", "AI_MODEL_MISSING"]);
 
+export type AIStreamOutcome =
+  | { kind: "completed" }
+  | { kind: "cancelled" }
+  | { kind: "failed"; message: string };
+
+export interface StreamChatOptions {
+  signal?: AbortSignal;
+  onChunk: (chunk: string) => void;
+}
+
+const STREAM_ERROR = "AI 响应异常，请重试。";
+const INCOMPLETE_STREAM_ERROR = "AI 响应流意外中断，请重试。";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function readChatCompletionEvents(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  options: StreamChatOptions,
+): Promise<AIStreamOutcome> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let completed = false;
+  let cancellation: Promise<void> | undefined;
+  const cancel = () => {
+    cancellation ??= reader.cancel().catch(() => undefined);
+    return cancellation;
+  };
+  const onAbort = () => {
+    void cancel();
+  };
+
+  function processEvent(event: string): boolean {
+    if (options.signal?.aborted) return false;
+    const data: string[] = [];
+    let eventType = "";
+    for (const line of event.split(/\r?\n/)) {
+      if (line.startsWith(":")) continue;
+      const colon = line.indexOf(":");
+      const field = colon < 0 ? line : line.slice(0, colon);
+      const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
+      if (field === "data") data.push(value);
+      if (field === "event") eventType = value;
+    }
+    if (eventType === "error") throw new Error(STREAM_ERROR);
+    if (data.length === 0) return false;
+    const payload = data.join("\n");
+    if (payload.trim() === "[DONE]") return true;
+    const parsed: unknown = JSON.parse(payload);
+    if (!isRecord(parsed) || "error" in parsed) throw new Error(STREAM_ERROR);
+    const choice: unknown = Array.isArray(parsed.choices) ? parsed.choices[0] : undefined;
+    const delta = isRecord(choice) ? choice.delta : undefined;
+    if (isRecord(delta) && typeof delta.content === "string" && delta.content) {
+      options.onChunk(delta.content);
+    }
+    return false;
+  }
+
+  options.signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    while (true) {
+      if (options.signal?.aborted) return { kind: "cancelled" };
+      const { done, value } = await reader.read();
+      if (options.signal?.aborted) return { kind: "cancelled" };
+      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+      let boundary: RegExpExecArray | null;
+      while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+        const event = buffer.slice(0, boundary.index);
+        buffer = buffer.slice(boundary.index + boundary[0].length);
+        if (processEvent(event)) {
+          completed = true;
+          return { kind: "completed" };
+        }
+        if (options.signal?.aborted) return { kind: "cancelled" };
+      }
+      if (done) {
+        completed = processEvent(buffer);
+        if (options.signal?.aborted) return { kind: "cancelled" };
+        return completed
+          ? { kind: "completed" }
+          : { kind: "failed", message: INCOMPLETE_STREAM_ERROR };
+      }
+    }
+  } catch {
+    return options.signal?.aborted
+      ? { kind: "cancelled" }
+      : { kind: "failed", message: STREAM_ERROR };
+  } finally {
+    options.signal?.removeEventListener("abort", onAbort);
+    try {
+      if (!completed) await cancel();
+    } finally {
+      reader.releaseLock();
+    }
+  }
+}
+
 // ─── 主流式请求函数 ──────────────────────────────────────────────────────────
 
 export async function streamChatMessage(
-  messages: ChatMessage[],
+  messages: readonly ChatMessage[],
   context: DisasterContext | undefined,
-  onChunk: (chunk: string) => void,
-  onDone: () => void,
-  onError: (err: string) => void,
-): Promise<void> {
+  options: StreamChatOptions,
+): Promise<AIStreamOutcome> {
+  if (options.signal?.aborted) return { kind: "cancelled" };
   try {
     const resp = await fetch(AI_CHAT_ENDPOINT, {
       method: "POST",
+      signal: options.signal,
       headers: {
         "Content-Type": "application/json",
       },
@@ -59,57 +159,34 @@ export async function streamChatMessage(
     if (!resp.ok) {
       const text = await resp.text();
       let code = "";
-      let message = text;
 
       try {
-        const parsed = JSON.parse(text);
-        code = parsed.code ?? "";
-        message = parsed.message ?? text;
+        const parsed: unknown = JSON.parse(text);
+        if (isRecord(parsed) && typeof parsed.code === "string") code = parsed.code;
       } catch {
-        // Keep the raw response text for non-JSON errors.
+        // Non-JSON error bodies must not be exposed to the caller.
       }
 
+      if (options.signal?.aborted) return { kind: "cancelled" };
       if (resp.status === 503 && DEMO_FALLBACK_CODES.has(code)) {
-        await runDemoMode(messages, context, onChunk, onDone);
-        return;
+        return await runDemoMode(messages, context, options);
       }
 
-      onError(`AI BFF 请求失败 (${resp.status}): ${message}`);
-      return;
+      return { kind: "failed", message: `AI 请求失败 (${resp.status})，请稍后重试。` };
     }
 
     const reader = resp.body?.getReader();
     if (!reader) {
-      onError("无法读取响应流");
-      return;
+      return options.signal?.aborted
+        ? { kind: "cancelled" }
+        : { kind: "failed", message: "无法读取 AI 响应流，请重试。" };
     }
 
-    const decoder = new TextDecoder();
-    let buf = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t || t === "data: [DONE]") continue;
-        if (!t.startsWith("data: ")) continue;
-        try {
-          const json = JSON.parse(t.slice(6));
-          const delta: string | undefined = json.choices?.[0]?.delta?.content;
-          if (delta) onChunk(delta);
-        } catch {
-          /* skip malformed chunks */
-        }
-      }
-    }
-    onDone();
-  } catch (err) {
-    onError(err instanceof Error ? err.message : "网络请求失败，请检查网络连接");
+    return await readChatCompletionEvents(reader, options);
+  } catch {
+    return options.signal?.aborted
+      ? { kind: "cancelled" }
+      : { kind: "failed", message: "网络请求失败，请检查网络连接。" };
   }
 }
 
@@ -244,11 +321,10 @@ ${ctx?.byType["VOLCANO"] ? `当前监控活跃火山事件 **${ctx.byType["VOLCA
 ];
 
 async function runDemoMode(
-  messages: ChatMessage[],
+  messages: readonly ChatMessage[],
   ctx: DisasterContext | undefined,
-  onChunk: (c: string) => void,
-  onDone: () => void,
-): Promise<void> {
+  options: StreamChatOptions,
+): Promise<AIStreamOutcome> {
   const last = messages[messages.length - 1]?.content?.toLowerCase() ?? "";
 
   let response = "";
@@ -285,11 +361,28 @@ ${ctx ? `📡 当前平台正在监控 **${ctx.total} 条**活跃灾害事件。
   // 逐字流式输出，模拟打字效果
   const chars = response.split("");
   for (let i = 0; i < chars.length; i++) {
-    onChunk(chars[i]);
+    if (options.signal?.aborted) return { kind: "cancelled" };
+    options.onChunk(chars[i]);
     // 每隔几个字符稍作延迟，营造流畅打字感
     if (i % 4 === 0) {
-      await new Promise((r) => setTimeout(r, 6));
+      await waitForDemoChunk(options.signal);
     }
   }
-  onDone();
+  return options.signal?.aborted ? { kind: "cancelled" } : { kind: "completed" };
+}
+
+function waitForDemoChunk(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    const finish = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, 6);
+    signal?.addEventListener("abort", finish, { once: true });
+  });
 }

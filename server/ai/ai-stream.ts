@@ -1,4 +1,4 @@
-import { Transform } from 'stream';
+import { Transform } from "stream";
 
 interface WorkflowStreamState {
   previousWorkflowResult?: string;
@@ -7,37 +7,47 @@ interface WorkflowStreamState {
 const toChatCompletionDelta = (delta: string): string =>
   `data: ${JSON.stringify({ choices: [{ delta: { content: delta } }] })}\n\n`;
 
-const RESPONSE_DONE_TYPES = new Set([
-  'response.completed',
-  'response.failed',
-  'response.incomplete',
-]);
+const RESPONSE_FAILURE_CODES = {
+  "response.failed": "AI_PROVIDER_STREAM_FAILED",
+  "response.incomplete": "AI_PROVIDER_STREAM_INCOMPLETE",
+} as const;
+
+function toStreamError(code: string): string {
+  return `event: error\ndata: ${JSON.stringify({
+    code,
+    message: "AI provider stream failed.",
+  })}\n\n`;
+}
 
 export function convertResponsesSSEToChatCompletionsSSE(sseText: string): string {
-  let output = '';
+  let output = "";
 
   for (const line of sseText.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (!trimmed.startsWith('data:')) {
+    if (!trimmed.startsWith("data:")) {
       continue;
     }
 
     const data = trimmed.slice(5).trim();
-    if (!data || data === '[DONE]') {
-      if (data === '[DONE]') {
-        output += 'data: [DONE]\n\n';
+    if (!data || data === "[DONE]") {
+      if (data === "[DONE]") {
+        output += "data: [DONE]\n\n";
       }
       continue;
     }
 
     try {
       const event = JSON.parse(data);
-      const delta = typeof event.delta === 'string' ? event.delta : '';
+      const delta = typeof event.delta === "string" ? event.delta : "";
 
       if (delta) {
         output += toChatCompletionDelta(delta);
-      } else if (RESPONSE_DONE_TYPES.has(event.type)) {
-        output += 'data: [DONE]\n\n';
+      } else if (event.type === "response.completed") {
+        output += "data: [DONE]\n\n";
+      } else if (event.type in RESPONSE_FAILURE_CODES) {
+        output += toStreamError(
+          RESPONSE_FAILURE_CODES[event.type as keyof typeof RESPONSE_FAILURE_CODES],
+        );
       }
     } catch {
       // Ignore malformed provider chunks; the next chunk may still be valid SSE.
@@ -48,18 +58,20 @@ export function convertResponsesSSEToChatCompletionsSSE(sseText: string): string
 }
 
 export function extractWorkflowResult(workflowResponse: unknown): string {
-  if (!workflowResponse || typeof workflowResponse !== 'object') return '';
+  if (!workflowResponse || typeof workflowResponse !== "object") return "";
   const response = workflowResponse as Record<string, unknown>;
-  const data = response.data && typeof response.data === 'object'
-    ? response.data as Record<string, unknown>
-    : undefined;
-  const outputs = data?.outputs && typeof data.outputs === 'object'
-    ? data.outputs as Record<string, unknown>
-    : response.outputs && typeof response.outputs === 'object'
-      ? response.outputs as Record<string, unknown>
+  const data =
+    response.data && typeof response.data === "object"
+      ? (response.data as Record<string, unknown>)
       : undefined;
+  const outputs =
+    data?.outputs && typeof data.outputs === "object"
+      ? (data.outputs as Record<string, unknown>)
+      : response.outputs && typeof response.outputs === "object"
+        ? (response.outputs as Record<string, unknown>)
+        : undefined;
   const result = outputs?.result;
-  return typeof result === 'string' && result.trim().length > 0 ? result : '';
+  return typeof result === "string" && result.trim().length > 0 ? result : "";
 }
 
 export function workflowResultToChatCompletionsSSE(result: string): string {
@@ -70,17 +82,17 @@ export function convertWorkflowSSEToChatCompletionsSSE(
   sseText: string,
   state: WorkflowStreamState = {},
 ): string {
-  let output = '';
-  let eventType = '';
+  let output = "";
+  let eventType = "";
 
   for (const line of sseText.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (trimmed.startsWith('event:')) {
+    if (trimmed.startsWith("event:")) {
       eventType = trimmed.slice(6).trim();
       continue;
     }
 
-    if (!trimmed.startsWith('data:')) {
+    if (!trimmed.startsWith("data:")) {
       continue;
     }
 
@@ -89,27 +101,28 @@ export function convertWorkflowSSEToChatCompletionsSSE(
       continue;
     }
 
-    if (data === '[DONE]') {
-      output += 'data: [DONE]\n\n';
+    if (data === "[DONE]") {
+      output += "data: [DONE]\n\n";
       continue;
     }
 
     try {
       const event: unknown = JSON.parse(data);
-      if (!event || typeof event !== 'object') continue;
+      if (!event || typeof event !== "object") continue;
       const eventRecord = event as Record<string, unknown>;
-      const directDelta = typeof eventRecord.delta === 'string' ? eventRecord.delta : '';
-      const directContent = typeof eventRecord.content === 'string' ? eventRecord.content : '';
-      const eventData = eventRecord.data && typeof eventRecord.data === 'object' ? eventRecord.data : eventRecord;
+      const directDelta = typeof eventRecord.delta === "string" ? eventRecord.delta : "";
+      const directContent = typeof eventRecord.content === "string" ? eventRecord.content : "";
+      const eventData =
+        eventRecord.data && typeof eventRecord.data === "object" ? eventRecord.data : eventRecord;
       const result = extractWorkflowResult(eventRecord) || extractWorkflowResult(eventData);
-      const resolvedEventType = typeof eventRecord.type === 'string' ? eventRecord.type : eventType;
+      const resolvedEventType = typeof eventRecord.type === "string" ? eventRecord.type : eventType;
 
       if (directDelta) {
         output += toChatCompletionDelta(directDelta);
       } else if (directContent) {
         output += toChatCompletionDelta(directContent);
       } else if (result) {
-        const previousResult = state.previousWorkflowResult ?? '';
+        const previousResult = state.previousWorkflowResult ?? "";
         const delta = result.startsWith(previousResult)
           ? result.slice(previousResult.length)
           : result;
@@ -120,8 +133,8 @@ export function convertWorkflowSSEToChatCompletionsSSE(
         }
       }
 
-      if (resolvedEventType === 'complete') {
-        output += 'data: [DONE]\n\n';
+      if (resolvedEventType === "complete") {
+        output += "data: [DONE]\n\n";
       }
     } catch {
       // Ignore malformed provider chunks; the next chunk may still be valid SSE.
@@ -132,14 +145,14 @@ export function convertWorkflowSSEToChatCompletionsSSE(
 }
 
 export function createWorkflowToChatCompletionsStream(): Transform {
-  let buffer = '';
+  let buffer = "";
   const state = {};
 
   return new Transform({
     transform(chunk, _encoding, callback) {
-      buffer += chunk.toString('utf8');
+      buffer += chunk.toString("utf8");
       const parts = buffer.split(/\r?\n\r?\n/);
-      buffer = parts.pop() ?? '';
+      buffer = parts.pop() ?? "";
 
       for (const part of parts) {
         this.push(convertWorkflowSSEToChatCompletionsSSE(`${part}\n\n`, state));
@@ -157,13 +170,13 @@ export function createWorkflowToChatCompletionsStream(): Transform {
 }
 
 export function createResponsesToChatCompletionsStream(): Transform {
-  let buffer = '';
+  let buffer = "";
 
   return new Transform({
     transform(chunk, _encoding, callback) {
-      buffer += chunk.toString('utf8');
+      buffer += chunk.toString("utf8");
       const parts = buffer.split(/\r?\n\r?\n/);
-      buffer = parts.pop() ?? '';
+      buffer = parts.pop() ?? "";
 
       for (const part of parts) {
         this.push(convertResponsesSSEToChatCompletionsSSE(`${part}\n\n`));

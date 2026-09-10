@@ -342,11 +342,18 @@ AIChatAssistant
 
 ## P1：AI 流式会话生命周期治理
 
-- `src/services/ai/aiAssistantService.ts` 直接使用浏览器 `fetch`，没有 `AbortController`；关闭面板或离开页面无法主动取消请求。
-- `AIChatAssistant.tsx` 的发送流程没有统一的消息条数、单条长度、上下文大小和并发请求约束。
-- 前端 SSE 解析忽略不完整尾部和 malformed chunk，分析页重试也没有请求序列号或卸载保护，旧请求可能覆盖新结果。
+### 已完成
 
-建议增加取消、请求序列号、最大上下文、断流重连策略和 provider 成本预算；验收需覆盖关闭面板、网络断开、重复点击、超长消息、旧响应晚到和流式半包。
+- 浏览器流式 Service 支持 `AbortSignal` 和 `completed`、`cancelled`、`failed` 终态；SSE 解码覆盖 UTF-8 半包、CRLF/LF、多行 data、注释、尾部无换行、显式 `[DONE]` 及错误事件。没有完成标记、损坏 JSON 或 provider 错误都会返回稳定失败结果，不暴露上游正文。
+- `useAIChatSession` 统一管理活动请求、递增请求序号、关闭/清空/停止/卸载取消、已停止部分文本、手动重试快照和历史筛选。取消或失败的回答不会进入下一轮模型输入，重试不会重复添加用户消息。
+- 前端发送前复用 BFF 的 50 条消息、单条 8000 字符及 64 KiB UTF-8 请求预算；历史超过预算时从最早完整轮次裁剪，界面仍保留全部可见消息。
+- BFF provider attempt 的超时现在覆盖连接和完整响应体；响应体结束、失败、客户端断连或 workflow JSON 读取结束后才释放计时器。Responses provider 的 `response.failed` 和 `response.incomplete` 会转换为安全 SSE error 事件，只有明确完成事件才输出 `[DONE]`。
+- 组件测试覆盖关闭后的取消与晚到 chunk 隔离、失败后的无重复消息重试；Service 与 BFF 流协议测试覆盖取消、错误和不完整流。
+
+### 后续边界
+
+- 当前不会自动重连或自动重试已经开始输出的请求；如需恢复网络后的续传，必须由 provider 支持可验证的会话游标。
+- 成本配额、跨标签页并发限制、跨实例限流和会话持久化仍需在服务端增加统一存储后单独设计。
 
 ## P1：前后端错误信息与调试信息分级（已完成）
 
