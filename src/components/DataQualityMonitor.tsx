@@ -3,9 +3,8 @@ import { assessDataQuality, getQualityThresholds } from "../services/analytics/a
 import {
   formatAnalyticsNumber,
   localizeAnalyticsMessage,
-  normalizeQualityReport,
-  normalizeQualityScore,
 } from "../services/analytics/analyticsPresentation";
+import type { QualityReportData, QualityThresholds } from "../services/analytics/contracts/quality";
 import type { Hazard } from "../types";
 import { createClientLogger } from "../utils/logger";
 
@@ -26,20 +25,16 @@ if (typeof document !== "undefined") {
   document.head.appendChild(styleSheet);
 }
 
-type QualityReport = NonNullable<ReturnType<typeof normalizeQualityReport>>;
-
 interface DataQualityMonitorProps {
   hazards: Hazard[];
   source?: string;
 }
 
-type QualityThresholds = Record<string, number>;
-
 const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
   hazards,
   source = "DisasterAWARE",
 }) => {
-  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
+  const [qualityReport, setQualityReport] = useState<QualityReportData | null>(null);
   const [thresholds, setThresholds] = useState<QualityThresholds | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +42,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
   const loadThresholds = useCallback(async () => {
     try {
       const result = await getQualityThresholds();
-      if (result.success) {
-        setThresholds((result.data as QualityThresholds | undefined) ?? null);
-      }
+      setThresholds(result.data);
     } catch {
       logger.warn("quality_thresholds_load_failed");
     }
@@ -60,10 +53,9 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     setError(null);
     try {
       const result = await assessDataQuality(hazards, source);
-      if (result.success && result.data) {
-        setQualityReport(normalizeQualityReport(result.data));
-      }
+      setQualityReport(result.data);
     } catch {
+      setQualityReport(null);
       setError("质量评估暂时不可用，请稍后重试。");
       logger.error("quality_assessment_failed");
     } finally {
@@ -89,7 +81,11 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
       excellent: { bg: "rgba(33, 150, 243, 0.2)", text: "#64B5F6" },
     };
 
-    const colors = colorMap[status] || { bg: "rgba(158, 158, 158, 0.2)", text: "#9E9E9E" };
+    const normalizedStatus = status.toLowerCase();
+    const colors = colorMap[normalizedStatus] || {
+      bg: "rgba(158, 158, 158, 0.2)",
+      text: "#9E9E9E",
+    };
 
     return (
       <span
@@ -107,17 +103,16 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
           warning: "警告",
           fail: "失败",
           excellent: "优秀",
-        }[status.toLowerCase()] ?? "未知"}
+        }[normalizedStatus] ?? "未知"}
       </span>
     );
   };
 
-  const renderDimensionCard = (name: string, score: number, label: string) => {
-    const normalizedScore = normalizeQualityScore(score) ?? 0;
-    const percentage = (normalizedScore * 100).toFixed(1);
-    const thresholdScore = normalizeQualityScore(thresholds?.[name]) ?? 0.9;
+  const renderDimensionCard = (name: keyof QualityThresholds, score: number, label: string) => {
+    const percentage = (score * 100).toFixed(1);
+    const thresholdScore = thresholds?.[name] ?? 0.9;
     const threshold = (thresholdScore * 100).toFixed(0);
-    const isPassing = normalizedScore >= thresholdScore;
+    const isPassing = score >= thresholdScore;
 
     return (
       <div
@@ -142,12 +137,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
             style={{
               fontSize: "20px",
               fontWeight: "bold",
-              color:
-                normalizedScore >= 0.95
-                  ? "#4CAF50"
-                  : normalizedScore >= 0.85
-                    ? "#FFA726"
-                    : "#EF5350",
+              color: score >= 0.95 ? "#4CAF50" : score >= 0.85 ? "#FFA726" : "#EF5350",
             }}
           >
             {percentage}%

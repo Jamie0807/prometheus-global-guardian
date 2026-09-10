@@ -5,11 +5,15 @@ import {
   getPredictionDisplay,
   getRiskLevelLabel,
 } from "../../../../services/analytics/analyticsPresentation";
-import type { AnalyticsRecord } from "../../types";
+import type { PredictionModelResult, PredictionsResponse } from "../../types";
 import PredictionStatusBadge from "../PredictionStatusBadge";
 
 interface PredictionsTabProps {
-  predictions: AnalyticsRecord;
+  predictions: PredictionsResponse;
+}
+
+function next7Days(prediction: PredictionModelResult): number[] | undefined {
+  return prediction.status === "ready" ? prediction.predictions.next7Days : undefined;
 }
 
 export default function PredictionsTab({ predictions }: PredictionsTabProps) {
@@ -25,6 +29,9 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
       <h3 style={{ color: "#4CAF50", marginBottom: "20px" }}>🔮 预测模型结果</h3>
 
       {/* 总体风险评估 */}
+      {predictions.data.overallRiskAssessment.status === "failed" && (
+        <p role="status">模型不可用</p>
+      )}
       {predictions.data?.overallRiskAssessment && (
         <div
           style={{
@@ -141,12 +148,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               </div>
 
               {/* 7天预测数据 */}
-              {predictions.data.earthquakePrediction.predictions?.next7Days ? (
+              {next7Days(predictions.data.earthquakePrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
                     未来7天预测:
                   </div>
-                  {predictions.data.earthquakePrediction.predictions.next7Days.map(
+                  {next7Days(predictions.data.earthquakePrediction)?.map(
                     (count: number, idx: number) => (
                       <div
                         key={idx}
@@ -164,26 +171,6 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                       </div>
                     ),
                   )}
-                  {predictions.data.earthquakePrediction.predictions.averageMagnitude !==
-                    undefined &&
-                    predictions.data.earthquakePrediction.predictions.averageMagnitude !== null && (
-                      <div
-                        style={{
-                          marginTop: "8px",
-                          padding: "6px",
-                          backgroundColor: "#0a0a0a",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        <span style={{ color: "#888", fontSize: "11px" }}>平均震级: </span>
-                        <span style={{ color: "#FF9800", fontSize: "11px", fontWeight: "bold" }}>
-                          {formatAnalyticsNumber(
-                            predictions.data.earthquakePrediction.predictions.averageMagnitude,
-                            1,
-                          )}
-                        </span>
-                      </div>
-                    )}
                 </div>
               ) : (
                 <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
@@ -216,12 +203,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.volcanoPrediction} />
               </div>
-              {predictions.data.volcanoPrediction.predictions?.next7Days ? (
+              {next7Days(predictions.data.volcanoPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
                     未来7天预测:
                   </div>
-                  {predictions.data.volcanoPrediction.predictions.next7Days.map(
+                  {next7Days(predictions.data.volcanoPrediction)?.map(
                     (count: number, idx: number) => (
                       <div
                         key={idx}
@@ -271,12 +258,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.stormPrediction} />
               </div>
-              {predictions.data.stormPrediction.predictions?.next7Days ? (
+              {next7Days(predictions.data.stormPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
                     未来7天预测:
                   </div>
-                  {predictions.data.stormPrediction.predictions.next7Days.map(
+                  {next7Days(predictions.data.stormPrediction)?.map(
                     (count: number, idx: number) => (
                       <div
                         key={idx}
@@ -326,12 +313,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.floodPrediction} />
               </div>
-              {predictions.data.floodPrediction.predictions?.next7Days ? (
+              {next7Days(predictions.data.floodPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
                     未来7天预测:
                   </div>
-                  {predictions.data.floodPrediction.predictions.next7Days.map(
+                  {next7Days(predictions.data.floodPrediction)?.map(
                     (count: number, idx: number) => (
                       <div
                         key={idx}
@@ -381,12 +368,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.wildfirePrediction} />
               </div>
-              {predictions.data.wildfirePrediction.predictions?.next7Days ? (
+              {next7Days(predictions.data.wildfirePrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
                     未来7天预测:
                   </div>
-                  {predictions.data.wildfirePrediction.predictions.next7Days.map(
+                  {next7Days(predictions.data.wildfirePrediction)?.map(
                     (count: number, idx: number) => (
                       <div
                         key={idx}

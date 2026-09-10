@@ -1,0 +1,170 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import OverviewTab from "../../src/features/analytics/components/tabs/OverviewTab";
+import PredictionsTab from "../../src/features/analytics/components/tabs/PredictionsTab";
+import RiskTab from "../../src/features/analytics/components/tabs/RiskTab";
+import InsightsPanel from "../../src/components/InsightsPanel";
+import ChartsPanel from "../../src/components/ChartsPanel";
+import { parseStatistics } from "../../src/services/analytics/contracts/statistics";
+import { parsePredictions } from "../../src/services/analytics/contracts/predictions";
+import { parseRiskAssessment } from "../../src/services/analytics/contracts/risk";
+import type { AnalyticsHazard } from "../../src/features/analytics/types";
+
+const serviceMocks = vi.hoisted(() => ({ getStatistics: vi.fn(), getRiskAssessment: vi.fn() }));
+vi.mock("../../src/services/analytics/analyticsService", () => serviceMocks);
+vi.mock("../../src/components/DataVisualization", () => ({ LineChart: () => <div /> }));
+vi.mock("recharts", () => ({
+  ResponsiveContainer: () => null,
+  PieChart: () => null,
+  Pie: () => null,
+  Cell: () => null,
+  BarChart: () => null,
+  Bar: () => null,
+  LineChart: () => null,
+  Line: () => null,
+  AreaChart: () => null,
+  Area: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  Legend: () => null,
+}));
+
+const hazards: AnalyticsHazard[] = [
+  {
+    id: "test",
+    title: "Test",
+    type: "EARTHQUAKE",
+    geometry: { type: "Point", coordinates: [0, 0] },
+    description: "Test",
+    source: "USGS",
+  },
+];
+const statistics = parseStatistics({
+  basicStats: { count: 1, mean: { magnitude: 0 }, std: { magnitude: null }, min: {}, max: {} },
+  centralTendency: {},
+  variabilityMeasures: { standardDeviation: null, range: 0, coefficientOfVariation: 0 },
+  distributionMetrics: { q50: 0, iqr: null, skewness: null },
+  typeDistribution: { counts: { EARTHQUAKE: 1 }, percentages: { EARTHQUAKE: 100 } },
+});
+const failedModel = {
+  status: "failed",
+  reason: "model_error",
+  dataPoints: 3,
+  minimumDataPoints: 3,
+  confidence: null,
+};
+
+describe("validated analytics result consumers", () => {
+  it.each([0, null])(
+    "renders actual statistics fields with mean %s and legitimate zero values",
+    (mean) => {
+      render(
+        <OverviewTab
+          hazards={hazards}
+          hazardsByType={{ EARTHQUAKE: 1 }}
+          intensityData={[]}
+          statistics={{
+            success: true,
+            data: {
+              ...statistics,
+              descriptiveStatistics: {
+                ...statistics.descriptiveStatistics,
+                basicStats: {
+                  ...statistics.descriptiveStatistics.basicStats,
+                  mean: { magnitude: mean },
+                },
+              },
+            },
+          }}
+          pivot4DTrends={null}
+          pivot4DRiskScores={null}
+        />,
+      );
+      expect(screen.getByText("平均波动幅度")).toBeInTheDocument();
+      expect(screen.getAllByText("0.00").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText("✓ 集中")).toBeInTheDocument();
+      expect(screen.getAllByText("暂无数据").length).toBeGreaterThan(0);
+      expect(screen.getByText(/强度平均值（magnitude）：/)).toHaveTextContent(
+        mean === null ? "暂无数据" : "0.00",
+      );
+    },
+  );
+
+  it("formats validated temporal metrics safely and keeps legacy recommendation strings", () => {
+    render(
+      <RiskTab
+        riskAssessment={{
+          success: true,
+          data: parseRiskAssessment({
+            overallRiskScore: { score: 0, level: "MINIMAL" },
+            typeRisks: {},
+            geographicRisks: [],
+            temporalRisks: {
+              recent7Days: 0,
+              previous7Days: 0,
+              growthRate: 0,
+              trend: "stable",
+            },
+            recommendations: ["Maintain monitoring"],
+            recommendationDetails: [],
+          }),
+        }}
+      />,
+    );
+    expect(screen.getByText("Maintain monitoring")).toBeInTheDocument();
+    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("趋势: 稳定")).toBeInTheDocument();
+  });
+
+  it("shows unavailable predictions for model and overall failures", () => {
+    const data = parsePredictions({
+      earthquakePrediction: failedModel,
+      volcanoPrediction: failedModel,
+      stormPrediction: failedModel,
+      floodPrediction: failedModel,
+      wildfirePrediction: failedModel,
+      overallRiskAssessment: {
+        status: "failed",
+        reason: "model_error",
+        overallRiskScore: null,
+        riskLevel: "UNKNOWN",
+        averageAccuracy: null,
+        confidence: null,
+        modelWeights: {},
+        recommendation: "",
+      },
+    });
+    render(<PredictionsTab predictions={{ success: true, data }} />);
+    expect(screen.getAllByText("模型失败").length).toBeGreaterThanOrEqual(5);
+    expect(screen.getByText("模型不可用")).toBeInTheDocument();
+    expect(screen.queryByText("0.0")).not.toBeInTheDocument();
+  });
+
+  it.each([0, 75])("uses the validated risk score %s without scaling it", async (score) => {
+    serviceMocks.getRiskAssessment.mockResolvedValue({
+      success: true,
+      data: parseRiskAssessment({
+        overallRiskScore: { score, level: "HIGH" },
+        typeRisks: {},
+        geographicRisks: [],
+        temporalRisks: {},
+        recommendations: [],
+        recommendationDetails: [],
+      }),
+    });
+    render(<InsightsPanel hazards={hazards} />);
+    expect(await screen.findByText(`${score.toFixed(1)} / 100`)).toBeInTheDocument();
+    expect(screen.getByText("高风险")).toBeInTheDocument();
+  });
+
+  it("selects magnitude statistics from column maps without formatting an object", async () => {
+    serviceMocks.getStatistics.mockResolvedValue({ success: true, data: statistics });
+    render(<ChartsPanel hazards={hazards} />);
+    expect(await screen.findByText("强度平均值（magnitude）")).toBeInTheDocument();
+    expect(screen.getByText("0.00")).toBeInTheDocument();
+    expect(screen.getByText("暂无数据")).toBeInTheDocument();
+  });
+});

@@ -4,14 +4,16 @@ import {
   getRiskLevelLabel,
   getTrendLabel,
 } from "../../../../services/analytics/analyticsPresentation";
-import type { AnalyticsRecord, GeographicRisk, TypeRisk } from "../../types";
+import type { RiskAssessmentResponse } from "../../types";
 import RiskRecommendationLine from "../RiskRecommendationLine";
 
 interface RiskTabProps {
-  riskAssessment: AnalyticsRecord;
+  riskAssessment: RiskAssessmentResponse;
 }
 
 export default function RiskTab({ riskAssessment }: RiskTabProps) {
+  const temporalRisks = riskAssessment.data.temporalRisks;
+  const hasTemporalRisks = temporalRisks !== null;
   return (
     <div
       style={{
@@ -50,7 +52,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
             等级: {getRiskLevelLabel(riskAssessment.data.overallRiskScore.level)}
           </div>
           <div style={{ fontSize: "14px", color: "#888", marginTop: "10px" }}>
-            趋势: {getTrendLabel(riskAssessment.data.overallRiskScore.trend)}
+            趋势: {getTrendLabel(hasTemporalRisks ? temporalRisks.trend : "UNKNOWN")}
           </div>
         </div>
       )}
@@ -59,7 +61,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
       {riskAssessment.data?.typeRisks && (
         <div style={{ marginBottom: "30px" }}>
           <h4 style={{ color: "#fff", marginBottom: "15px" }}>各类型风险分析</h4>
-          {Object.entries(riskAssessment.data.typeRisks).map(([type, risk]: [string, TypeRisk]) => (
+          {Object.entries(riskAssessment.data.typeRisks).map(([type, risk]) => (
             <div
               key={type}
               style={{
@@ -106,10 +108,6 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                       </span>
                     </div>
                   )}
-                  <div>
-                    <span style={{ color: "#666" }}>权重: </span>
-                    <span style={{ color: "#888" }}>{risk.weight}</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -133,58 +131,56 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
             检测到 {riskAssessment.data.geographicRisks.length} 个风险区域
           </div>
           <div style={{ maxHeight: "200px", overflow: "auto" }}>
-            {riskAssessment.data.geographicRisks
-              .slice(0, 10)
-              .map((area: GeographicRisk, idx: number) => (
+            {riskAssessment.data.geographicRisks.slice(0, 10).map((area, idx) => (
+              <div
+                key={idx}
+                style={{
+                  padding: "8px",
+                  borderBottom: "1px solid #333",
+                  fontSize: "12px",
+                }}
+              >
                 <div
-                  key={idx}
                   style={{
-                    padding: "8px",
-                    borderBottom: "1px solid #333",
-                    fontSize: "12px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ color: "#fff" }}>
-                        位置: [{area.location?.lat?.toFixed(4)}, {area.location?.lon?.toFixed(4)}]
-                      </div>
-                      <div style={{ color: "#666", fontSize: "11px", marginTop: "3px" }}>
-                        灾害数量: {area.hazardCount}
-                      </div>
+                  <div>
+                    <div style={{ color: "#fff" }}>
+                      位置: [{area.location?.lat?.toFixed(4)}, {area.location?.lon?.toFixed(4)}]
                     </div>
-                    <div
-                      style={{
-                        padding: "4px 8px",
-                        borderRadius: "4px",
-                        backgroundColor:
-                          area.riskLevel === "HIGH"
-                            ? "#f44336"
-                            : area.riskLevel === "MODERATE"
-                              ? "#ff9800"
-                              : "#4CAF50",
-                        color: "#fff",
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {area.riskLevel}
+                    <div style={{ color: "#666", fontSize: "11px", marginTop: "3px" }}>
+                      灾害数量: {area.hazardCount}
                     </div>
                   </div>
+                  <div
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      backgroundColor:
+                        area.riskLevel === "HIGH"
+                          ? "#f44336"
+                          : area.riskLevel === "MODERATE"
+                            ? "#ff9800"
+                            : "#4CAF50",
+                      color: "#fff",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {area.riskLevel}
+                  </div>
                 </div>
-              ))}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* 时间趋势 */}
-      {riskAssessment.data?.temporalRisks && (
+      {hasTemporalRisks && (
         <div
           style={{
             backgroundColor: "#1a1a1a",
@@ -212,7 +208,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                   marginTop: "5px",
                 }}
               >
-                {riskAssessment.data.temporalRisks.recent7Days}
+                {formatAnalyticsNumber(temporalRisks.recent7Days, 0)}
               </div>
             </div>
             <div>
@@ -225,7 +221,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                   marginTop: "5px",
                 }}
               >
-                {riskAssessment.data.temporalRisks.previous7Days}
+                {formatAnalyticsNumber(temporalRisks.previous7Days, 0)}
               </div>
             </div>
             <div>
@@ -238,7 +234,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                   marginTop: "5px",
                 }}
               >
-                {formatAnalyticsSignedPercent(riskAssessment.data.temporalRisks.growthRate)}
+                {formatAnalyticsSignedPercent(temporalRisks.growthRate)}
               </div>
             </div>
             <div>
@@ -251,7 +247,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                   marginTop: "5px",
                 }}
               >
-                {getTrendLabel(riskAssessment.data.temporalRisks.trend)}
+                {getTrendLabel(temporalRisks.trend)}
               </div>
             </div>
           </div>
@@ -271,10 +267,9 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
         >
           <h4 style={{ color: "#4CAF50", marginBottom: "15px" }}>💡 规则建议</h4>
           <ul style={{ margin: 0, paddingLeft: "20px", color: "#fff" }}>
-            {(
-              riskAssessment.data.recommendationDetails ??
-              riskAssessment.data.recommendations ??
-              []
+            {(riskAssessment.data.recommendationDetails.length > 0
+              ? riskAssessment.data.recommendationDetails
+              : riskAssessment.data.recommendations
             ).map((rec, idx) => (
               <RiskRecommendationLine key={idx} recommendation={rec} />
             ))}

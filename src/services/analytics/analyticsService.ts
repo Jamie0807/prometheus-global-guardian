@@ -11,7 +11,30 @@
 
 import { requestRaw } from "../http/httpClient";
 import type { Hazard } from "../../types";
-import type { AnalysisRequest, AnalyticsResponse, HazardData } from "./analyticsTypes";
+import type { AnalysisRequest, HazardData, LegacyAnalyticsResponse } from "./analyticsTypes";
+import type { AnalyticsSuccess } from "./contracts/common";
+import {
+  AnalyticsBusinessError,
+  AnalyticsContractError,
+  parseAnalyticsSuccess,
+} from "./contracts/common";
+import { parsePredictions, type PredictionsData } from "./contracts/predictions";
+import { parseRiskAssessment, type RiskAssessmentData } from "./contracts/risk";
+import { parseStatistics, type StatisticsData } from "./contracts/statistics";
+import {
+  parseQualityReport,
+  parseQualityThresholds,
+  type QualityReportData,
+  type QualityThresholds,
+} from "./contracts/quality";
+import {
+  parsePivotRiskScores,
+  parsePivotTable,
+  parsePivotTrends,
+  type PivotRiskScoresData,
+  type PivotTableData,
+  type PivotTrendsData,
+} from "./contracts/pivot";
 import { createClientLogger } from "../../utils/logger";
 
 const API_BASE_URL = import.meta.env.VITE_PYTHON_API_URL ?? "http://localhost:8001";
@@ -19,33 +42,12 @@ const REQUEST_TIMEOUT = 30000; // 30秒超时
 const MAX_RETRIES = 3;
 const logger = createClientLogger("analytics-service");
 
-type AnalyticsResult<T = unknown> = Omit<AnalyticsResponse<T>, "data"> & { data: T };
+type AnalyticsResult<T = unknown> = Omit<LegacyAnalyticsResponse<T>, "data"> & { data: T };
 type HazardProperties = Record<string, unknown>;
 type HazardInput = Partial<Hazard> & {
   populationExposed?: number | null;
   properties?: HazardProperties;
 };
-
-interface DataQualityReport {
-  overallScore: number;
-  status: string;
-  detailChecks: Record<string, number>;
-  totalRecords: number;
-  issues: string[];
-  recommendations: string[];
-}
-
-interface StatisticsData {
-  basicStats?: {
-    mean?: number;
-    std?: number;
-  };
-}
-
-interface RiskAssessmentData {
-  overallRisk?: string;
-  riskScore?: number;
-}
 
 /**
  * 带超时控制的fetch
@@ -111,6 +113,14 @@ async function fetchWithRetry(
   throw lastError || new Error("请求失败");
 }
 
+async function readAnalyticsJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new AnalyticsContractError("response.body");
+  }
+}
+
 export type { AnalysisRequest, HazardData } from "./analyticsTypes";
 
 /**
@@ -145,7 +155,7 @@ export async function getServiceInfo(): Promise<AnalyticsResult> {
  */
 export async function getStatistics(
   hazards: readonly HazardInput[],
-): Promise<AnalyticsResult<StatisticsData>> {
+): Promise<AnalyticsSuccess<StatisticsData>> {
   try {
     if (!hazards || hazards.length === 0) {
       throw new Error("没有数据可供分析");
@@ -163,8 +173,11 @@ export async function getStatistics(
       throw new Error(`统计分析失败: ${errorText}`);
     }
 
-    return await response.json();
-  } catch {
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseStatistics);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsContractError || error instanceof AnalyticsBusinessError)
+      throw error;
     logger.error("statistics_fetch_failed");
     throw new Error("统计分析请求失败");
   }
@@ -177,7 +190,7 @@ export async function getPredictions(
   hazards: readonly HazardInput[],
   analysisType = "predictions",
   timeRange = 30,
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<PredictionsData>> {
   try {
     if (!hazards || hazards.length === 0) {
       throw new Error("没有数据可供预测");
@@ -199,8 +212,11 @@ export async function getPredictions(
       throw new Error(`预测分析失败: ${errorText}`);
     }
 
-    return await response.json();
-  } catch {
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parsePredictions);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsContractError || error instanceof AnalyticsBusinessError)
+      throw error;
     logger.error("predictions_fetch_failed");
     throw new Error("预测分析请求失败");
   }
@@ -235,7 +251,7 @@ export async function processETL(hazards: readonly HazardInput[]): Promise<Analy
  */
 export async function getRiskAssessment(
   hazards: readonly HazardInput[],
-): Promise<AnalyticsResult<RiskAssessmentData>> {
+): Promise<AnalyticsSuccess<RiskAssessmentData>> {
   try {
     if (!hazards || hazards.length === 0) {
       throw new Error("没有数据可供风险评估");
@@ -253,8 +269,11 @@ export async function getRiskAssessment(
       throw new Error(`风险评估失败: ${errorText}`);
     }
 
-    return await response.json();
-  } catch {
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseRiskAssessment);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsContractError || error instanceof AnalyticsBusinessError)
+      throw error;
     logger.error("risk_assessment_failed");
     throw new Error("风险评估请求失败");
   }
@@ -302,7 +321,7 @@ export async function getComprehensiveAnalysis(
 export async function assessDataQuality(
   hazards: readonly HazardInput[],
   source: string = "unknown",
-): Promise<AnalyticsResult<DataQualityReport>> {
+): Promise<AnalyticsSuccess<QualityReportData>> {
   try {
     if (!hazards || hazards.length === 0) {
       throw new Error("没有数据可供质量评估");
@@ -323,8 +342,11 @@ export async function assessDataQuality(
       throw new Error(`质量评估失败: ${errorText}`);
     }
 
-    return await response.json();
-  } catch {
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseQualityReport);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsContractError || error instanceof AnalyticsBusinessError)
+      throw error;
     logger.error("quality_assessment_failed");
     throw new Error("质量评估请求失败");
   }
@@ -398,13 +420,14 @@ export async function mergeMultiSourceData(
 /**
  * 获取质量阈值配置
  */
-export async function getQualityThresholds(): Promise<AnalyticsResult<Record<string, number>>> {
+export async function getQualityThresholds(): Promise<AnalyticsSuccess<QualityThresholds>> {
   try {
     const response = await fetchWithTimeout(`${API_BASE_URL}/api/v1/quality/thresholds`, {}, 5000);
     if (!response.ok) {
       throw new Error("Failed to fetch quality thresholds");
     }
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseQualityThresholds);
   } catch (error) {
     logger.error("quality_thresholds_fetch_failed");
     throw error;
@@ -503,7 +526,7 @@ export async function create4DPivotTable(
     geoDim?: NonNullable<AnalysisRequest["geo_dim"]>;
     aggfunc?: NonNullable<AnalysisRequest["aggfunc"]>;
   },
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<PivotTableData>> {
   try {
     const formattedData = formatHazards(hazards);
     const request = {
@@ -523,7 +546,8 @@ export async function create4DPivotTable(
       throw new Error("Failed to create 4D pivot table");
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parsePivotTable);
   } catch (error) {
     logger.error("pivot_table_creation_failed");
     throw error;
@@ -575,7 +599,7 @@ export async function multiDimensionalQuery(
 export async function analyze4DTrends(
   hazards: readonly HazardInput[],
   timeWindow: number = 7,
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<PivotTrendsData>> {
   try {
     const formattedData = formatHazards(hazards);
     const request = {
@@ -593,7 +617,8 @@ export async function analyze4DTrends(
       throw new Error("4D trend analysis failed");
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parsePivotTrends);
   } catch (error) {
     logger.error("trend_analysis_failed");
     throw error;
@@ -606,7 +631,7 @@ export async function analyze4DTrends(
 export async function calculate4DRiskScores(
   hazards: readonly HazardInput[],
   timeWindow: number = 7,
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<PivotRiskScoresData>> {
   try {
     const formattedData = formatHazards(hazards);
     const request = {
@@ -624,7 +649,8 @@ export async function calculate4DRiskScores(
       throw new Error("4D risk scoring failed");
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parsePivotRiskScores);
   } catch (error) {
     logger.error("risk_scoring_failed");
     throw error;

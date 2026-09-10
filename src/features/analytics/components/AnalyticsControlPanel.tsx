@@ -1,13 +1,18 @@
 import { type ReactNode } from "react";
 import { AlertBox, LoadingSpinner } from "../../../components/DataVisualization";
-import type { AnalyticsRecord, ServiceStatus } from "../types";
+import type {
+  StatisticsResponse,
+  PredictionsResponse,
+  RiskAssessmentResponse,
+  ServiceStatus,
+} from "../types";
 
 interface AnalyticsControlPanelProps {
   serviceStatus: ServiceStatus;
   loading: boolean;
-  statistics: AnalyticsRecord | null;
-  predictions: AnalyticsRecord | null;
-  riskAssessment: AnalyticsRecord | null;
+  statistics: StatisticsResponse | null;
+  predictions: PredictionsResponse | null;
+  riskAssessment: RiskAssessmentResponse | null;
   onCheckService: () => Promise<void>;
   onRunAnalysis: () => Promise<void>;
   children: ReactNode;

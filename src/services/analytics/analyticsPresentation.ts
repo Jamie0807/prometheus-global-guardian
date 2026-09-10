@@ -336,13 +336,15 @@ export function getPredictionDisplay(
 ): PredictionDisplay {
   const copy = getAnalyticsCopy(locale);
   const status =
-    input.status === "ready" ||
-    input.status === "insufficient_data" ||
-    input.status === "model_error"
-      ? input.status
-      : input.error
-        ? "model_error"
-        : "no_result";
+    input.status === "failed"
+      ? "model_error"
+      : input.status === "ready" ||
+          input.status === "insufficient_data" ||
+          input.status === "model_error"
+        ? input.status
+        : input.error
+          ? "model_error"
+          : "no_result";
   const accuracy = toFiniteNumber(input.accuracy);
   const dataPoints = toFiniteNumber(input.dataPoints);
   const minimumDataPoints = toFiniteNumber(input.minimumDataPoints);

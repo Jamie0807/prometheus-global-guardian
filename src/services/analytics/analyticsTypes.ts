@@ -1,3 +1,15 @@
+import type { AnalyticsSuccess } from "./contracts/common";
+
+export type { AnalyticsSuccess } from "./contracts/common";
+export type { StatisticsData } from "./contracts/statistics";
+export type {
+  OverallPredictionAssessment,
+  PredictionModelResult,
+  PredictionStatus,
+  PredictionsData,
+} from "./contracts/predictions";
+export type { RiskAssessmentData } from "./contracts/risk";
+
 export type HazardCoordinates = [longitude: number, latitude: number];
 
 export interface HazardData {
@@ -26,7 +38,10 @@ export interface AnalysisRequest {
   time_window?: number;
 }
 
-export interface AnalyticsResponse<T = unknown> {
+export type AnalyticsResponse<T = unknown> = AnalyticsSuccess<T>;
+
+/** Legacy shape retained while older endpoint adapters migrate to contracts. */
+export interface LegacyAnalyticsResponse<T = unknown> {
   success?: boolean;
   data?: T;
   message?: string;

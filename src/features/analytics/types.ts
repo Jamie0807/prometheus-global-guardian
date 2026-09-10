@@ -1,4 +1,13 @@
 import type { Hazard as AppHazard } from "../../types";
+import type { AnalyticsSuccess } from "../../services/analytics/contracts/common";
+import type { PredictionsData } from "../../services/analytics/contracts/predictions";
+export type { PredictionModelResult } from "../../services/analytics/contracts/predictions";
+import type { RiskAssessmentData } from "../../services/analytics/contracts/risk";
+import type { StatisticsData } from "../../services/analytics/contracts/statistics";
+export type {
+  PivotRiskScoresData,
+  PivotTrendsData,
+} from "../../services/analytics/contracts/pivot";
 
 export type AnalyticsHazard = AppHazard & {
   properties?: {
@@ -23,6 +32,9 @@ export interface AnalyticsPageProps {
 }
 
 export type NumberMap = Record<string, number>;
+export type StatisticsResponse = AnalyticsSuccess<StatisticsData>;
+export type PredictionsResponse = AnalyticsSuccess<PredictionsData>;
+export type RiskAssessmentResponse = AnalyticsSuccess<RiskAssessmentData>;
 
 export interface ConfidenceInterval {
   mean?: number;
@@ -51,7 +63,9 @@ export interface FourDimensionalPivot {
   crossAnalysis?: NumberMap;
 }
 
-export interface AnalyticsData {
+export interface OverviewStatisticsView {
+  magnitudeMean: number | null;
+  magnitudeStandardDeviation: number | null;
   inferentialStatistics?: {
     confidenceIntervals?: {
       magnitude?: ConfidenceInterval;
@@ -67,14 +81,14 @@ export interface AnalyticsData {
   };
   descriptiveStatistics?: {
     variabilityMeasures?: {
-      standardDeviation?: number;
-      range?: number;
-      coefficientOfVariation?: number;
+      standardDeviation?: number | null;
+      range?: number | null;
+      coefficientOfVariation?: number | null;
     };
     distributionMetrics?: {
-      skewness?: number;
-      q50?: number;
-      iqr?: number;
+      skewness?: number | null;
+      q50?: number | null;
+      iqr?: number | null;
     };
     typeDistribution?: {
       mostCommon?: string;
@@ -89,46 +103,6 @@ export interface AnalyticsData {
   };
   timeSeriesAnalysis?: {
     trendAnalysis?: TrendAnalysis;
-  };
-  overallRiskAssessment?: {
-    overallRiskScore?: number;
-    riskLevel?: string;
-    averageAccuracy?: number;
-    recommendation?: string;
-    modelWeights?: NumberMap;
-  };
-  earthquakePrediction?: PredictionSummary;
-  volcanoPrediction?: PredictionSummary;
-  stormPrediction?: PredictionSummary;
-  floodPrediction?: PredictionSummary;
-  wildfirePrediction?: PredictionSummary;
-  overallRiskScore?: {
-    score?: number;
-    level?: string;
-    trend?: string;
-  };
-  typeRisks?: Record<string, TypeRisk>;
-  geographicRisks?: GeographicRisk[];
-  temporalRisks?: {
-    recent7Days: number;
-    previous7Days: number;
-    growthRate: number;
-    trend: string;
-  };
-  recommendations?: string[];
-  recommendationDetails?: RiskRecommendation[];
-}
-
-export interface PredictionSummary {
-  status?: string;
-  reason?: string;
-  dataPoints?: number;
-  minimumDataPoints?: number;
-  confidence?: number | null;
-  accuracy?: number;
-  predictions?: {
-    next7Days?: number[];
-    averageMagnitude?: number;
   };
 }
 
@@ -153,48 +127,6 @@ export interface GeographicRisk {
   };
   hazardCount?: number;
   riskLevel?: string;
-}
-
-export interface TrendRisk {
-  region?: string;
-  type?: string;
-  trend_slope?: number;
-}
-
-export interface PivotRisk {
-  region?: string;
-  type?: string;
-  risk_score?: number;
-  total_events?: number;
-}
-
-export interface PivotStatistics {
-  total_combinations?: number;
-  increasing?: number;
-  stable?: number;
-  decreasing?: number;
-  max_risk_score?: number;
-  avg_risk_score?: number;
-}
-
-export interface AnalyticsRecord {
-  success?: boolean;
-  data: AnalyticsData;
-  message?: string;
-  error?: string;
-}
-
-export interface PivotTrendRecord {
-  message?: string;
-  statistics?: PivotStatistics;
-  high_risk_trends?: TrendRisk[];
-}
-
-export interface PivotRiskRecord {
-  message?: string;
-  statistics?: PivotStatistics;
-  top_10_risks?: PivotRisk[];
-  all_risk_scores?: PivotRisk[];
 }
 
 export type ServiceStatus = "checking" | "online" | "offline";

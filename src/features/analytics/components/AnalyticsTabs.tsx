@@ -1,10 +1,15 @@
-import type { AnalyticsRecord, AnalyticsTab } from "../types";
+import type {
+  StatisticsResponse,
+  PredictionsResponse,
+  RiskAssessmentResponse,
+  AnalyticsTab,
+} from "../types";
 
 interface AnalyticsTabsProps {
   activeTab: AnalyticsTab;
-  statistics: AnalyticsRecord | null;
-  predictions: AnalyticsRecord | null;
-  riskAssessment: AnalyticsRecord | null;
+  statistics: StatisticsResponse | null;
+  predictions: PredictionsResponse | null;
+  riskAssessment: RiskAssessmentResponse | null;
   onChange: (tab: AnalyticsTab) => void;
 }
 

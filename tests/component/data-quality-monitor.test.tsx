@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DataQualityMonitor from "../../src/components/DataQualityMonitor";
+import { AnalyticsContractError } from "../../src/services/analytics/contracts/common";
 import type { Hazard } from "../../src/types";
 
 const serviceMocks = vi.hoisted(() => ({
@@ -43,6 +44,7 @@ describe("DataQualityMonitor", () => {
       success: true,
       data: {
         overallScore: 34.4,
+        targetScore: 95,
         status: "FAIL",
         detailChecks: {
           completeness: 0.778,
@@ -92,30 +94,14 @@ describe("DataQualityMonitor", () => {
     expect(screen.getByText("更新或归档过期记录")).toBeInTheDocument();
   });
 
-  it("keeps invalid quality dimensions inside the display range", async () => {
-    serviceMocks.assessDataQuality.mockResolvedValueOnce({
-      success: true,
-      data: {
-        overallScore: 140,
-        status: "PASS",
-        detailChecks: {
-          completeness: -0.2,
-          accuracy: 1.4,
-          consistency: Number.NaN,
-          timeliness: Number.POSITIVE_INFINITY,
-          validity: 0.5,
-        },
-        totalRecords: 1,
-        issues: [],
-        recommendations: [],
-      },
-    });
+  it("shows an error instead of rendering a rejected quality report", async () => {
+    serviceMocks.assessDataQuality.mockRejectedValueOnce(
+      new AnalyticsContractError("data.detailChecks.completeness"),
+    );
 
     render(<DataQualityMonitor hazards={hazards} />);
 
-    expect(await screen.findByText("100.0")).toBeInTheDocument();
-    expect(screen.getAllByText("0.0%").length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByText(/-\d+\.\d+%/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    expect(await screen.findByText("质量评估失败")).toBeInTheDocument();
+    expect(screen.queryByText("0.0")).not.toBeInTheDocument();
   });
 });

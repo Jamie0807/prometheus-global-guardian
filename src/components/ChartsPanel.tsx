@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getStatistics } from "../services/analytics/analyticsService";
+import type { StatisticsData } from "../services/analytics/contracts/statistics";
+import { formatAnalyticsNumber } from "../services/analytics/analyticsPresentation";
 import type { Hazard } from "../types";
 import {
   PieChart,
@@ -20,6 +22,7 @@ import {
 } from "recharts";
 import ChartDrilldownModal from "./ChartDrilldownModal";
 import { createClientLogger } from "../utils/logger";
+import { readChartEvent } from "../features/analytics/utils/chartEventAdapter";
 
 const logger = createClientLogger("charts-panel");
 
@@ -31,19 +34,8 @@ type ChartHazard = Hazard & {
   };
 };
 
-interface PythonStats {
-  basicStats?: {
-    mean?: number;
-    std?: number;
-  };
-}
-
-interface ChartClickData {
-  name?: string;
-}
-
 const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
-  const [pythonStats, setPythonStats] = useState<PythonStats | null>(null);
+  const [pythonStats, setPythonStats] = useState<StatisticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeChart, setActiveChart] = useState<"pie" | "bar" | "line" | "area">("pie");
   const [chartError, setChartError] = useState<string>("");
@@ -103,16 +95,17 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
 
   // 处理图表点击事件（钻取功能）
   const handleChartClick = (
-    data: ChartClickData,
+    data: unknown,
     drilldownType: "type" | "severity" | "source" | "date",
   ) => {
     logger.debug("chart_clicked", { drilldownType });
-    if (!data || !data.name) {
+    const chartEvent = readChartEvent(data);
+    if (chartEvent === null) {
       logger.warn("chart_drilldown_invalid");
       return;
     }
 
-    const value = data.name;
+    const value = chartEvent.name;
     let filtered: ChartHazard[] = [];
     let title = "";
 
@@ -163,7 +156,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
     try {
       const result = await getStatistics(hazards.slice(0, 100));
       if (result.success) {
-        setPythonStats((result.data as PythonStats | undefined) ?? null);
+        setPythonStats(result.data);
       } else {
         setChartError("统计数据加载失败");
       }
@@ -548,18 +541,24 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
               fontSize: "13px",
             }}
           >
-            {pythonStats.basicStats && (
+            {pythonStats.descriptiveStatistics.basicStats && (
               <>
                 <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
-                  <div style={{ color: "#888" }}>平均值</div>
+                  <div style={{ color: "#888" }}>强度平均值（magnitude）</div>
                   <div style={{ color: "#fff", fontWeight: "bold" }}>
-                    {pythonStats.basicStats.mean?.toFixed(2) || "N/A"}
+                    {formatAnalyticsNumber(
+                      pythonStats.descriptiveStatistics.basicStats.mean.magnitude,
+                      2,
+                    )}
                   </div>
                 </div>
                 <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
-                  <div style={{ color: "#888" }}>标准差</div>
+                  <div style={{ color: "#888" }}>强度标准差（magnitude）</div>
                   <div style={{ color: "#fff", fontWeight: "bold" }}>
-                    {pythonStats.basicStats.std?.toFixed(2) || "N/A"}
+                    {formatAnalyticsNumber(
+                      pythonStats.descriptiveStatistics.basicStats.std.magnitude,
+                      2,
+                    )}
                   </div>
                 </div>
               </>

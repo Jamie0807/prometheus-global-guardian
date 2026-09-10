@@ -1,8 +1,8 @@
 import { getPredictionDisplay } from "../../../services/analytics/analyticsPresentation";
-import type { PredictionSummary } from "../types";
+import type { PredictionModelResult } from "../../../services/analytics/contracts/predictions";
 
 interface PredictionStatusBadgeProps {
-  prediction: PredictionSummary;
+  prediction: PredictionModelResult;
 }
 
 export default function PredictionStatusBadge({ prediction }: PredictionStatusBadgeProps) {

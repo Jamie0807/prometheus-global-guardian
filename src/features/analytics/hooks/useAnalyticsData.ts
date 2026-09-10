@@ -10,24 +10,28 @@ import {
 } from "../../../services/analytics/analyticsService";
 import { notify } from "../../../utils/notifications";
 import { createClientLogger } from "../../../utils/logger";
+import { AnalyticsContractError } from "../../../services/analytics/contracts/common";
 import type {
   AnalyticsHazard,
-  AnalyticsRecord,
-  PivotRiskRecord,
-  PivotTrendRecord,
+  StatisticsResponse,
+  PredictionsResponse,
+  RiskAssessmentResponse,
+  PivotRiskScoresData,
+  PivotTrendsData,
   ServiceStatus,
 } from "../types";
 import { buildAnalyticsDataHash } from "../utils/analyticsTransforms";
 
 const logger = createClientLogger("analytics-data");
+const ANALYTICS_CONTRACT_ERROR_MESSAGE = "分析服务返回的数据格式异常，请稍后重试。";
 
 export interface AnalyticsDataState {
   serviceStatus: ServiceStatus;
-  predictions: AnalyticsRecord | null;
-  statistics: AnalyticsRecord | null;
-  riskAssessment: AnalyticsRecord | null;
-  pivot4DTrends: PivotTrendRecord | null;
-  pivot4DRiskScores: PivotRiskRecord | null;
+  predictions: PredictionsResponse | null;
+  statistics: StatisticsResponse | null;
+  riskAssessment: RiskAssessmentResponse | null;
+  pivot4DTrends: PivotTrendsData | null;
+  pivot4DRiskScores: PivotRiskScoresData | null;
   loading: boolean;
   checkServiceStatus: () => Promise<void>;
   runAnalysis: () => Promise<void>;
@@ -36,11 +40,11 @@ export interface AnalyticsDataState {
 
 export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState {
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>("checking");
-  const [predictions, setPredictions] = useState<AnalyticsRecord | null>(null);
-  const [statistics, setStatistics] = useState<AnalyticsRecord | null>(null);
-  const [riskAssessment, setRiskAssessment] = useState<AnalyticsRecord | null>(null);
-  const [pivot4DTrends, setPivot4DTrends] = useState<PivotTrendRecord | null>(null);
-  const [pivot4DRiskScores, setPivot4DRiskScores] = useState<PivotRiskRecord | null>(null);
+  const [predictions, setPredictions] = useState<PredictionsResponse | null>(null);
+  const [statistics, setStatistics] = useState<StatisticsResponse | null>(null);
+  const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentResponse | null>(null);
+  const [pivot4DTrends, setPivot4DTrends] = useState<PivotTrendsData | null>(null);
+  const [pivot4DRiskScores, setPivot4DRiskScores] = useState<PivotRiskScoresData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [, setErrorMessage] = useState("");
@@ -97,9 +101,9 @@ export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState
         getRiskAssessment(analysisData),
       ]);
 
-      setStatistics(statsResult as AnalyticsRecord);
-      setPredictions(predResult as AnalyticsRecord);
-      setRiskAssessment(riskResult as AnalyticsRecord);
+      setStatistics(statsResult);
+      setPredictions(predResult);
+      setRiskAssessment(riskResult);
       setHasAnalyzed(true);
       setLastAnalyzedDataHash(dataHash);
       setRetryCount(0);
@@ -107,28 +111,28 @@ export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState
       try {
         const pivotData = await create4DPivotTable(analysisData);
         logger.debug("pivot_table_created", { success: pivotData.success });
-
-        const trendsResult = await analyze4DTrends(analysisData);
-        logger.debug("trend_analysis_completed", { success: Boolean(trendsResult?.success) });
-        if (trendsResult?.success) {
-          const trendsData = trendsResult.data || { message: "时间窗口内数据不足" };
-          logger.debug("trend_data_updated");
-          setPivot4DTrends(trendsData as PivotTrendRecord);
-        } else {
-          logger.warn("trend_analysis_unavailable");
-        }
-
-        const riskScoresResult = await calculate4DRiskScores(analysisData);
-        logger.debug("risk_scoring_completed", { success: Boolean(riskScoresResult?.success) });
-        if (riskScoresResult?.success) {
-          const riskData = riskScoresResult.data || { message: "时间窗口内数据不足" };
-          logger.debug("risk_score_data_updated");
-          setPivot4DRiskScores(riskData as PivotRiskRecord);
-        } else {
-          logger.warn("risk_scoring_unavailable");
-        }
       } catch {
-        logger.warn("enhanced_analysis_fallback");
+        logger.warn("pivot_table_creation_unavailable");
+      }
+
+      try {
+        const trendsResult = await analyze4DTrends(analysisData);
+        logger.debug("trend_analysis_completed", { success: trendsResult.success });
+        setPivot4DTrends(trendsResult.data);
+        logger.debug("trend_data_updated");
+      } catch {
+        setPivot4DTrends(null);
+        logger.warn("trend_analysis_unavailable");
+      }
+
+      try {
+        const riskScoresResult = await calculate4DRiskScores(analysisData);
+        logger.debug("risk_scoring_completed", { success: riskScoresResult.success });
+        setPivot4DRiskScores(riskScoresResult.data);
+        logger.debug("risk_score_data_updated");
+      } catch {
+        setPivot4DRiskScores(null);
+        logger.warn("risk_scoring_unavailable");
       }
 
       notify.success(
@@ -140,12 +144,15 @@ export function useAnalyticsData(hazards: AnalyticsHazard[]): AnalyticsDataState
       logger.error("analysis_execution_failed");
       setErrorMessage(errorMessage);
 
-      if (retryCount < 3 && !isRetry) {
+      if (!(error instanceof AnalyticsContractError) && retryCount < 3 && !isRetry) {
         setRetryCount((previous) => previous + 1);
         notify.warning("分析失败", `正在重试... (第 ${retryCount + 1} 次)`);
         setTimeout(() => void executeAnalysis(true), 2000 * (retryCount + 1));
       } else {
-        notify.error("分析失败", errorMessage);
+        notify.error(
+          "分析失败",
+          error instanceof AnalyticsContractError ? ANALYTICS_CONTRACT_ERROR_MESSAGE : errorMessage,
+        );
       }
     } finally {
       setLoading(false);

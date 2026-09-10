@@ -1,32 +1,44 @@
+import { toOverviewStatistics } from "../../utils/analyticsViewModels";
+import { formatAnalyticsNumber } from "../../../../services/analytics/analyticsPresentation";
 import { LineChart } from "../../../../components/DataVisualization";
 import type {
   AnalyticsHazard,
-  AnalyticsRecord,
+  StatisticsResponse,
   CorrelationValue,
-  PivotRisk,
-  PivotRiskRecord,
-  PivotTrendRecord,
-  TrendRisk,
+  PivotRiskScoresData,
+  PivotTrendsData,
 } from "../../types";
+import type { PivotRow } from "../../../../services/analytics/contracts/pivot";
 import type { IntensitySeriesPoint } from "../../utils/analyticsTransforms";
 
 interface OverviewTabProps {
   hazards: AnalyticsHazard[];
   hazardsByType: Record<string, number>;
   intensityData: IntensitySeriesPoint[];
-  statistics: AnalyticsRecord;
-  pivot4DTrends: PivotTrendRecord | null;
-  pivot4DRiskScores: PivotRiskRecord | null;
+  statistics: StatisticsResponse;
+  pivot4DTrends: PivotTrendsData | null;
+  pivot4DRiskScores: PivotRiskScoresData | null;
+}
+
+function readPivotString(row: PivotRow, key: string): string | null {
+  const value = row[key];
+  return typeof value === "string" ? value : null;
+}
+
+function readPivotNumber(row: PivotRow, key: string): number | null {
+  const value = row[key];
+  return typeof value === "number" ? value : null;
 }
 
 export default function OverviewTab({
   hazards,
   hazardsByType,
   intensityData,
-  statistics,
+  statistics: response,
   pivot4DTrends,
   pivot4DRiskScores,
 }: OverviewTabProps) {
+  const statistics = { data: toOverviewStatistics(response.data) };
   return (
     <div
       style={{
@@ -133,9 +145,7 @@ export default function OverviewTab({
                 marginTop: "5px",
               }}
             >
-              {Object.entries(hazardsByType).sort(
-                (a, b) => (b[1] as number) - (a[1] as number),
-              )[0]?.[0] || "暂无"}
+              {Object.entries(hazardsByType).sort((a, b) => b[1] - a[1])[0]?.[0] || "暂无"}
             </div>
           </div>
           <div
@@ -162,6 +172,15 @@ export default function OverviewTab({
       </div>
 
       {/* 数据可靠性分析 */}
+      <div style={{ marginBottom: "30px", color: "#fff" }}>
+        <div>
+          强度平均值（magnitude）：{formatAnalyticsNumber(statistics.data.magnitudeMean, 2)}
+        </div>
+        <div>
+          强度标准差（magnitude）：
+          {formatAnalyticsNumber(statistics.data.magnitudeStandardDeviation, 2)}
+        </div>
+      </div>
       {statistics.data.inferentialStatistics?.confidenceIntervals && (
         <div style={{ marginBottom: "30px" }}>
           <h4 style={{ color: "#fff", marginBottom: "15px" }}>📐 数据可信度分析</h4>
@@ -194,7 +213,8 @@ export default function OverviewTab({
                 <div>
                   <div style={{ color: "#888", fontSize: "12px" }}>当前平均值</div>
                   <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold" }}>
-                    {statistics.data.inferentialStatistics.confidenceIntervals.magnitude.mean?.toFixed(
+                    {formatAnalyticsNumber(
+                      statistics.data.inferentialStatistics.confidenceIntervals.magnitude.mean,
                       2,
                     )}
                   </div>
@@ -202,7 +222,9 @@ export default function OverviewTab({
                 <div>
                   <div style={{ color: "#888", fontSize: "12px" }}>预计最低值</div>
                   <div style={{ color: "#FF9800", fontSize: "20px", fontWeight: "bold" }}>
-                    {statistics.data.inferentialStatistics.confidenceIntervals.magnitude.lowerBound?.toFixed(
+                    {formatAnalyticsNumber(
+                      statistics.data.inferentialStatistics.confidenceIntervals.magnitude
+                        .lowerBound,
                       2,
                     )}
                   </div>
@@ -210,7 +232,9 @@ export default function OverviewTab({
                 <div>
                   <div style={{ color: "#888", fontSize: "12px" }}>预计最高值</div>
                   <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
-                    {statistics.data.inferentialStatistics.confidenceIntervals.magnitude.upperBound?.toFixed(
+                    {formatAnalyticsNumber(
+                      statistics.data.inferentialStatistics.confidenceIntervals.magnitude
+                        .upperBound,
                       2,
                     )}
                   </div>
@@ -219,15 +243,19 @@ export default function OverviewTab({
                   <div style={{ color: "#888", fontSize: "12px" }}>上下浮动</div>
                   <div style={{ color: "#2196F3", fontSize: "20px", fontWeight: "bold" }}>
                     ±
-                    {statistics.data.inferentialStatistics.confidenceIntervals.magnitude.marginOfError?.toFixed(
+                    {formatAnalyticsNumber(
+                      statistics.data.inferentialStatistics.confidenceIntervals.magnitude
+                        .marginOfError,
                       2,
                     )}
                   </div>
                 </div>
               </div>
             )}
-            {statistics.data.inferentialStatistics.confidenceIntervals.magnitude?.lowerBound &&
-              statistics.data.inferentialStatistics.confidenceIntervals.magnitude?.upperBound && (
+            {statistics.data.inferentialStatistics.confidenceIntervals.magnitude?.lowerBound !=
+              null &&
+              statistics.data.inferentialStatistics.confidenceIntervals.magnitude?.upperBound !=
+                null && (
                 <div
                   style={{
                     marginTop: "15px",
@@ -241,13 +269,17 @@ export default function OverviewTab({
                 >
                   💡 根据当前数据分析，未来灾害强度大概率会在{" "}
                   <span style={{ color: "#FF9800", fontWeight: "bold" }}>
-                    {statistics.data.inferentialStatistics.confidenceIntervals.magnitude.lowerBound.toFixed(
+                    {formatAnalyticsNumber(
+                      statistics.data.inferentialStatistics.confidenceIntervals.magnitude
+                        .lowerBound,
                       2,
                     )}
                   </span>{" "}
                   到{" "}
                   <span style={{ color: "#4CAF50", fontWeight: "bold" }}>
-                    {statistics.data.inferentialStatistics.confidenceIntervals.magnitude.upperBound.toFixed(
+                    {formatAnalyticsNumber(
+                      statistics.data.inferentialStatistics.confidenceIntervals.magnitude
+                        .upperBound,
                       2,
                     )}
                   </span>{" "}
@@ -280,8 +312,10 @@ export default function OverviewTab({
               <div>
                 <div style={{ color: "#888", fontSize: "12px" }}>平均波动幅度</div>
                 <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
-                  {statistics.data.descriptiveStatistics.variabilityMeasures.standardDeviation ? (
-                    statistics.data.descriptiveStatistics.variabilityMeasures.standardDeviation.toFixed(
+                  {statistics.data.descriptiveStatistics.variabilityMeasures.standardDeviation !=
+                  null ? (
+                    formatAnalyticsNumber(
+                      statistics.data.descriptiveStatistics.variabilityMeasures.standardDeviation,
                       2,
                     )
                   ) : (
@@ -295,8 +329,11 @@ export default function OverviewTab({
               <div>
                 <div style={{ color: "#888", fontSize: "12px" }}>最大最小差距</div>
                 <div style={{ color: "#9C27B0", fontSize: "20px", fontWeight: "bold" }}>
-                  {statistics.data.descriptiveStatistics.variabilityMeasures.range ? (
-                    statistics.data.descriptiveStatistics.variabilityMeasures.range.toFixed(2)
+                  {statistics.data.descriptiveStatistics.variabilityMeasures.range != null ? (
+                    formatAnalyticsNumber(
+                      statistics.data.descriptiveStatistics.variabilityMeasures.range,
+                      2,
+                    )
                   ) : (
                     <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
                   )}
@@ -309,7 +346,7 @@ export default function OverviewTab({
                 <div style={{ color: "#888", fontSize: "12px" }}>数据集中度</div>
                 <div style={{ color: "#FF9800", fontSize: "20px", fontWeight: "bold" }}>
                   {statistics.data.descriptiveStatistics.variabilityMeasures
-                    .coefficientOfVariation ? (
+                    .coefficientOfVariation != null ? (
                     statistics.data.descriptiveStatistics.variabilityMeasures
                       .coefficientOfVariation *
                       100 <
@@ -332,7 +369,8 @@ export default function OverviewTab({
                 </div>
               </div>
             </div>
-            {statistics.data.descriptiveStatistics.variabilityMeasures.coefficientOfVariation && (
+            {statistics.data.descriptiveStatistics.variabilityMeasures.coefficientOfVariation !=
+              null && (
               <div
                 style={{
                   marginTop: "15px",
@@ -418,8 +456,11 @@ export default function OverviewTab({
                   中位数（中间值）
                 </div>
                 <div style={{ color: "#2196F3", fontSize: "18px", fontWeight: "bold" }}>
-                  {statistics.data.descriptiveStatistics.distributionMetrics.q50 ? (
-                    statistics.data.descriptiveStatistics.distributionMetrics.q50.toFixed(2)
+                  {statistics.data.descriptiveStatistics.distributionMetrics.q50 != null ? (
+                    formatAnalyticsNumber(
+                      statistics.data.descriptiveStatistics.distributionMetrics.q50,
+                      2,
+                    )
                   ) : (
                     <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
                   )}
@@ -433,8 +474,11 @@ export default function OverviewTab({
                   主要数据范围
                 </div>
                 <div style={{ color: "#FF9800", fontSize: "18px", fontWeight: "bold" }}>
-                  {statistics.data.descriptiveStatistics.distributionMetrics.iqr ? (
-                    statistics.data.descriptiveStatistics.distributionMetrics.iqr.toFixed(2)
+                  {statistics.data.descriptiveStatistics.distributionMetrics.iqr != null ? (
+                    formatAnalyticsNumber(
+                      statistics.data.descriptiveStatistics.distributionMetrics.iqr,
+                      2,
+                    )
                   ) : (
                     <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
                   )}
@@ -488,7 +532,11 @@ export default function OverviewTab({
               <div>
                 <div style={{ color: "#888", fontSize: "12px" }}>数据质量</div>
                 <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
-                  {statistics.data.anomalyDetection.anomalyStatistics.dataQualityScore?.toFixed(1)}%
+                  {formatAnalyticsNumber(
+                    statistics.data.anomalyDetection.anomalyStatistics.dataQualityScore,
+                    1,
+                  )}
+                  %
                 </div>
               </div>
             </div>
@@ -606,7 +654,9 @@ export default function OverviewTab({
             </div>
 
             {/* 4维透视表数据可视化 - 增强版 */}
-            {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot && (
+            {(statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot ||
+              pivot4DTrends ||
+              pivot4DRiskScores) && (
               <div
                 style={{
                   marginTop: "20px",
@@ -642,321 +692,337 @@ export default function OverviewTab({
                   )}
                 </div>
 
-                {/* 基础维度统计 */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                    gap: "12px",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "15px",
-                      backgroundColor: "#1a1a1a",
-                      borderRadius: "8px",
-                      border: "2px solid #4CAF50",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
-                      时间维度
-                    </div>
-                    <div style={{ color: "#4CAF50", fontSize: "28px", fontWeight: "bold" }}>
-                      {
-                        Object.keys(
-                          statistics.data.descriptiveStatistics.typeDistribution
-                            .fourDimensionalPivot.timeDimension || {},
-                        ).length
-                      }
-                    </div>
-                    <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
-                      个时间段
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      padding: "15px",
-                      backgroundColor: "#1a1a1a",
-                      borderRadius: "8px",
-                      border: "2px solid #2196F3",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
-                      地理维度
-                    </div>
-                    <div style={{ color: "#2196F3", fontSize: "28px", fontWeight: "bold" }}>
-                      {
-                        Object.keys(
-                          statistics.data.descriptiveStatistics.typeDistribution
-                            .fourDimensionalPivot.geoDimension || {},
-                        ).length
-                      }
-                    </div>
-                    <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>个区域</div>
-                  </div>
-                  <div
-                    style={{
-                      padding: "15px",
-                      backgroundColor: "#1a1a1a",
-                      borderRadius: "8px",
-                      border: "2px solid #FF9800",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
-                      类型维度
-                    </div>
-                    <div style={{ color: "#FF9800", fontSize: "28px", fontWeight: "bold" }}>
-                      {
-                        Object.keys(
-                          statistics.data.descriptiveStatistics.typeDistribution
-                            .fourDimensionalPivot.typeDimension || {},
-                        ).length
-                      }
-                    </div>
-                    <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>种灾害</div>
-                  </div>
-                  <div
-                    style={{
-                      padding: "15px",
-                      backgroundColor: "#1a1a1a",
-                      borderRadius: "8px",
-                      border: "2px solid #9C27B0",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
-                      严重性维度
-                    </div>
-                    <div style={{ color: "#9C27B0", fontSize: "28px", fontWeight: "bold" }}>
-                      {
-                        Object.keys(
-                          statistics.data.descriptiveStatistics.typeDistribution
-                            .fourDimensionalPivot.severityDimension || {},
-                        ).length
-                      }
-                    </div>
-                    <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>个等级</div>
-                  </div>
-                  <div
-                    style={{
-                      padding: "15px",
-                      backgroundColor: "#1a1a1a",
-                      borderRadius: "8px",
-                      border: "2px solid #00BCD4",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
-                      交叉分析
-                    </div>
-                    <div style={{ color: "#00BCD4", fontSize: "28px", fontWeight: "bold" }}>
-                      {
-                        Object.keys(
-                          statistics.data.descriptiveStatistics.typeDistribution
-                            .fourDimensionalPivot.crossAnalysis || {},
-                        ).length
-                      }
-                    </div>
-                    <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>组关联</div>
-                  </div>
-                </div>
-
-                {/* 详细数据展示 - 新增 */}
-                <div
-                  style={{
-                    marginTop: "15px",
-                    padding: "15px",
-                    backgroundColor: "#1a1a1a",
-                    borderRadius: "8px",
-                    border: "1px solid #2196F3",
-                  }}
-                >
-                  <div
-                    style={{
-                      color: "#2196F3",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      marginBottom: "15px",
-                    }}
-                  >
-                    📊 多维数据透视详情
-                  </div>
-
-                  {/* 时间维度数据 */}
-                  {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                    .timeDimension &&
-                    Object.keys(
-                      statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                        .timeDimension,
-                    ).length > 0 && (
-                      <div style={{ marginBottom: "12px" }}>
-                        <div
-                          style={{
-                            color: "#4CAF50",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          ⏰ 时间维度分布:
+                {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot && (
+                  <>
+                    {/* 基础维度统计 */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                        gap: "12px",
+                        marginBottom: "20px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: "15px",
+                          backgroundColor: "#1a1a1a",
+                          borderRadius: "8px",
+                          border: "2px solid #4CAF50",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                          时间维度
                         </div>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                          {Object.entries(
-                            statistics.data.descriptiveStatistics.typeDistribution
-                              .fourDimensionalPivot.timeDimension,
-                          )
-                            .slice(0, 10)
-                            .map(([key, value]: [string, number]) => (
-                              <div
-                                key={key}
-                                style={{
-                                  padding: "6px 10px",
-                                  backgroundColor: "#0a0a0a",
-                                  borderRadius: "4px",
-                                  fontSize: "9px",
-                                  border: "1px solid #4CAF50",
-                                }}
-                              >
-                                <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
-                                <span style={{ color: "#4CAF50" }}>{key.split("_")[1]}</span>:{" "}
-                                <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
-                              </div>
-                            ))}
+                        <div style={{ color: "#4CAF50", fontSize: "28px", fontWeight: "bold" }}>
+                          {
+                            Object.keys(
+                              statistics.data.descriptiveStatistics.typeDistribution
+                                .fourDimensionalPivot.timeDimension || {},
+                            ).length
+                          }
+                        </div>
+                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                          个时间段
                         </div>
                       </div>
-                    )}
-
-                  {/* 地理维度数据 */}
-                  {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                    .geoDimension &&
-                    Object.keys(
-                      statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                        .geoDimension,
-                    ).length > 0 && (
-                      <div style={{ marginBottom: "12px" }}>
-                        <div
-                          style={{
-                            color: "#2196F3",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          🌍 地理维度分布:
+                      <div
+                        style={{
+                          padding: "15px",
+                          backgroundColor: "#1a1a1a",
+                          borderRadius: "8px",
+                          border: "2px solid #2196F3",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                          地理维度
                         </div>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                          {Object.entries(
-                            statistics.data.descriptiveStatistics.typeDistribution
-                              .fourDimensionalPivot.geoDimension,
-                          )
-                            .slice(0, 10)
-                            .map(([key, value]: [string, number]) => (
-                              <div
-                                key={key}
-                                style={{
-                                  padding: "6px 10px",
-                                  backgroundColor: "#0a0a0a",
-                                  borderRadius: "4px",
-                                  fontSize: "9px",
-                                  border: "1px solid #2196F3",
-                                }}
-                              >
-                                <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
-                                <span style={{ color: "#2196F3" }}>{key.split("_")[1]}</span>:{" "}
-                                <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
-                              </div>
-                            ))}
+                        <div style={{ color: "#2196F3", fontSize: "28px", fontWeight: "bold" }}>
+                          {
+                            Object.keys(
+                              statistics.data.descriptiveStatistics.typeDistribution
+                                .fourDimensionalPivot.geoDimension || {},
+                            ).length
+                          }
+                        </div>
+                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                          个区域
                         </div>
                       </div>
-                    )}
-
-                  {/* 严重性维度数据 */}
-                  {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                    .severityDimension &&
-                    Object.keys(
-                      statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                        .severityDimension,
-                    ).length > 0 && (
-                      <div style={{ marginBottom: "12px" }}>
-                        <div
-                          style={{
-                            color: "#9C27B0",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          ⚠️ 严重性维度分布:
+                      <div
+                        style={{
+                          padding: "15px",
+                          backgroundColor: "#1a1a1a",
+                          borderRadius: "8px",
+                          border: "2px solid #FF9800",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                          类型维度
                         </div>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                          {Object.entries(
-                            statistics.data.descriptiveStatistics.typeDistribution
-                              .fourDimensionalPivot.severityDimension,
-                          ).map(([key, value]: [string, number]) => (
+                        <div style={{ color: "#FF9800", fontSize: "28px", fontWeight: "bold" }}>
+                          {
+                            Object.keys(
+                              statistics.data.descriptiveStatistics.typeDistribution
+                                .fourDimensionalPivot.typeDimension || {},
+                            ).length
+                          }
+                        </div>
+                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                          种灾害
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          padding: "15px",
+                          backgroundColor: "#1a1a1a",
+                          borderRadius: "8px",
+                          border: "2px solid #9C27B0",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                          严重性维度
+                        </div>
+                        <div style={{ color: "#9C27B0", fontSize: "28px", fontWeight: "bold" }}>
+                          {
+                            Object.keys(
+                              statistics.data.descriptiveStatistics.typeDistribution
+                                .fourDimensionalPivot.severityDimension || {},
+                            ).length
+                          }
+                        </div>
+                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                          个等级
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          padding: "15px",
+                          backgroundColor: "#1a1a1a",
+                          borderRadius: "8px",
+                          border: "2px solid #00BCD4",
+                          textAlign: "center",
+                        }}
+                      >
+                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                          交叉分析
+                        </div>
+                        <div style={{ color: "#00BCD4", fontSize: "28px", fontWeight: "bold" }}>
+                          {
+                            Object.keys(
+                              statistics.data.descriptiveStatistics.typeDistribution
+                                .fourDimensionalPivot.crossAnalysis || {},
+                            ).length
+                          }
+                        </div>
+                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                          组关联
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 详细数据展示 - 新增 */}
+                    <div
+                      style={{
+                        marginTop: "15px",
+                        padding: "15px",
+                        backgroundColor: "#1a1a1a",
+                        borderRadius: "8px",
+                        border: "1px solid #2196F3",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: "#2196F3",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          marginBottom: "15px",
+                        }}
+                      >
+                        📊 多维数据透视详情
+                      </div>
+
+                      {/* 时间维度数据 */}
+                      {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
+                        .timeDimension &&
+                        Object.keys(
+                          statistics.data.descriptiveStatistics.typeDistribution
+                            .fourDimensionalPivot.timeDimension,
+                        ).length > 0 && (
+                          <div style={{ marginBottom: "12px" }}>
                             <div
-                              key={key}
                               style={{
-                                padding: "6px 10px",
-                                backgroundColor: "#0a0a0a",
-                                borderRadius: "4px",
-                                fontSize: "9px",
-                                border: "1px solid #9C27B0",
+                                color: "#4CAF50",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                marginBottom: "8px",
                               }}
                             >
-                              <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
-                              <span style={{ color: "#9C27B0" }}>{key.split("_")[1]}</span>:{" "}
-                              <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
+                              ⏰ 时间维度分布:
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {Object.entries(
+                                statistics.data.descriptiveStatistics.typeDistribution
+                                  .fourDimensionalPivot.timeDimension,
+                              )
+                                .slice(0, 10)
+                                .map(([key, value]: [string, number]) => (
+                                  <div
+                                    key={key}
+                                    style={{
+                                      padding: "6px 10px",
+                                      backgroundColor: "#0a0a0a",
+                                      borderRadius: "4px",
+                                      fontSize: "9px",
+                                      border: "1px solid #4CAF50",
+                                    }}
+                                  >
+                                    <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
+                                    <span style={{ color: "#4CAF50" }}>{key.split("_")[1]}</span>:{" "}
+                                    <span style={{ color: "#fff", fontWeight: "bold" }}>
+                                      {value}
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
 
-                  {/* 交叉分析数据 */}
-                  {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                    .crossAnalysis &&
-                    Object.keys(
-                      statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
-                        .crossAnalysis,
-                    ).length > 0 && (
-                      <div>
-                        <div
-                          style={{
-                            color: "#00BCD4",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          🔀 交叉关联分析:
-                        </div>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                          {Object.entries(
-                            statistics.data.descriptiveStatistics.typeDistribution
-                              .fourDimensionalPivot.crossAnalysis,
-                          ).map(([key, value]: [string, number]) => (
+                      {/* 地理维度数据 */}
+                      {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
+                        .geoDimension &&
+                        Object.keys(
+                          statistics.data.descriptiveStatistics.typeDistribution
+                            .fourDimensionalPivot.geoDimension,
+                        ).length > 0 && (
+                          <div style={{ marginBottom: "12px" }}>
                             <div
-                              key={key}
                               style={{
-                                padding: "6px 10px",
-                                backgroundColor: "#0a0a0a",
-                                borderRadius: "4px",
-                                fontSize: "9px",
-                                border: "1px solid #00BCD4",
+                                color: "#2196F3",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                marginBottom: "8px",
                               }}
                             >
-                              <span style={{ color: "#00BCD4" }}>{key}</span>:{" "}
-                              <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
+                              🌍 地理维度分布:
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {Object.entries(
+                                statistics.data.descriptiveStatistics.typeDistribution
+                                  .fourDimensionalPivot.geoDimension,
+                              )
+                                .slice(0, 10)
+                                .map(([key, value]: [string, number]) => (
+                                  <div
+                                    key={key}
+                                    style={{
+                                      padding: "6px 10px",
+                                      backgroundColor: "#0a0a0a",
+                                      borderRadius: "4px",
+                                      fontSize: "9px",
+                                      border: "1px solid #2196F3",
+                                    }}
+                                  >
+                                    <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
+                                    <span style={{ color: "#2196F3" }}>{key.split("_")[1]}</span>:{" "}
+                                    <span style={{ color: "#fff", fontWeight: "bold" }}>
+                                      {value}
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                      {/* 严重性维度数据 */}
+                      {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
+                        .severityDimension &&
+                        Object.keys(
+                          statistics.data.descriptiveStatistics.typeDistribution
+                            .fourDimensionalPivot.severityDimension,
+                        ).length > 0 && (
+                          <div style={{ marginBottom: "12px" }}>
+                            <div
+                              style={{
+                                color: "#9C27B0",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                marginBottom: "8px",
+                              }}
+                            >
+                              ⚠️ 严重性维度分布:
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {Object.entries(
+                                statistics.data.descriptiveStatistics.typeDistribution
+                                  .fourDimensionalPivot.severityDimension,
+                              ).map(([key, value]: [string, number]) => (
+                                <div
+                                  key={key}
+                                  style={{
+                                    padding: "6px 10px",
+                                    backgroundColor: "#0a0a0a",
+                                    borderRadius: "4px",
+                                    fontSize: "9px",
+                                    border: "1px solid #9C27B0",
+                                  }}
+                                >
+                                  <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
+                                  <span style={{ color: "#9C27B0" }}>{key.split("_")[1]}</span>:{" "}
+                                  <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                      {/* 交叉分析数据 */}
+                      {statistics.data.descriptiveStatistics.typeDistribution.fourDimensionalPivot
+                        .crossAnalysis &&
+                        Object.keys(
+                          statistics.data.descriptiveStatistics.typeDistribution
+                            .fourDimensionalPivot.crossAnalysis,
+                        ).length > 0 && (
+                          <div>
+                            <div
+                              style={{
+                                color: "#00BCD4",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                marginBottom: "8px",
+                              }}
+                            >
+                              🔀 交叉关联分析:
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {Object.entries(
+                                statistics.data.descriptiveStatistics.typeDistribution
+                                  .fourDimensionalPivot.crossAnalysis,
+                              ).map(([key, value]: [string, number]) => (
+                                <div
+                                  key={key}
+                                  style={{
+                                    padding: "6px 10px",
+                                    backgroundColor: "#0a0a0a",
+                                    borderRadius: "4px",
+                                    fontSize: "9px",
+                                    border: "1px solid #00BCD4",
+                                  }}
+                                >
+                                  <span style={{ color: "#00BCD4" }}>{key}</span>:{" "}
+                                  <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </>
+                )}
 
                 {/* 趋势分析图表 */}
                 {pivot4DTrends && (
@@ -979,61 +1045,60 @@ export default function OverviewTab({
                     >
                       📈 多维趋势分析（过去7天）
                     </div>
-                    {pivot4DTrends.message ? (
+                    {pivot4DTrends.kind === "empty" ? (
                       <div style={{ fontSize: "10px", color: "#888", fontStyle: "italic" }}>
                         {pivot4DTrends.message}
                       </div>
                     ) : (
                       <>
-                        {pivot4DTrends.statistics && (
-                          <div
-                            style={{
-                              fontSize: "10px",
-                              color: "#aaa",
-                              marginBottom: "10px",
-                            }}
-                          >
-                            总组合: {pivot4DTrends.statistics.total_combinations} | 上升:{" "}
-                            <span style={{ color: "#f44336" }}>
-                              {pivot4DTrends.statistics.increasing}
-                            </span>{" "}
-                            | 平稳:{" "}
-                            <span style={{ color: "#FF9800" }}>
-                              {pivot4DTrends.statistics.stable}
-                            </span>{" "}
-                            | 下降:{" "}
-                            <span style={{ color: "#4CAF50" }}>
-                              {pivot4DTrends.statistics.decreasing}
-                            </span>
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            color: "#aaa",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          总组合: {pivot4DTrends.statistics.total_combinations ?? 0} | 上升:{" "}
+                          <span style={{ color: "#f44336" }}>
+                            {pivot4DTrends.statistics.increasing ?? 0}
+                          </span>{" "}
+                          | 平稳:{" "}
+                          <span style={{ color: "#FF9800" }}>
+                            {pivot4DTrends.statistics.stable ?? 0}
+                          </span>{" "}
+                          | 下降:{" "}
+                          <span style={{ color: "#4CAF50" }}>
+                            {pivot4DTrends.statistics.decreasing ?? 0}
+                          </span>
+                        </div>
+                        {pivot4DTrends.high_risk_trends.length > 0 && (
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                            {pivot4DTrends.high_risk_trends.slice(0, 5).map((trend, idx) => {
+                              const region = readPivotString(trend, "region") ?? "未知";
+                              const type = readPivotString(trend, "type") ?? "未知";
+                              const slope = readPivotNumber(trend, "trend_slope") ?? 0;
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    padding: "8px 12px",
+                                    backgroundColor: "#0a0a0a",
+                                    borderRadius: "6px",
+                                    fontSize: "10px",
+                                    border: "1px solid #f44336",
+                                  }}
+                                >
+                                  <span style={{ color: "#888" }}>
+                                    {region} - {type}:
+                                  </span>{" "}
+                                  <span style={{ color: "#f44336" }}>
+                                    ↗ 斜率 {slope.toFixed(2)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
-                        {pivot4DTrends.high_risk_trends &&
-                          Array.isArray(pivot4DTrends.high_risk_trends) &&
-                          pivot4DTrends.high_risk_trends.length > 0 && (
-                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                              {pivot4DTrends.high_risk_trends
-                                .slice(0, 5)
-                                .map((trend: TrendRisk, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      padding: "8px 12px",
-                                      backgroundColor: "#0a0a0a",
-                                      borderRadius: "6px",
-                                      fontSize: "10px",
-                                      border: "1px solid #f44336",
-                                    }}
-                                  >
-                                    <span style={{ color: "#888" }}>
-                                      {trend.region} - {trend.type}:
-                                    </span>{" "}
-                                    <span style={{ color: "#f44336" }}>
-                                      ↗ 斜率 {trend.trend_slope?.toFixed(2) || "0"}
-                                    </span>
-                                  </div>
-                                ))}
-                            </div>
-                          )}
                       </>
                     )}
                   </div>
@@ -1060,7 +1125,7 @@ export default function OverviewTab({
                     >
                       🔥 多维风险评分（Top 8）
                     </div>
-                    {pivot4DRiskScores.message ? (
+                    {pivot4DRiskScores.kind === "empty" ? (
                       <div style={{ fontSize: "10px", color: "#888", fontStyle: "italic" }}>
                         {pivot4DRiskScores.message}
                       </div>
@@ -1073,78 +1138,72 @@ export default function OverviewTab({
                             gap: "8px",
                           }}
                         >
-                          {(
-                            pivot4DRiskScores.top_10_risks ||
-                            pivot4DRiskScores.all_risk_scores ||
-                            []
-                          )
-                            .slice(0, 8)
-                            .map((item: PivotRisk, idx: number) => {
-                              const score = item.risk_score || 0;
-                              const riskLevel = score > 2 ? "high" : score > 1 ? "medium" : "low";
-                              const color =
-                                riskLevel === "high"
-                                  ? "#f44336"
-                                  : riskLevel === "medium"
-                                    ? "#FF9800"
-                                    : "#4CAF50";
-                              const label = `${item.region || "未知"}-${item.type || "未知"}`;
+                          {pivot4DRiskScores.top_10_risks.slice(0, 8).map((item, idx) => {
+                            const score = readPivotNumber(item, "risk_score") ?? 0;
+                            const riskLevel = score > 2 ? "high" : score > 1 ? "medium" : "low";
+                            const color =
+                              riskLevel === "high"
+                                ? "#f44336"
+                                : riskLevel === "medium"
+                                  ? "#FF9800"
+                                  : "#4CAF50";
+                            const region = readPivotString(item, "region") ?? "未知";
+                            const type = readPivotString(item, "type") ?? "未知";
+                            const totalEvents = readPivotNumber(item, "total_events") ?? 0;
+                            const label = `${region}-${type}`;
 
-                              return (
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  padding: "10px",
+                                  backgroundColor: "#0a0a0a",
+                                  borderRadius: "6px",
+                                  border: `2px solid ${color}`,
+                                  textAlign: "center",
+                                }}
+                              >
                                 <div
-                                  key={idx}
                                   style={{
-                                    padding: "10px",
-                                    backgroundColor: "#0a0a0a",
-                                    borderRadius: "6px",
-                                    border: `2px solid ${color}`,
-                                    textAlign: "center",
+                                    fontSize: "9px",
+                                    color: "#888",
+                                    marginBottom: "5px",
                                   }}
                                 >
-                                  <div
-                                    style={{
-                                      fontSize: "9px",
-                                      color: "#888",
-                                      marginBottom: "5px",
-                                    }}
-                                  >
-                                    {label.length > 15 ? label.substring(0, 15) + "..." : label}
-                                  </div>
-                                  <div style={{ fontSize: "20px", fontWeight: "bold", color }}>
-                                    {score.toFixed(1)}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "8px",
-                                      color: "#666",
-                                      marginTop: "3px",
-                                    }}
-                                  >
-                                    事件: {item.total_events || 0}
-                                  </div>
+                                  {label.length > 15 ? label.substring(0, 15) + "..." : label}
                                 </div>
-                              );
-                            })}
+                                <div style={{ fontSize: "20px", fontWeight: "bold", color }}>
+                                  {score.toFixed(1)}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "8px",
+                                    color: "#666",
+                                    marginTop: "3px",
+                                  }}
+                                >
+                                  事件: {totalEvents}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        {pivot4DRiskScores.statistics && (
-                          <div
-                            style={{
-                              marginTop: "10px",
-                              padding: "10px",
-                              backgroundColor: "#0a0a0a",
-                              borderRadius: "6px",
-                              fontSize: "10px",
-                            }}
-                          >
-                            <span style={{ color: "#f44336", fontWeight: "bold" }}>⚠️ 统计:</span>{" "}
-                            <span style={{ color: "#aaa" }}>
-                              最高风险{" "}
-                              {pivot4DRiskScores.statistics.max_risk_score?.toFixed(2) || "0"} |
-                              平均风险{" "}
-                              {pivot4DRiskScores.statistics.avg_risk_score?.toFixed(2) || "0"}
-                            </span>
-                          </div>
-                        )}
+                        <div
+                          style={{
+                            marginTop: "10px",
+                            padding: "10px",
+                            backgroundColor: "#0a0a0a",
+                            borderRadius: "6px",
+                            fontSize: "10px",
+                          }}
+                        >
+                          <span style={{ color: "#f44336", fontWeight: "bold" }}>⚠️ 统计:</span>{" "}
+                          <span style={{ color: "#aaa" }}>
+                            最高风险 {(pivot4DRiskScores.statistics.max_risk_score ?? 0).toFixed(2)}{" "}
+                            | 平均风险{" "}
+                            {(pivot4DRiskScores.statistics.avg_risk_score ?? 0).toFixed(2)}
+                          </span>
+                        </div>
                       </>
                     )}
                   </div>
@@ -1402,7 +1461,10 @@ export default function OverviewTab({
                 <div>
                   <div style={{ color: "#888", fontSize: "12px" }}>变化速度</div>
                   <div style={{ color: "#fff", fontSize: "16px", marginTop: "5px" }}>
-                    {statistics.data.timeSeriesAnalysis.trendAnalysis.slope?.toFixed(4) || "N/A"}
+                    {formatAnalyticsNumber(
+                      statistics.data.timeSeriesAnalysis.trendAnalysis.slope,
+                      4,
+                    ) || "N/A"}
                   </div>
                 </div>
                 <div>
@@ -1441,8 +1503,8 @@ export default function OverviewTab({
               // 生成模拟数据点（基于线性回归结果）
               const trendData = statistics.data.timeSeriesAnalysis.trendAnalysis;
               const dataPoints = 30; // 30天数据
-              const slope = trendData.slope || 0;
-              const intercept = trendData.intercept || hazards.length / 2;
+              const slope = trendData.slope ?? 0;
+              const intercept = trendData.intercept ?? hazards.length / 2;
 
               // 生成趋势线数据
               const chartData = Array.from({ length: dataPoints }, (_, i) => ({

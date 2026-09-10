@@ -1,5 +1,10 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { getRiskAssessment } from "../services/analytics/analyticsService";
+import type { RiskAssessmentData } from "../services/analytics/contracts/risk";
+import {
+  formatAnalyticsNumber,
+  getRiskLevelLabel,
+} from "../services/analytics/analyticsPresentation";
 import type { Hazard } from "../types";
 import { createClientLogger } from "../utils/logger";
 
@@ -13,13 +18,8 @@ type InsightsHazard = Hazard & {
   };
 };
 
-interface RiskData {
-  overallRisk?: string;
-  riskScore?: number;
-}
-
 const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => {
-  const [riskData, setRiskData] = useState<RiskData | null>(null);
+  const [riskData, setRiskData] = useState<RiskAssessmentData | null>(null);
   const [loading, setLoading] = useState(false);
   const recentHazards = hazards.slice(0, 3);
 
@@ -30,7 +30,7 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
     try {
       const result = await getRiskAssessment(hazards.slice(0, 50));
       if (result.success) {
-        setRiskData((result.data as RiskData | undefined) ?? null);
+        setRiskData(result.data);
       }
     } catch {
       logger.error("risk_assessment_load_failed");
@@ -88,7 +88,7 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
             🐍 Python 风险评估
           </h4>
 
-          {riskData.overallRisk && (
+          {riskData.overallRiskScore && (
             <div
               style={{
                 padding: "12px",
@@ -100,23 +100,24 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
               <div style={{ color: "#888", fontSize: "12px" }}>综合风险等级</div>
               <div
                 style={{
-                  color:
-                    riskData.overallRisk === "high"
-                      ? "#f44336"
-                      : riskData.overallRisk === "medium"
-                        ? "#ff9800"
-                        : "#4CAF50",
+                  color: ["HIGH", "CRITICAL"].includes(
+                    riskData.overallRiskScore.level.toUpperCase(),
+                  )
+                    ? "#f44336"
+                    : riskData.overallRiskScore.level.toUpperCase() === "MODERATE"
+                      ? "#ff9800"
+                      : "#4CAF50",
                   fontSize: "18px",
                   fontWeight: "bold",
                   marginTop: "4px",
                 }}
               >
-                {riskData.overallRisk.toUpperCase()}
+                {getRiskLevelLabel(riskData.overallRiskScore.level)}
               </div>
             </div>
           )}
 
-          {riskData.riskScore !== undefined && (
+          {riskData.overallRiskScore && (
             <div
               style={{
                 padding: "12px",
@@ -128,7 +129,7 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
               <div
                 style={{ color: "#fff", fontSize: "18px", fontWeight: "bold", marginTop: "4px" }}
               >
-                {(riskData.riskScore * 100).toFixed(1)} / 100
+                {formatAnalyticsNumber(riskData.overallRiskScore.score, 1)} / 100
               </div>
             </div>
           )}

@@ -2,13 +2,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   analyze4DTrends,
+  assessDataQuality,
   calculate4DRiskScores,
   create4DPivotTable,
   formatHazards,
   get4DSummary,
+  getQualityThresholds,
+  getPredictions,
+  getRiskAssessment,
+  getStatistics,
   multiDimensionalQuery,
   type AnalysisRequest,
 } from "../src/services/analytics/analyticsService";
+import { AnalyticsBusinessError } from "../src/services/analytics/contracts/common";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -147,14 +153,35 @@ describe("analytics service", () => {
   });
 
   it("sends hazards and each endpoint's 4D parameters", async () => {
-    const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(
-        new Response(JSON.stringify({ success: true, data: {} }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
+    const response = (data: unknown) =>
+      new Response(JSON.stringify({ success: true, data }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response({
+          pivot_table: {},
+          summary: {
+            total_records: 1,
+            time_range: { start: "2026-09-03", end: "2026-09-03", days: 0 },
+            geographic_distribution: { regions: { Asia: 1 }, continents: { Asia: 1 } },
+            type_distribution: { FLOOD: 1 },
+            severity_distribution: { WATCH: 1 },
+            dimensions: { time_unique: 1, geo_unique: 1, type_unique: 1, severity_unique: 1 },
+          },
+          dimensions: { rows: 1, columns: 1 },
         }),
-      ),
-    );
+      )
+      .mockResolvedValueOnce(response({}))
+      .mockResolvedValueOnce(
+        response({ trends: [], message: "时间窗口内数据不足", time_window: 14 }),
+      )
+      .mockResolvedValueOnce(
+        response({ risk_scores: [], message: "时间窗口内数据不足", time_window: 21 }),
+      )
+      .mockResolvedValueOnce(response({}));
     vi.stubGlobal("fetch", fetchMock);
 
     const hazards = [
@@ -245,5 +272,142 @@ describe("analytics service", () => {
         body: JSON.stringify({ hazards: formattedHazards }),
       }),
     );
+  });
+
+  it("parses domain responses at the service JSON boundary", async () => {
+    const stats = {
+      descriptiveStatistics: {
+        basicStats: {
+          count: 1,
+          mean: { magnitude: 0 },
+          std: { magnitude: null },
+          min: { magnitude: 0 },
+          max: { magnitude: 0 },
+        },
+        centralTendency: { mean: 0, median: 0, mode: null },
+        variabilityMeasures: {},
+        distributionMetrics: {},
+        typeDistribution: { counts: { FLOOD: 1 }, percentages: { FLOOD: 100 } },
+      },
+      inferentialStatistics: {
+        confidenceIntervals: {},
+        hypothesisTests: {},
+        regressionAnalysis: {},
+      },
+      timeSeriesAnalysis: {
+        movingAverages: {},
+        trendAnalysis: {},
+        seasonalDecomposition: {},
+        autocorrelation: {},
+      },
+      correlationAnalysis: {
+        pearsonCorrelation: {},
+        spearmanCorrelation: {},
+        mutualInformation: {},
+      },
+      anomalyDetection: { outlierDetection: {}, anomalyStatistics: {} },
+      performanceMetrics: {},
+    };
+    const model = {
+      status: "failed",
+      reason: "model_error",
+      dataPoints: 0,
+      minimumDataPoints: 3,
+      confidence: null,
+    };
+    const predictions = {
+      earthquakePrediction: model,
+      volcanoPrediction: model,
+      stormPrediction: model,
+      floodPrediction: model,
+      wildfirePrediction: model,
+      overallRiskAssessment: {
+        status: "failed",
+        reason: "model_error",
+        overallRiskScore: null,
+        riskLevel: "UNKNOWN",
+        averageAccuracy: null,
+        confidence: null,
+        modelWeights: {},
+        recommendation: "",
+      },
+    };
+    const risk = {
+      overallRiskScore: { score: 0, level: "MINIMAL" },
+      typeRisks: {},
+      geographicRisks: [],
+      temporalRisks: {},
+      recommendations: [],
+      recommendationDetails: [],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: stats })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: predictions })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: risk })));
+    vi.stubGlobal("fetch", fetchMock);
+    const hazard = {
+      id: "h",
+      type: "FLOOD",
+      title: "f",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      timestamp: "2026-09-10T00:00:00Z",
+    };
+    expect((await getStatistics([hazard])).data.descriptiveStatistics.basicStats.count).toBe(1);
+    expect((await getPredictions([hazard])).data.overallRiskAssessment.overallRiskScore).toBeNull();
+    expect((await getRiskAssessment([hazard])).data.overallRiskScore.score).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("converts HTTP 200 malformed JSON into a contract error for all first-stage endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(new Response("{ malformed-json", { status: 200 })));
+    vi.stubGlobal("fetch", fetchMock);
+    const hazards = [
+      {
+        id: "h",
+        type: "FLOOD",
+        title: "f",
+        geometry: { type: "Point" as const, coordinates: [0, 0] },
+      },
+    ];
+
+    const calls = [
+      () => getStatistics(hazards),
+      () => getPredictions(hazards),
+      () => getRiskAssessment(hazards),
+      () => assessDataQuality(hazards),
+      () => getQualityThresholds(),
+      () => create4DPivotTable(hazards),
+      () => analyze4DTrends(hazards),
+      () => calculate4DRiskScores(hazards),
+    ];
+
+    for (const call of calls) {
+      await expect(call()).rejects.toMatchObject({
+        code: "ANALYTICS_RESPONSE_INVALID",
+        path: "response.body",
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("preserves an explicit business failure as a stable business error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ success: false, error: "sensitive-body-marker" }), {
+            status: 200,
+          }),
+        ),
+      ),
+    );
+
+    await expect(getStatistics([{ id: "h" }])).rejects.toMatchObject({
+      code: "ANALYTICS_REQUEST_FAILED",
+    });
+    await expect(getStatistics([{ id: "h" }])).rejects.toBeInstanceOf(AnalyticsBusinessError);
   });
 });
