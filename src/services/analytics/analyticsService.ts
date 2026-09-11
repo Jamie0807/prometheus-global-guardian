@@ -11,7 +11,7 @@
 
 import { requestRaw } from "../http/httpClient";
 import type { Hazard } from "../../types";
-import type { AnalysisRequest, HazardData, LegacyAnalyticsResponse } from "./analyticsTypes";
+import type { AnalysisRequest, HazardData } from "./analyticsTypes";
 import type { AnalyticsSuccess } from "./contracts/common";
 import {
   AnalyticsBusinessError,
@@ -36,13 +36,27 @@ import {
   type PivotTrendsData,
 } from "./contracts/pivot";
 import { createClientLogger } from "../../utils/logger";
+import { parseAnalyticsServiceInfo, type AnalyticsServiceInfo } from "./contracts/serviceInfo";
+import { parseQualityHistory, type QualityHistoryData } from "./contracts/qualityHistory";
+import { parseETLProcess, type ETLProcessData } from "./contracts/etl";
+import {
+  parseComprehensiveAnalysis,
+  type ComprehensiveAnalysisData,
+} from "./contracts/comprehensive";
+import {
+  parseUnifiedMerge,
+  parseUnifiedTransform,
+  type UnifiedMergeData,
+  type UnifiedTransformData,
+} from "./contracts/unified";
+import { parsePivotQuery, type PivotQueryData } from "./contracts/pivotQuery";
+import { parsePivotSummary, type PivotSummaryData } from "./contracts/pivotSummary";
 
 const API_BASE_URL = import.meta.env.VITE_PYTHON_API_URL ?? "http://localhost:8001";
 const REQUEST_TIMEOUT = 30000; // 30秒超时
 const MAX_RETRIES = 3;
 const logger = createClientLogger("analytics-service");
 
-type AnalyticsResult<T = unknown> = Omit<LegacyAnalyticsResponse<T>, "data"> & { data: T };
 type HazardProperties = Record<string, unknown>;
 type HazardInput = Partial<Hazard> & {
   populationExposed?: number | null;
@@ -139,11 +153,12 @@ export async function checkHealth(): Promise<boolean> {
 /**
  * 获取服务信息
  */
-export async function getServiceInfo(): Promise<AnalyticsResult> {
+export async function getServiceInfo(): Promise<AnalyticsServiceInfo> {
   try {
     const response = await fetchWithTimeout(`${API_BASE_URL}/`);
     if (!response.ok) throw new Error("Failed to fetch service info");
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsServiceInfo(payload);
   } catch (error: unknown) {
     logger.error("service_info_fetch_failed");
     throw error;
@@ -225,7 +240,9 @@ export async function getPredictions(
 /**
  * ETL 数据处理
  */
-export async function processETL(hazards: readonly HazardInput[]): Promise<AnalyticsResult> {
+export async function processETL(
+  hazards: readonly HazardInput[],
+): Promise<AnalyticsSuccess<ETLProcessData>> {
   try {
     const formattedData = formatHazards(hazards);
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/etl/process`, {
@@ -239,7 +256,8 @@ export async function processETL(hazards: readonly HazardInput[]): Promise<Analy
       throw new Error(`ETL API failed: ${errorText}`);
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseETLProcess);
   } catch (error: unknown) {
     logger.error("etl_processing_failed");
     throw error;
@@ -286,7 +304,7 @@ export async function getComprehensiveAnalysis(
   hazards: readonly HazardInput[],
   analysisType = "comprehensive",
   timeRange = 30,
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<ComprehensiveAnalysisData>> {
   try {
     const formattedData = formatHazards(hazards);
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/analyze`, {
@@ -304,7 +322,8 @@ export async function getComprehensiveAnalysis(
       throw new Error(`Comprehensive analysis API failed: ${errorText}`);
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseComprehensiveAnalysis);
   } catch (error: unknown) {
     logger.error("comprehensive_analysis_failed");
     throw error;
@@ -358,7 +377,7 @@ export async function assessDataQuality(
 export async function transformToUnifiedModel(
   hazards: readonly HazardInput[],
   source: string,
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<UnifiedTransformData>> {
   try {
     if (!hazards || hazards.length === 0) {
       throw new Error("没有数据可供转换");
@@ -379,8 +398,11 @@ export async function transformToUnifiedModel(
       throw new Error(`统一模型转换失败: ${errorText}`);
     }
 
-    return await response.json();
-  } catch {
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseUnifiedTransform);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsContractError || error instanceof AnalyticsBusinessError)
+      throw error;
     logger.error("unified_model_transformation_failed");
     throw new Error("统一模型转换请求失败");
   }
@@ -393,7 +415,7 @@ export async function mergeMultiSourceData(
   usgsData?: readonly unknown[],
   nasaData?: readonly unknown[],
   gdacsData?: readonly unknown[],
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<UnifiedMergeData>> {
   try {
     const response = await fetchWithRetry(`${API_BASE_URL}/api/v1/unified-model/merge`, {
       method: "POST",
@@ -410,8 +432,11 @@ export async function mergeMultiSourceData(
       throw new Error(`多数据源合并失败: ${errorText}`);
     }
 
-    return await response.json();
-  } catch {
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseUnifiedMerge);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsContractError || error instanceof AnalyticsBusinessError)
+      throw error;
     logger.error("multi_source_merge_failed");
     throw new Error("多数据源合并请求失败");
   }
@@ -437,7 +462,9 @@ export async function getQualityThresholds(): Promise<AnalyticsSuccess<QualityTh
 /**
  * 获取质量历史记录
  */
-export async function getQualityHistory(limit: number = 10): Promise<AnalyticsResult> {
+export async function getQualityHistory(
+  limit: number = 10,
+): Promise<AnalyticsSuccess<QualityHistoryData>> {
   try {
     const response = await fetchWithTimeout(
       `${API_BASE_URL}/api/v1/quality/history?limit=${limit}`,
@@ -447,7 +474,8 @@ export async function getQualityHistory(limit: number = 10): Promise<AnalyticsRe
     if (!response.ok) {
       throw new Error("Failed to fetch quality history");
     }
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parseQualityHistory);
   } catch (error) {
     logger.error("quality_history_fetch_failed");
     throw error;
@@ -565,7 +593,7 @@ export async function multiDimensionalQuery(
     types?: string[];
     severities?: string[];
   },
-): Promise<AnalyticsResult> {
+): Promise<AnalyticsSuccess<PivotQueryData>> {
   try {
     const formattedData = formatHazards(hazards);
     const request = {
@@ -586,7 +614,8 @@ export async function multiDimensionalQuery(
       throw new Error("Multi-dimensional query failed");
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parsePivotQuery);
   } catch (error) {
     logger.error("multi_dimensional_query_failed");
     throw error;
@@ -660,7 +689,9 @@ export async function calculate4DRiskScores(
 /**
  * 获取4维数据汇总统计
  */
-export async function get4DSummary(hazards: readonly HazardInput[]): Promise<AnalyticsResult> {
+export async function get4DSummary(
+  hazards: readonly HazardInput[],
+): Promise<AnalyticsSuccess<PivotSummaryData>> {
   try {
     const formattedData = formatHazards(hazards);
     const request = {
@@ -677,7 +708,8 @@ export async function get4DSummary(hazards: readonly HazardInput[]): Promise<Ana
       throw new Error("Failed to get 4D summary");
     }
 
-    return await response.json();
+    const payload = await readAnalyticsJson(response);
+    return parseAnalyticsSuccess(payload, parsePivotSummary);
   } catch (error) {
     logger.error("summary_fetch_failed");
     throw error;

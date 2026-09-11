@@ -1,5 +1,7 @@
 import type { AnalyticsSuccess } from "../../src/services/analytics/contracts/common";
 import type { PivotTrendsData } from "../../src/services/analytics/contracts/pivot";
+import type { PivotQueryData } from "../../src/services/analytics/contracts/pivotQuery";
+import type { PivotSummaryData } from "../../src/services/analytics/contracts/pivotSummary";
 import type { RiskAssessmentData } from "../../src/services/analytics/contracts/risk";
 import type { StatisticsData } from "../../src/services/analytics/contracts/statistics";
 
@@ -73,5 +75,19 @@ const invalidTemporal: AnalyticsSuccess<RiskAssessmentData> = {
 // @ts-expect-error A discriminated union must be narrowed before ready-only fields are read
 type UnnarrowedPivotRows = PivotTrendsData["all_trends"];
 
-export { invalid, invalidTemporal, statistics };
+const validPivotQuery = {
+  results: [{ metadata: { tags: ["flood", null] } }],
+  total_count: 1,
+  query_params: {
+    time_range: ["2026-09-01", "2026-09-03"],
+    regions: ["Asia-Pacific"],
+    types: ["FLOOD"],
+    severities: ["WATCH"],
+  },
+} satisfies PivotQueryData;
+
+// @ts-expect-error Pivot query and summary data are distinct contracts
+const invalidSummary: PivotSummaryData = validPivotQuery;
+
+export { invalid, invalidSummary, invalidTemporal, statistics, validPivotQuery };
 export type { UnnarrowedPivotRows };

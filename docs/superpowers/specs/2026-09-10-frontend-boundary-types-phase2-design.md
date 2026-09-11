@@ -27,16 +27,16 @@
 
 ### 2.2 Python 真实响应结构
 
-- 服务信息：根对象包含服务名称、版本、状态、描述和端点信息；端点信息是字符串键到字符串值的字典。
-- ETL：`processedData` 为记录数组，`qualityMetrics` 为质量对象，`recordsProcessed` 为非负整数。
+- 服务信息：根对象包含 `service`、`status`、`version` 和 `features`；`features` 是字符串数组。
+- ETL：`processedData` 为记录数组，可包含 `coordinates` 等嵌套 JSON 值；`qualityMetrics` 为 API 转换后的 camelCase 质量展示对象，`recordsProcessed` 为非负整数。
 - 综合分析：`statistics`、`predictions`、`riskAssessment`、`dataQuality`、`processingInfo` 和 `performance` 为固定区块；领域子对象复用第一阶段已验证类型，`processingInfo.totalRecords` 为非负整数。
 - 统一模型转换：`records` 为记录数组，`total_records` 为非负整数，`schema` 为字符串数组，`source` 为字符串。
-- 多源合并：`unified_records` 为记录数组，`total_records` 为非负整数，`source_records`、`merged_quality`、`source_quality_reports` 和 `source_comparison` 为固定对象或明确 JSON 值。
-- 质量历史：`history` 为质量报告数组，`count` 为非负整数；每条报告复用第一阶段质量报告字段并允许后端历史额外字段。
+- 多源合并：`unified_records` 为记录数组，`total_records` 为非负整数，`source_records` 为计数字典；`merged_quality` 与 `source_quality_reports` 是 `quality_monitor` 的原始 snake_case 报告，`source_comparison` 固定包含来源概览、分数字典与最佳/最差来源。
+- 质量历史：`history` 为 `quality_monitor` 的原始 snake_case 质量报告数组，`count` 为非负整数；前端边界将字段映射为明确 camelCase 类型并保留受验证的维度附加信息。
 - 多维查询：`results` 为记录数组，`total_count` 为非负整数，`query_params` 回显时间范围、区域、类型和严重性筛选。
 - 4D 汇总：包含 `total_records`、`time_range`、地域/类型/严重性分布及维度计数；时间范围天数和所有计数字典值均为非负整数。
 
-记录行只允许 JSON 标量值：`string | number | boolean | null`。未知字段可以保留在记录中，但嵌套对象、数组、非有限数字和其他值必须在边界拒绝。
+平铺记录只允许 JSON 标量值：`string | number | boolean | null`。Python 已定义会返回嵌套值的记录（例如 ETL `coordinates` 和历史维度详情）使用递归 JSON 守卫；所有数字必须有限，未知字段可以保留在已验证的记录中。
 
 ## 3. 架构与迁移
 
@@ -44,11 +44,11 @@
 
 在 `src/services/analytics/contracts/` 新增按领域拆分的解析模块：`serviceInfo.ts`、`etl.ts`、`comprehensive.ts`、`unified.ts`、`qualityHistory.ts`、`pivotQuery.ts`、`pivotSummary.ts`。解析器只依赖 `common.ts` 和第一阶段领域解析器，不依赖 React 或浏览器全局。
 
-所有固定字段使用现有守卫校验；记录数组使用共享 JSON 值解析器；动态字典键只使用安全占位路径，不能把外部键拼进用户可见错误文案。字段缺失、已出现错型、损坏 JSON 和成功响应中包含业务错误对象均抛出稳定契约错误。
+所有固定字段使用现有守卫校验；记录数组按其实际响应结构使用平铺或递归 JSON 值解析器；动态字典键只使用安全占位路径，不能把外部键拼进用户可见错误文案。字段缺失、已出现错型、损坏 JSON 和成功响应中包含业务错误对象均抛出稳定契约错误。
 
 ### 3.2 Service
 
-每个本阶段方法将 `response.json()` 结果先保存为 `unknown`，调用 `parseAnalyticsSuccess` 和对应领域解析器后返回 `AnalyticsSuccess<T>`。契约错误不重试；HTTP/网络错误继续沿用现有稳定错误语义。
+除根路径 `getServiceInfo` 外，每个本阶段方法将 `response.json()` 结果先保存为 `unknown`，调用 `parseAnalyticsSuccess` 和对应领域解析器后返回 `AnalyticsSuccess<T>`。`getServiceInfo` 的 FastAPI 根路由不使用 `{ success, data }` 外壳，直接由 `parseAnalyticsServiceInfo` 解析并返回 `AnalyticsServiceInfo`。契约错误不重试；HTTP/网络错误继续沿用现有稳定错误语义。
 
 旧 `AnalyticsResult` 仅保留给明确尚未迁移的接口；本阶段 8 个方法全部切换到明确返回类型。
 
@@ -68,7 +68,7 @@
 每个领域先写失败测试，再实现最小解析器。测试必须覆盖：
 
 - Python 真实成功结构和未知字段兼容。
-- 缺失必填字段、已出现错型、嵌套对象、字符串数字、负数/小数计数和非有限数字。
+- 缺失必填字段、已出现错型、未声明的嵌套对象、字符串数字、负数/小数计数和非有限数字。
 - 损坏 JSON、`success: false`、业务错误对象和安全错误文案。
 - 合法空记录、零计数、空历史和无数据合并。
 - 所有 8 个 Service 方法的 JSON 边界接入。

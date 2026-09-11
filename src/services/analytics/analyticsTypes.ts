@@ -9,6 +9,18 @@ export type {
   PredictionsData,
 } from "./contracts/predictions";
 export type { RiskAssessmentData } from "./contracts/risk";
+export type { AnalyticsServiceInfo } from "./contracts/serviceInfo";
+export type { QualityHistoryData } from "./contracts/qualityHistory";
+export type { ETLProcessData } from "./contracts/etl";
+export type { ComprehensiveAnalysisData } from "./contracts/comprehensive";
+export type {
+  SourceComparisonData,
+  UnifiedMergeData,
+  UnifiedTransformData,
+} from "./contracts/unified";
+export type { AnalyticsJsonTreeRecord, AnalyticsJsonTreeValue } from "./contracts/records";
+export type { PivotQueryData } from "./contracts/pivotQuery";
+export type { PivotSummaryData } from "./contracts/pivotSummary";
 
 export type HazardCoordinates = [longitude: number, latitude: number];
 

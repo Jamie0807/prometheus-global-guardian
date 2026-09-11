@@ -1,9 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsContractError } from "../src/services/analytics/contracts/common";
+import { parseComprehensiveAnalysis } from "../src/services/analytics/contracts/comprehensive";
 import { parsePredictions } from "../src/services/analytics/contracts/predictions";
 import { parseRiskAssessment } from "../src/services/analytics/contracts/risk";
 import { parseStatistics } from "../src/services/analytics/contracts/statistics";
+import { parseETLProcess } from "../src/services/analytics/contracts/etl";
+import {
+  parseUnifiedMerge,
+  parseUnifiedTransform,
+} from "../src/services/analytics/contracts/unified";
+import {
+  parseAnalyticsJsonRecord,
+  parseAnalyticsJsonRecords,
+} from "../src/services/analytics/contracts/records";
+import { parseAnalyticsServiceInfo } from "../src/services/analytics/contracts/serviceInfo";
+import { parseQualityHistory } from "../src/services/analytics/contracts/qualityHistory";
 import {
   parseQualityReport,
   parseQualityThresholds,
@@ -13,6 +25,8 @@ import {
   parsePivotRiskScores,
   parsePivotTrends,
 } from "../src/services/analytics/contracts/pivot";
+import { parsePivotQuery } from "../src/services/analytics/contracts/pivotQuery";
+import { parsePivotSummary } from "../src/services/analytics/contracts/pivotSummary";
 import {
   analyze4DTrends,
   assessDataQuality,
@@ -35,6 +49,94 @@ const prediction = (status: "ready" | "insufficient_data" | "failed") => ({
   ...(status === "ready" ? { accuracy: 80, predictions: { next7Days: [0, 1, 2] } } : {}),
 });
 
+const qualityHistoryReport = (source: string, recordCount = 0) => ({
+  source,
+  timestamp: "2026-09-11T00:00:00.000Z",
+  record_count: recordCount,
+  overall_score: 0,
+  overall_status: "pass",
+  dimensions: {},
+  issues: [],
+  recommendations: [],
+});
+
+const comprehensiveData = () => ({
+  statistics: {
+    descriptiveStatistics: {
+      basicStats: { count: 0, mean: {}, std: {}, min: {}, max: {} },
+      centralTendency: {},
+      variabilityMeasures: {},
+      distributionMetrics: {},
+      typeDistribution: { counts: {}, percentages: {} },
+    },
+    inferentialStatistics: {
+      confidenceIntervals: {},
+      hypothesisTests: {},
+      regressionAnalysis: {},
+    },
+    timeSeriesAnalysis: {
+      movingAverages: {},
+      trendAnalysis: {},
+      seasonalDecomposition: {},
+      autocorrelation: {},
+    },
+    correlationAnalysis: {
+      pearsonCorrelation: {},
+      spearmanCorrelation: {},
+      mutualInformation: {},
+    },
+    anomalyDetection: { outlierDetection: {}, anomalyStatistics: {} },
+    performanceMetrics: {},
+  },
+  predictions: {
+    earthquakePrediction: prediction("failed"),
+    volcanoPrediction: prediction("failed"),
+    stormPrediction: prediction("failed"),
+    floodPrediction: prediction("failed"),
+    wildfirePrediction: prediction("failed"),
+    overallRiskAssessment: {
+      status: "failed",
+      reason: "model_error",
+      overallRiskScore: null,
+      riskLevel: "UNKNOWN",
+      averageAccuracy: null,
+      confidence: null,
+      modelWeights: {},
+      recommendation: "",
+    },
+  },
+  riskAssessment: {
+    overallRiskScore: { score: 0, level: "MINIMAL" },
+    typeRisks: {},
+    geographicRisks: [],
+    temporalRisks: {},
+    recommendations: [],
+    recommendationDetails: [],
+  },
+  dataQuality: {
+    overallScore: 0,
+    targetScore: 95,
+    detailChecks: {
+      completeness: 0,
+      accuracy: 0,
+      consistency: 0,
+      timeliness: 0,
+      validity: 0,
+    },
+    totalRecords: 0,
+    status: "PASS",
+    issues: [],
+    recommendations: [],
+  },
+  processingInfo: { totalRecords: 0, timeRange: 0, analysisType: "comprehensive" },
+  performance: {
+    processingTimeMs: 0,
+    recordsProcessed: 0,
+    parallelExecution: true,
+    cacheEnabled: true,
+  },
+});
+
 describe("analytics domain contracts", () => {
   const qualityReport = (overallScore: number) => ({
     overallScore,
@@ -50,6 +152,427 @@ describe("analytics domain contracts", () => {
     status: "PASS",
     issues: [],
     recommendations: [],
+  });
+
+  it("parses the real comprehensive analysis shape and preserves zero values", () => {
+    const parsed = parseComprehensiveAnalysis(comprehensiveData());
+
+    expect(parsed.statistics.descriptiveStatistics.basicStats.count).toBe(0);
+    expect(parsed.predictions.overallRiskAssessment.status).toBe("failed");
+    expect(parsed.riskAssessment.temporalRisks).toBeNull();
+    expect(parsed.dataQuality.totalRecords).toBe(0);
+    expect(parsed.processingInfo).toEqual({
+      totalRecords: 0,
+      timeRange: 0,
+      analysisType: "comprehensive",
+    });
+    expect(parsed.performance).toEqual({
+      processingTimeMs: 0,
+      recordsProcessed: 0,
+      parallelExecution: true,
+      cacheEnabled: true,
+    });
+  });
+
+  it("requires every comprehensive analysis block", () => {
+    const missingDataQuality = comprehensiveData();
+    Reflect.deleteProperty(missingDataQuality, "dataQuality");
+
+    expect(() => parseComprehensiveAnalysis(missingDataQuality)).toThrowError(
+      AnalyticsContractError,
+    );
+    expect(() =>
+      parseComprehensiveAnalysis({
+        ...comprehensiveData(),
+        statistics: { descriptiveStatistics: {} },
+      }),
+    ).toThrowError(AnalyticsContractError);
+  });
+
+  it("validates comprehensive processing information", () => {
+    const valid = comprehensiveData();
+    for (const processingInfo of [
+      { ...valid.processingInfo, totalRecords: -1 },
+      { ...valid.processingInfo, totalRecords: 0.5 },
+      { ...valid.processingInfo, timeRange: -1 },
+      { ...valid.processingInfo, timeRange: Number.NaN },
+      { ...valid.processingInfo, analysisType: 1 },
+    ]) {
+      expect(() => parseComprehensiveAnalysis({ ...valid, processingInfo })).toThrowError(
+        AnalyticsContractError,
+      );
+    }
+  });
+
+  it("validates comprehensive performance metrics and flags", () => {
+    const valid = comprehensiveData();
+    for (const performance of [
+      { ...valid.performance, processingTimeMs: -1 },
+      { ...valid.performance, processingTimeMs: "0" },
+      { ...valid.performance, processingTimeMs: Number.POSITIVE_INFINITY },
+      { ...valid.performance, recordsProcessed: -1 },
+      { ...valid.performance, recordsProcessed: 0.5 },
+      { ...valid.performance, parallelExecution: 1 },
+      { ...valid.performance, cacheEnabled: "yes" },
+    ]) {
+      expect(() => parseComprehensiveAnalysis({ ...valid, performance })).toThrowError(
+        AnalyticsContractError,
+      );
+    }
+  });
+
+  it("parses ETL records with nested JSON and preserves zero counts", () => {
+    const result = parseETLProcess({
+      processedData: [
+        {
+          id: "event-1",
+          coordinates: [120, 30],
+          metadata: { verified: true, tags: ["flood", null], depth: 0 },
+        },
+      ],
+      qualityMetrics: { ...qualityReport(0), totalRecords: 1 },
+      recordsProcessed: 1,
+    });
+
+    expect(result).toEqual({
+      processedData: [
+        {
+          id: "event-1",
+          coordinates: [120, 30],
+          metadata: { verified: true, tags: ["flood", null], depth: 0 },
+        },
+      ],
+      qualityMetrics: { ...qualityReport(0), totalRecords: 1 },
+      recordsProcessed: 1,
+    });
+    expect(
+      parseETLProcess({
+        processedData: [],
+        qualityMetrics: qualityReport(0),
+        recordsProcessed: 0,
+      }).recordsProcessed,
+    ).toBe(0);
+  });
+
+  it("parses empty and nested unified transform responses", () => {
+    expect(
+      parseUnifiedTransform({ records: [], total_records: 0, schema: [], source: "USGS" }),
+    ).toEqual({ records: [], total_records: 0, schema: [], source: "USGS" });
+
+    expect(
+      parseUnifiedTransform({
+        records: [{ coordinates: [120, 30], properties: { labels: ["watch"] } }],
+        total_records: 1,
+        schema: ["coordinates", "properties"],
+        source: "GDACS",
+      }).records[0],
+    ).toEqual({ coordinates: [120, 30], properties: { labels: ["watch"] } });
+  });
+
+  it("parses merge quality reports and the Python source comparison shape", () => {
+    const mergedQuality = qualityHistoryReport("MERGED");
+    const result = parseUnifiedMerge({
+      unified_records: [],
+      total_records: 0,
+      source_records: { USGS: 0, NASA: 0, GDACS: 0 },
+      merged_quality: mergedQuality,
+      source_quality_reports: [],
+      source_comparison: {
+        sources: [],
+        average_scores: {},
+        best_source: null,
+        worst_source: null,
+      },
+    });
+
+    expect(result).toMatchObject({
+      total_records: 0,
+      source_records: { USGS: 0, NASA: 0, GDACS: 0 },
+      merged_quality: { source: "MERGED", recordCount: 0, overallScore: 0 },
+      source_quality_reports: [],
+      source_comparison: {
+        sources: [],
+        average_scores: {},
+        best_source: null,
+        worst_source: null,
+      },
+    });
+
+    expect(
+      parseUnifiedMerge({
+        unified_records: [{ coordinates: [120, 30] }],
+        total_records: 1,
+        source_records: { USGS: 1 },
+        merged_quality: qualityHistoryReport("MERGED", 1),
+        source_quality_reports: [qualityHistoryReport("USGS", 1)],
+        source_comparison: {
+          sources: [{ source: "USGS", score: 0.95, status: "pass", record_count: 1 }],
+          average_scores: { USGS: 0.95 },
+          best_source: "USGS",
+          worst_source: "USGS",
+        },
+      }).source_comparison,
+    ).toEqual({
+      sources: [{ source: "USGS", score: 0.95, status: "pass", record_count: 1 }],
+      average_scores: { USGS: 0.95 },
+      best_source: "USGS",
+      worst_source: "USGS",
+    });
+  });
+
+  it("normalizes Python's empty source comparison result", () => {
+    expect(
+      parseUnifiedMerge({
+        unified_records: [],
+        total_records: 0,
+        source_records: { USGS: 0, NASA: 0, GDACS: 0 },
+        merged_quality: qualityHistoryReport("MERGED"),
+        source_quality_reports: [],
+        source_comparison: {},
+      }).source_comparison,
+    ).toEqual({
+      sources: [],
+      average_scores: {},
+      best_source: null,
+      worst_source: null,
+    });
+  });
+
+  it("rejects malformed ETL quality metrics and nested non-finite numbers", () => {
+    expect(() =>
+      parseETLProcess({ processedData: [], qualityMetrics: {}, recordsProcessed: 1 }),
+    ).toThrow(AnalyticsContractError);
+    expect(() =>
+      parseETLProcess({
+        processedData: [{ metadata: { measurements: [1, Number.NaN] } }],
+        qualityMetrics: qualityReport(95),
+        recordsProcessed: 1,
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.processedData.0.[key].[key].1" }));
+    expect(() =>
+      parseUnifiedTransform({
+        records: [{ coordinates: [120, Number.POSITIVE_INFINITY] }],
+        total_records: 1,
+        schema: ["coordinates"],
+        source: "USGS",
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.records.0.[key].1" }));
+  });
+
+  it("requires non-negative integer counts across ETL and unified data", () => {
+    expect(() =>
+      parseETLProcess({
+        processedData: [],
+        qualityMetrics: qualityReport(95),
+        recordsProcessed: "0",
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.recordsProcessed" }));
+    expect(() =>
+      parseUnifiedTransform({ records: [], total_records: -1, schema: [], source: "USGS" }),
+    ).toThrowError(expect.objectContaining({ path: "data.total_records" }));
+    expect(() =>
+      parseUnifiedTransform({ records: [], total_records: 0.5, schema: [], source: "USGS" }),
+    ).toThrowError(expect.objectContaining({ path: "data.total_records" }));
+
+    const validMerge = {
+      unified_records: [],
+      total_records: 0,
+      source_records: { USGS: 0 },
+      merged_quality: qualityHistoryReport("MERGED"),
+      source_quality_reports: [],
+      source_comparison: {
+        sources: [],
+        average_scores: {},
+        best_source: null,
+        worst_source: null,
+      },
+    };
+    expect(() => parseUnifiedMerge({ ...validMerge, source_records: { USGS: -1 } })).toThrowError(
+      expect.objectContaining({ path: "data.source_records.[key]" }),
+    );
+    expect(() => parseUnifiedMerge({ ...validMerge, source_records: { USGS: 0.5 } })).toThrowError(
+      expect.objectContaining({ path: "data.source_records.[key]" }),
+    );
+    expect(() => parseUnifiedMerge({ ...validMerge, total_records: "0" })).toThrowError(
+      expect.objectContaining({ path: "data.total_records" }),
+    );
+  });
+
+  it("validates unified fields and source comparison values", () => {
+    expect(() => parseUnifiedTransform({ records: [], total_records: 0, source: "USGS" })).toThrow(
+      AnalyticsContractError,
+    );
+    expect(() => parseUnifiedTransform({ records: [], total_records: 0, schema: [] })).toThrow(
+      AnalyticsContractError,
+    );
+
+    const validMerge = {
+      unified_records: [],
+      total_records: 0,
+      source_records: {},
+      merged_quality: qualityHistoryReport("MERGED"),
+      source_quality_reports: [],
+      source_comparison: {
+        sources: [],
+        average_scores: {},
+        best_source: null,
+        worst_source: null,
+      },
+    };
+    expect(() =>
+      parseUnifiedMerge({
+        ...validMerge,
+        source_comparison: {
+          ...validMerge.source_comparison,
+          sources: [{ source: "USGS", score: 1, status: "pass", record_count: -1 }],
+        },
+      }),
+    ).toThrowError(
+      expect.objectContaining({ path: "data.source_comparison.sources.0.record_count" }),
+    );
+    expect(() =>
+      parseUnifiedMerge({
+        ...validMerge,
+        source_comparison: {
+          ...validMerge.source_comparison,
+          average_scores: { USGS: Number.NaN },
+        },
+      }),
+    ).toThrowError(
+      expect.objectContaining({ path: "data.source_comparison.average_scores.[key]" }),
+    );
+    expect(() =>
+      parseUnifiedMerge({
+        ...validMerge,
+        source_comparison: {
+          sources: [{ source: "USGS", score: 1.01, status: "pass", record_count: 1 }],
+          average_scores: { USGS: 1.01 },
+          best_source: "USGS",
+          worst_source: "USGS",
+        },
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.source_comparison.sources.0.score" }));
+    expect(() =>
+      parseUnifiedMerge({
+        ...validMerge,
+        source_comparison: {
+          sources: [],
+          average_scores: { USGS: -0.01 },
+          best_source: null,
+          worst_source: null,
+        },
+      }),
+    ).toThrowError(
+      expect.objectContaining({ path: "data.source_comparison.average_scores.[key]" }),
+    );
+  });
+
+  it("parses the direct Python service info response", () => {
+    expect(
+      parseAnalyticsServiceInfo({
+        service: "Prometheus",
+        status: "running",
+        version: "1",
+        features: [],
+      }),
+    ).toMatchObject({ status: "running", features: [] });
+    expect(() =>
+      parseAnalyticsServiceInfo({
+        service: "Prometheus",
+        status: "running",
+        version: "1",
+        features: [1],
+      }),
+    ).toThrowError(AnalyticsContractError);
+  });
+
+  it("restricts shared JSON records to finite scalar values", () => {
+    expect(
+      parseAnalyticsJsonRecord(
+        { event: "created", score: 0, active: false, note: null },
+        "data.history.0",
+      ),
+    ).toEqual({ event: "created", score: 0, active: false, note: null });
+    expect(parseAnalyticsJsonRecords([], "data.history")).toEqual([]);
+    expect(() => parseAnalyticsJsonRecord({ event: { nested: true } }, "data.history.0")).toThrow(
+      AnalyticsContractError,
+    );
+    expect(() => parseAnalyticsJsonRecord({ event: ["nested"] }, "data.history.0")).toThrow(
+      AnalyticsContractError,
+    );
+    expect(() => parseAnalyticsJsonRecord({ score: Number.NaN }, "data.history.0")).toThrow(
+      AnalyticsContractError,
+    );
+  });
+
+  it("parses the snake_case quality history returned by Python", () => {
+    const historyReport = {
+      source: "USGS",
+      timestamp: "2026-09-11T00:00:00.000Z",
+      record_count: 1,
+      overall_score: 0.95,
+      overall_status: "pass",
+      dimensions: {
+        completeness: {
+          score: 1,
+          status: "pass",
+          field_completeness: { id: 1 },
+          missing_fields: [],
+          issues: [],
+          recommendations: [],
+        },
+      },
+      issues: [],
+      recommendations: [],
+    };
+
+    expect(parseQualityHistory({ history: [historyReport], count: 1 })).toMatchObject({
+      history: [{ source: "USGS", recordCount: 1, overallScore: 0.95 }],
+      count: 1,
+    });
+  });
+
+  it("reports an indexed path for an invalid quality history row", () => {
+    expect(() =>
+      parseQualityHistory({
+        history: [{ source: "USGS", dimensions: {} }],
+        count: 1,
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.history.0.timestamp" }));
+  });
+
+  it("rejects non-finite nested quality history details with a safe indexed path", () => {
+    expect(() =>
+      parseQualityHistory({
+        history: [
+          {
+            source: "USGS",
+            timestamp: "2026-09-11T00:00:00.000Z",
+            record_count: 1,
+            overall_score: 0.95,
+            overall_status: "pass",
+            dimensions: {
+              completeness: {
+                score: 1,
+                status: "pass",
+                field_completeness: { id: Number.NaN },
+              },
+            },
+            issues: [],
+            recommendations: [],
+          },
+        ],
+        count: 1,
+      }),
+    ).toThrowError(
+      expect.objectContaining({ path: "data.history.0.dimensions.[key].[key].[key]" }),
+    );
+  });
+
+  it("parses empty quality history and validates its count", () => {
+    expect(parseQualityHistory({ history: [], count: 0 })).toEqual({ history: [], count: 0 });
+    expect(() => parseQualityHistory({ history: [], count: -1 })).toThrow(AnalyticsContractError);
+    expect(() => parseQualityHistory({ history: [], count: 1.5 })).toThrow(AnalyticsContractError);
   });
 
   it("parses statistics with mapped columns, nulls, and zero values", () => {
@@ -738,6 +1261,161 @@ describe("analytics domain contracts", () => {
         summary: { ...pivot.summary, type_distribution: { FLOOD: 1.5 } },
       }),
     ).toThrowError(expect.objectContaining({ path: "data.summary.type_distribution.[key]" }));
+  });
+
+  it("parses empty and filtered pivot queries with recursive JSON records", () => {
+    expect(
+      parsePivotQuery({
+        results: [],
+        total_count: 0,
+        query_params: { time_range: null, regions: null, types: null, severities: null },
+      }),
+    ).toEqual({
+      results: [],
+      total_count: 0,
+      query_params: { time_range: null, regions: null, types: null, severities: null },
+    });
+
+    expect(
+      parsePivotQuery({
+        results: [
+          {
+            id: "event-1",
+            coordinates: [120, 30],
+            metadata: { verified: true, tags: ["flood", null] },
+          },
+        ],
+        total_count: 1,
+        query_params: {
+          time_range: ["2026-09-01", "2026-09-03"],
+          regions: ["Asia-Pacific"],
+          types: ["FLOOD"],
+          severities: ["WATCH"],
+        },
+      }),
+    ).toEqual({
+      results: [
+        {
+          id: "event-1",
+          coordinates: [120, 30],
+          metadata: { verified: true, tags: ["flood", null] },
+        },
+      ],
+      total_count: 1,
+      query_params: {
+        time_range: ["2026-09-01", "2026-09-03"],
+        regions: ["Asia-Pacific"],
+        types: ["FLOOD"],
+        severities: ["WATCH"],
+      },
+    });
+  });
+
+  it("rejects malformed pivot query counts, records, and filter echoes", () => {
+    const validQuery = {
+      results: [],
+      total_count: 0,
+      query_params: { time_range: null, regions: null, types: null, severities: null },
+    };
+
+    expect(() => parsePivotQuery({ ...validQuery, total_count: "0" })).toThrowError(
+      expect.objectContaining({ path: "data.total_count" }),
+    );
+    expect(() => parsePivotQuery({ ...validQuery, total_count: -1 })).toThrowError(
+      expect.objectContaining({ path: "data.total_count" }),
+    );
+    expect(() => parsePivotQuery({ ...validQuery, total_count: 0.5 })).toThrowError(
+      expect.objectContaining({ path: "data.total_count" }),
+    );
+    expect(() => parsePivotQuery({ ...validQuery, results: [null] })).toThrowError(
+      expect.objectContaining({ path: "data.results.0" }),
+    );
+    expect(() =>
+      parsePivotQuery({
+        ...validQuery,
+        results: [{ metadata: { score: Number.NaN } }],
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.results.0.[key].[key]" }));
+
+    for (const time_range of [[], ["2026-09-01"], ["2026-09-01", "2026-09-03", "extra"], 1]) {
+      expect(() =>
+        parsePivotQuery({
+          ...validQuery,
+          query_params: { ...validQuery.query_params, time_range },
+        }),
+      ).toThrowError(expect.objectContaining({ path: "data.query_params.time_range" }));
+    }
+    expect(() =>
+      parsePivotQuery({
+        ...validQuery,
+        query_params: { ...validQuery.query_params, regions: ["Asia", 1] },
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.query_params.regions.1" }));
+  });
+
+  it("parses the direct Python pivot summary and preserves zero counts", () => {
+    expect(
+      parsePivotSummary({
+        total_records: 0,
+        time_range: { start: "NaT", end: "NaT", days: 0 },
+        geographic_distribution: { regions: {}, continents: {} },
+        type_distribution: {},
+        severity_distribution: {},
+        dimensions: { time_unique: 0, geo_unique: 0, type_unique: 0, severity_unique: 0 },
+      }),
+    ).toEqual({
+      total_records: 0,
+      time_range: { start: "NaT", end: "NaT", days: 0 },
+      geographic_distribution: { regions: {}, continents: {} },
+      type_distribution: {},
+      severity_distribution: {},
+      dimensions: { time_unique: 0, geo_unique: 0, type_unique: 0, severity_unique: 0 },
+    });
+  });
+
+  it("requires nonnegative integer counts throughout the direct pivot summary", () => {
+    const validSummary = {
+      total_records: 1,
+      time_range: { start: "2026-09-01", end: "2026-09-03", days: 2 },
+      geographic_distribution: { regions: { Asia: 1 }, continents: { Asia: 1 } },
+      type_distribution: { FLOOD: 1 },
+      severity_distribution: { WATCH: 1 },
+      dimensions: { time_unique: 1, geo_unique: 1, type_unique: 1, severity_unique: 1 },
+    };
+
+    expect(() => parsePivotSummary({ ...validSummary, total_records: "1" })).toThrowError(
+      expect.objectContaining({ path: "data.total_records" }),
+    );
+    expect(() =>
+      parsePivotSummary({
+        ...validSummary,
+        time_range: { ...validSummary.time_range, days: -1 },
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.time_range.days" }));
+    expect(() =>
+      parsePivotSummary({
+        ...validSummary,
+        geographic_distribution: {
+          ...validSummary.geographic_distribution,
+          regions: { Asia: 0.5 },
+        },
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.geographic_distribution.regions.[key]" }));
+    expect(() =>
+      parsePivotSummary({
+        ...validSummary,
+        severity_distribution: { WATCH: -1 },
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.severity_distribution.[key]" }));
+    expect(() =>
+      parsePivotSummary({
+        ...validSummary,
+        dimensions: { ...validSummary.dimensions, geo_unique: 0.5 },
+      }),
+    ).toThrowError(expect.objectContaining({ path: "data.dimensions.geo_unique" }));
+    expect(() =>
+      parsePivotSummary({ ...validSummary, time_range: ["2026-09-01", "2026-09-03"] }),
+    ).toThrowError(expect.objectContaining({ path: "data.time_range" }));
   });
 
   it("parses quality and 4D payloads at their service JSON boundaries", async () => {
