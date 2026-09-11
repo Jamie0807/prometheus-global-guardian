@@ -3,11 +3,25 @@ import { ServiceError } from "../http/serviceError";
 
 let authorized = false;
 
+function parseAuthorizeResponse(value: unknown): { authorized: true } {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    (value as { authorized?: unknown }).authorized !== true
+  ) {
+    throw new ServiceError("Authorization response is invalid", "invalid_response");
+  }
+
+  return { authorized: true };
+}
+
 export async function authorize(): Promise<void> {
-  await requestJson<{ authorized: boolean }>("/api/authorize", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
+  parseAuthorizeResponse(
+    await requestJson("/api/authorize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
   authorized = true;
 }
 

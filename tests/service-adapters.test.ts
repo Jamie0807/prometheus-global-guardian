@@ -9,6 +9,12 @@ import {
 } from "../src/services/hazards/hazardAdapters";
 
 describe("hazard adapters", () => {
+  it("returns an empty list for non-object public source payloads", () => {
+    expect(adaptUSGSResponse(null)).toEqual([]);
+    expect(adaptNASAResponse("invalid-nasa-payload")).toEqual([]);
+    expect(adaptGDACSResponse([])).toEqual([]);
+  });
+
   it("maps NASA categories and titles to stable hazard types", () => {
     expect(mapNASACategoryToType("Wildfires")).toBe("WILDFIRE");
     expect(mapNASACategoryToType("Unknown category")).toBe("UNKNOWN");
@@ -36,6 +42,30 @@ describe("hazard adapters", () => {
     });
   });
 
+  it("keeps only USGS records with an id, geometry, and finite coordinates", () => {
+    const validFeature = {
+      id: "usgs-valid",
+      properties: { title: "M 4.5 - Test", mag: 4.5, time: 0 },
+      geometry: { type: "Point", coordinates: [1, 2] },
+    };
+
+    const hazards = adaptUSGSResponse({
+      features: [
+        validFeature,
+        { ...validFeature, id: undefined },
+        { ...validFeature, id: "usgs-no-geometry", geometry: undefined },
+        {
+          ...validFeature,
+          id: "usgs-invalid-coordinates",
+          geometry: { type: "Point", coordinates: [1, Number.POSITIVE_INFINITY] },
+        },
+      ],
+    });
+
+    expect(hazards).toHaveLength(1);
+    expect(hazards[0]?.id).toBe("usgs-valid");
+  });
+
   it("skips NASA events without geometry and uses the latest geometry", () => {
     const hazards = adaptNASAResponse({
       events: [
@@ -51,6 +81,31 @@ describe("hazard adapters", () => {
 
     expect(hazards).toHaveLength(1);
     expect(hazards[0]).toMatchObject({ id: "nasa-2", type: "FLOOD", source: "NASA EONET" });
+  });
+
+  it("keeps only NASA records with an id, geometry, and finite coordinates", () => {
+    const validEvent = {
+      id: "nasa-valid",
+      title: "River event",
+      categories: [{ title: "Floods" }],
+      geometry: [{ type: "Point", coordinates: [1, 2], date: "2024-01-01" }],
+    };
+
+    const hazards = adaptNASAResponse({
+      events: [
+        validEvent,
+        { ...validEvent, id: undefined },
+        { ...validEvent, id: "nasa-no-geometry", geometry: [] },
+        {
+          ...validEvent,
+          id: "nasa-invalid-coordinates",
+          geometry: [{ type: "Point", coordinates: [Number.NaN, 2] }],
+        },
+      ],
+    });
+
+    expect(hazards).toHaveLength(1);
+    expect(hazards[0]?.id).toBe("nasa-valid");
   });
 
   it("skips GDACS records without geometry and maps severity", () => {
@@ -71,5 +126,28 @@ describe("hazard adapters", () => {
       severity: "WATCH",
       geometry: { coordinates: [3, 4] },
     });
+  });
+
+  it("keeps only GDACS records with an id, geometry, and finite coordinates", () => {
+    const validFeature = {
+      geometry: { type: "Point", coordinates: [3, 4] },
+      properties: { eventid: 42, name: "Flood", alertlevel: "Orange" },
+    };
+
+    const hazards = adaptGDACSResponse({
+      features: [
+        validFeature,
+        { ...validFeature, properties: { name: "Missing id" } },
+        { ...validFeature, geometry: undefined, properties: { eventid: 43 } },
+        {
+          ...validFeature,
+          geometry: { type: "Point", coordinates: [3, Number.NEGATIVE_INFINITY] },
+          properties: { eventid: 44 },
+        },
+      ],
+    });
+
+    expect(hazards).toHaveLength(1);
+    expect(hazards[0]?.id).toBe("gdacs-42");
   });
 });

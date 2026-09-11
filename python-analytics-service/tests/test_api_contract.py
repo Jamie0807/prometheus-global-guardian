@@ -11,7 +11,7 @@ SERVICE_ROOT = Path(__file__).resolve().parents[1]
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.schemas.requests import AnalysisRequest, QualityCheckRequest, UnifiedDataRequest
+from app.schemas.requests import AnalysisRequest, HazardData, QualityCheckRequest, UnifiedDataRequest
 from app.services.analytics_service import AnalyticsService
 from app.services.pivot_service import PivotService
 
@@ -49,6 +49,27 @@ class AnalysisRequestContractTests(unittest.TestCase):
         for payload in invalid_requests:
             with self.subTest(payload=payload), self.assertRaises(ValidationError):
                 AnalysisRequest(**payload)
+
+    def test_rejects_non_finite_magnitude_and_fractional_population(self):
+        for overrides in (
+            {"magnitude": float("nan")},
+            {"magnitude": float("inf")},
+            {"populationExposed": 1.5},
+        ):
+            with self.subTest(overrides=overrides), self.assertRaises(ValidationError):
+                HazardData.model_validate({**HAZARD, **overrides})
+
+    def test_rejects_non_json_numbers_in_hazard_fields(self):
+        for overrides in (
+            {"coordinates": ["116.4", 39.9]},
+            {"coordinates": [True, 39.9]},
+            {"magnitude": "4.5"},
+            {"magnitude": True},
+            {"populationExposed": "1000"},
+            {"populationExposed": True},
+        ):
+            with self.subTest(overrides=overrides), self.assertRaises(ValidationError):
+                HazardData.model_validate({**HAZARD, **overrides})
 
     def test_rejects_invalid_4d_parameters_and_source_models(self):
         for overrides in ({"time_dim": "invalid"}, {"geo_dim": "invalid"}, {"aggfunc": "median"}, {"time_range": ["2026-09-01T00:00:00.000Z"]}, {"time_window": 0}):

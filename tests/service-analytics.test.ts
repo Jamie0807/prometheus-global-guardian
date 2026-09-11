@@ -453,24 +453,22 @@ describe("analytics service", () => {
     });
   });
 
-  it("does not coerce invalid numeric values into zero", () => {
-    const result = formatHazards([
-      {
-        id: "hazard-invalid-number",
-        geometry: { type: "Point", coordinates: [1, 2] },
-        magnitude: "" as unknown as number,
-        populationExposed: false,
-        properties: {
-          magnitude: " " as unknown as number,
-          populationExposed: [] as unknown as number,
+  it.each([
+    ["a malformed coordinate array", { geometry: { type: "Point", coordinates: [1] } }],
+    ["a malformed property coordinate array", { properties: { coordinates: ["1", 2] } }],
+    ["a non-finite magnitude", { magnitude: Number.NaN }],
+    ["an infinite exposed population", { populationExposed: Number.POSITIVE_INFINITY }],
+    ["a numeric string magnitude", { magnitude: "1" as unknown as number }],
+    ["a boolean exposed population", { populationExposed: false as unknown as number }],
+  ])("rejects %s instead of silently applying a request fallback", (_caseName, invalidValue) => {
+    expect(() =>
+      formatHazards([
+        {
+          id: "hazard-invalid-value",
+          ...invalidValue,
         },
-      },
-    ]);
-
-    expect(result[0]).toMatchObject({
-      magnitude: null,
-      populationExposed: null,
-    });
+      ]),
+    ).toThrow(AnalyticsContractError);
   });
 
   it("supports the complete 4D AnalysisRequest contract", () => {

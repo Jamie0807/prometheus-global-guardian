@@ -23,7 +23,7 @@
     "test:unit": "pnpm run test:bff && pnpm run test:services",
     "test:component": "./scripts/with-node-version.sh vitest run --config vitest.component.config.ts",
     "test:e2e": "./scripts/with-node-version.sh playwright test",
-    "test:python": "cd python-analytics-service && python -m unittest discover -s tests -p 'test_*.py'",
+    "test:python": "./scripts/test-python.sh",
     "test:baseline": "pnpm run lint && pnpm run format:check && pnpm run typecheck:client && pnpm run typecheck:server && pnpm run typecheck:contracts && pnpm run test:unit && pnpm run test:component && pnpm run test:e2e && pnpm run build",
     "test:services": "./scripts/with-node-version.sh vitest run",
     "typecheck:client": "./scripts/with-node-version.sh tsc --noEmit -p tsconfig.app.json",

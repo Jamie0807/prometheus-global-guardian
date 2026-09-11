@@ -127,15 +127,15 @@ export async function requestText(
   return response.text();
 }
 
-export async function requestJson<T>(
+export async function requestJson(
   input: RequestInfo | URL,
   init?: RequestInit,
   options?: HttpRequestOptions,
-): Promise<T> {
+): Promise<unknown> {
   const responseText = await requestText(input, init, options);
 
   try {
-    return JSON.parse(responseText) as T;
+    return JSON.parse(responseText);
   } catch (error: unknown) {
     throw new ServiceError("Response body is not valid JSON", "invalid_json", { cause: error });
   }

@@ -14,7 +14,9 @@ describe("HTTP service client", () => {
       vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 })),
     );
 
-    await expect(requestJson<{ ok: boolean }>("/api/test")).resolves.toEqual({ ok: true });
+    const payload: unknown = await requestJson("/api/test");
+
+    expect(isOkPayload(payload) && payload.ok).toBe(true);
   });
 
   it("returns successful text and stream responses", async () => {
@@ -123,9 +125,9 @@ describe("HTTP service client", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      requestJson<{ ok: boolean }>("/api/test", undefined, { retries: 2 }),
-    ).resolves.toEqual({ ok: true });
+    const payload: unknown = await requestJson("/api/test", undefined, { retries: 2 });
+
+    expect(isOkPayload(payload) && payload.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -141,3 +143,7 @@ describe("HTTP service client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+function isOkPayload(value: unknown): value is { ok: true } {
+  return typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === true;
+}

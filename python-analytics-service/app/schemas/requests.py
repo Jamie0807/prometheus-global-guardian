@@ -26,6 +26,26 @@ class HazardData(BaseModel):
     source: str = Field(default="DisasterAWARE", min_length=1, max_length=64)
     populationExposed: int | None = Field(default=None, ge=0, le=1_000_000_000)
 
+    @field_validator("coordinates", mode="before")
+    @classmethod
+    def validate_coordinate_input_types(cls, value: object) -> object:
+        if not isinstance(value, list) or any(
+            isinstance(coordinate, bool)
+            or not isinstance(coordinate, (int, float))
+            for coordinate in value
+        ):
+            raise ValueError("coordinates must contain JSON numbers")
+        return value
+
+    @field_validator("magnitude", "populationExposed", mode="before")
+    @classmethod
+    def validate_numeric_input_types(cls, value: object) -> object:
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, (int, float))
+        ):
+            raise ValueError("numeric fields must contain JSON numbers")
+        return value
+
     @field_validator("id", "type", "title", "timestamp", "severity", "source")
     @classmethod
     def validate_text_fields(cls, value: str | None) -> str | None:

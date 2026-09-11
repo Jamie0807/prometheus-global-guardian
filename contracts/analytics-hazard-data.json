@@ -1,0 +1,265 @@
+{
+  "valid": {
+    "complete": {
+      "id": "hazard-contract-1",
+      "type": "FLOOD",
+      "title": "Contract flood event",
+      "coordinates": [116.4, 39.9],
+      "timestamp": "2026-09-11T00:00:00.000Z",
+      "magnitude": 0,
+      "severity": "WATCH",
+      "source": "DisasterAWARE",
+      "populationExposed": 0
+    },
+    "nullableOptionalValues": {
+      "id": "hazard-contract-2",
+      "type": "EARTHQUAKE",
+      "title": "Nullable contract event",
+      "coordinates": [0, 0],
+      "timestamp": "2026-09-11T00:00:00.000Z",
+      "magnitude": null,
+      "severity": "UNKNOWN",
+      "source": "DisasterAWARE",
+      "populationExposed": null
+    },
+    "omittedDefaults": {
+      "id": "hazard-contract-3",
+      "timestamp": "2026-09-11T00:00:00.000Z",
+      "magnitude": null,
+      "populationExposed": null
+    }
+  },
+  "invalid": [
+    {
+      "rule": "blank_id",
+      "value": {
+        "id": "",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "id_too_long",
+      "value": {
+        "id": "012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "blank_type",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": " ",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "type_too_long",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "01234567890123456789012345678901234567890123456789012345678901234",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "blank_title",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": " ",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "title_too_long",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "blank_timestamp",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": " "
+      }
+    },
+    {
+      "rule": "timestamp_too_long",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "01234567890123456789012345678901234567890123456789012345678901234"
+      }
+    },
+    {
+      "rule": "blank_severity",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "severity": " "
+      }
+    },
+    {
+      "rule": "severity_too_long",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "severity": "01234567890123456789012345678901234567890123456789012345678901234"
+      }
+    },
+    {
+      "rule": "blank_source",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "source": " "
+      }
+    },
+    {
+      "rule": "source_too_long",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "source": "01234567890123456789012345678901234567890123456789012345678901234"
+      }
+    },
+    {
+      "rule": "coordinate_length",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "coordinate_numeric_string",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": ["116.4", 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "coordinate_range",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [181, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z"
+      }
+    },
+    {
+      "rule": "magnitude_not_number",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "magnitude": "NaN"
+      }
+    },
+    {
+      "rule": "magnitude_numeric_string",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "magnitude": "1"
+      }
+    },
+    {
+      "rule": "magnitude_range",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "magnitude": 20.1
+      }
+    },
+    {
+      "rule": "negative_population",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "populationExposed": -1
+      }
+    },
+    {
+      "rule": "fractional_population",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "populationExposed": 1.5
+      }
+    },
+    {
+      "rule": "population_boolean",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "populationExposed": true
+      }
+    },
+    {
+      "rule": "unknown_field",
+      "value": {
+        "id": "hazard-contract-1",
+        "type": "FLOOD",
+        "title": "Contract flood event",
+        "coordinates": [116.4, 39.9],
+        "timestamp": "2026-09-11T00:00:00.000Z",
+        "unexpected": true
+      }
+    }
+  ]
+}

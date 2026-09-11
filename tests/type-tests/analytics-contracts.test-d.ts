@@ -1,4 +1,5 @@
 import type { AnalyticsSuccess } from "../../src/services/analytics/contracts/common";
+import type { HazardData } from "../../src/services/analytics/analyticsTypes";
 import type { PivotTrendsData } from "../../src/services/analytics/contracts/pivot";
 import type { PivotQueryData } from "../../src/services/analytics/contracts/pivotQuery";
 import type { PivotSummaryData } from "../../src/services/analytics/contracts/pivotSummary";
@@ -86,8 +87,39 @@ const validPivotQuery = {
   },
 } satisfies PivotQueryData;
 
+const validHazard = {
+  id: "hazard-zero",
+  type: "FLOOD",
+  title: "Zero-value hazard",
+  coordinates: [0, 0],
+  timestamp: "2026-09-11T00:00:00.000Z",
+  magnitude: 0,
+  populationExposed: 0,
+} satisfies HazardData;
+
+const invalidHazardCoordinates: HazardData = {
+  ...validHazard,
+  // @ts-expect-error Hazard coordinates must be numeric longitude and latitude values.
+  coordinates: ["0", 0],
+};
+
+const invalidHazardPopulation: HazardData = {
+  ...validHazard,
+  // @ts-expect-error Exposed population must be numeric when present.
+  populationExposed: "0",
+};
+
 // @ts-expect-error Pivot query and summary data are distinct contracts
 const invalidSummary: PivotSummaryData = validPivotQuery;
 
-export { invalid, invalidSummary, invalidTemporal, statistics, validPivotQuery };
+export {
+  invalid,
+  invalidHazardCoordinates,
+  invalidHazardPopulation,
+  invalidSummary,
+  invalidTemporal,
+  statistics,
+  validHazard,
+  validPivotQuery,
+};
 export type { UnnarrowedPivotRows };

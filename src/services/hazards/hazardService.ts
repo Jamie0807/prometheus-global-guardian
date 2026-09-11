@@ -7,7 +7,10 @@ import {
   detectHazardTypeFromTitle,
   mapNASACategoryToType,
 } from "./hazardAdapters";
+import { parseActiveHazards, parseHazardTypes } from "./contracts/disasterAware";
+import { parseHazardFeed } from "./contracts/hazardFeed";
 import { authorize, authFetch, getAccessToken } from "../auth/authService";
+import { ServiceError } from "../http/serviceError";
 import { createClientLogger } from "../../utils/logger";
 
 const logger = createClientLogger("hazard-service");
@@ -31,12 +34,13 @@ export async function fetchHazardFeed(
   const params = new URLSearchParams();
   if (filter && filter !== "ALL") params.set("type", filter);
   const query = params.toString();
-  return requestJson<HazardFeedResponse>(`/api/hazards${query ? `?${query}` : ""}`, { signal });
+  const url = `/api/hazards${query ? `?${query}` : ""}`;
+  return parseHazardFeed(await requestJson(url, { signal }));
 }
 
 export async function fetchUSGSEarthquakes(): Promise<Hazard[]> {
   try {
-    return adaptUSGSResponse(await requestJson<unknown>(USGS_URL));
+    return adaptUSGSResponse(await requestJson(USGS_URL));
   } catch {
     logger.warn("usgs_fetch_failed");
     return [];
@@ -45,7 +49,7 @@ export async function fetchUSGSEarthquakes(): Promise<Hazard[]> {
 
 export async function fetchNASAEONET(): Promise<Hazard[]> {
   try {
-    return adaptNASAResponse(await requestJson<unknown>(NASA_URL));
+    return adaptNASAResponse(await requestJson(NASA_URL));
   } catch {
     logger.warn("nasa_eonet_fetch_failed");
     return [];
@@ -54,7 +58,7 @@ export async function fetchNASAEONET(): Promise<Hazard[]> {
 
 export async function fetchGDACS(): Promise<Hazard[]> {
   try {
-    return adaptGDACSResponse(await requestJson<unknown>(GDACS_URL));
+    return adaptGDACSResponse(await requestJson(GDACS_URL));
   } catch {
     logger.warn("gdacs_fetch_failed");
     return [];
@@ -64,7 +68,7 @@ export async function fetchGDACS(): Promise<Hazard[]> {
 export async function fetchHazardTypes(): Promise<HazardType[]> {
   try {
     if (!getAccessToken()) await authorize();
-    return await responseJson<HazardType[]>(await authFetch("/api/hazards/types"));
+    return parseHazardTypes(await readDisasterAwareJson(await authFetch("/api/hazards/types")));
   } catch {
     logger.warn("hazard_types_fetch_failed");
     return [];
@@ -78,7 +82,7 @@ export async function fetchHazardsActive(type?: string): Promise<ActiveHazard[]>
       type && type !== "ALL"
         ? `/api/hazards/active/category/${encodeURIComponent(type)}`
         : "/api/hazards/active";
-    return await responseJson<ActiveHazard[]>(await authFetch(path));
+    return parseActiveHazards(await readDisasterAwareJson(await authFetch(path)));
   } catch {
     logger.warn("active_hazards_fetch_failed");
     return [];
@@ -88,8 +92,10 @@ export async function fetchHazardsActive(type?: string): Promise<ActiveHazard[]>
 export async function fetchActiveHazardsByCategory(categoryId: string): Promise<ActiveHazard[]> {
   try {
     if (!getAccessToken()) await authorize();
-    return await responseJson<ActiveHazard[]>(
-      await authFetch(`/api/hazards/active/category/${encodeURIComponent(categoryId)}`),
+    return parseActiveHazards(
+      await readDisasterAwareJson(
+        await authFetch(`/api/hazards/active/category/${encodeURIComponent(categoryId)}`),
+      ),
     );
   } catch {
     logger.warn("active_hazards_category_fetch_failed", { categoryId });
@@ -97,9 +103,12 @@ export async function fetchActiveHazardsByCategory(categoryId: string): Promise<
   }
 }
 
-async function responseJson<T>(response: Response | undefined): Promise<T> {
+async function readDisasterAwareJson(response: Response | undefined): Promise<unknown> {
   if (!response || !response.ok) {
-    throw new Error("DisasterAware API request failed");
+    throw new ServiceError("DisasterAware API request failed", "http", {
+      status: response?.status,
+    });
   }
-  return (await response.json()) as T;
+  const value: unknown = await response.json();
+  return value;
 }

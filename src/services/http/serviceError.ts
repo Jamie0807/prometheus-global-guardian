@@ -1,4 +1,4 @@
-export type ServiceErrorCode = "network" | "timeout" | "http" | "invalid_json";
+export type ServiceErrorCode = "network" | "timeout" | "http" | "invalid_json" | "invalid_response";
 
 export interface ServiceErrorOptions {
   status?: number;

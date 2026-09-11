@@ -229,7 +229,7 @@ python test_pivot_table.py
 pnpm run test:python
 ```
 
-从仓库根目录执行 `pnpm run test:python`，无需启动服务。当前 34 项 unittest 覆盖应用工厂隔离、API 契约、FastAPI 路由，以及预测、风险和质量结果语义。
+从仓库根目录执行 `pnpm run test:python`，无需启动服务。脚本优先使用项目 `.venv`，在 CI 中回退到 `python3`。当前 39 项 unittest 覆盖应用工厂隔离、API 契约、FastAPI 路由，以及预测、风险和质量结果语义。
 
 `tests/test_api_contract.py` 是不依赖已启动服务、直接调用模型和路由函数的 API 契约单元测试，覆盖统一 `hazards` 请求体、4D 参数校验、端点参数传递和数值聚合行为。
 

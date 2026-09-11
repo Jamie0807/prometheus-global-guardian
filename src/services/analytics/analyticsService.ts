@@ -18,6 +18,7 @@ import {
   AnalyticsContractError,
   parseAnalyticsSuccess,
 } from "./contracts/common";
+import { parseAnalyticsHazardData } from "./contracts/hazardInput";
 import { parsePredictions, type PredictionsData } from "./contracts/predictions";
 import { parseRiskAssessment, type RiskAssessmentData } from "./contracts/risk";
 import { parseStatistics, type StatisticsData } from "./contracts/statistics";
@@ -489,7 +490,7 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
   return hazards.map((hazard, idx) => {
     const properties = hazard.properties;
 
-    return {
+    const candidate = {
       id: String(hazard.id ?? properties?.id ?? `hazard-${idx}-${Date.now()}`),
       type: String(hazard.type ?? properties?.type ?? "未分类"),
       title: String(
@@ -499,47 +500,52 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
           properties?.description ??
           "Unknown Event",
       ),
-      coordinates: toCoordinates(hazard.geometry?.coordinates) ??
-        toCoordinates(properties?.coordinates) ?? [0, 0],
+      coordinates: toCoordinates(hazard.geometry?.coordinates, `hazards.${idx}.coordinates`) ??
+        toCoordinates(properties?.coordinates, `hazards.${idx}.properties.coordinates`) ?? [0, 0],
       timestamp: String(hazard.timestamp ?? properties?.timestamp ?? new Date().toISOString()),
-      magnitude: toNullableNumber(hazard.magnitude ?? properties?.magnitude),
+      magnitude: toNullableNumber(
+        hazard.magnitude ?? properties?.magnitude,
+        `hazards.${idx}.magnitude`,
+      ),
       severity: String(hazard.severity ?? properties?.severity ?? "unknown"),
       source: String(hazard.source ?? properties?.source ?? "DisasterAWARE"),
       populationExposed: toNullableNumber(
         hazard.populationExposed ?? properties?.populationExposed,
+        `hazards.${idx}.populationExposed`,
       ),
-    };
+    } satisfies HazardData;
+
+    return parseAnalyticsHazardData(candidate, `hazards.${idx}`);
   });
 }
 
-function toCoordinates(value: unknown): HazardData["coordinates"] | undefined {
-  if (!Array.isArray(value) || value.length < 2) {
-    return undefined;
+function toCoordinates(value: unknown, path: string): HazardData["coordinates"] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length !== 2) {
+    throw new AnalyticsContractError(path);
   }
 
   const [longitude, latitude] = value;
-  return typeof longitude === "number" &&
-    Number.isFinite(longitude) &&
-    typeof latitude === "number" &&
-    Number.isFinite(latitude)
-    ? [longitude, latitude]
-    : undefined;
+  if (
+    typeof longitude !== "number" ||
+    !Number.isFinite(longitude) ||
+    typeof latitude !== "number" ||
+    !Number.isFinite(latitude)
+  ) {
+    throw new AnalyticsContractError(path);
+  }
+  return [longitude, latitude];
 }
 
-function toNullableNumber(value: unknown): number | null {
+function toNullableNumber(value: unknown, path: string): number | null {
   if (value === null || value === undefined) {
     return null;
   }
 
-  if (
-    (typeof value !== "number" && typeof value !== "string") ||
-    (typeof value === "string" && value.trim() === "")
-  ) {
-    return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new AnalyticsContractError(path);
   }
-
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : null;
+  return value;
 }
 
 // ==================== 4维数据透视表API ====================

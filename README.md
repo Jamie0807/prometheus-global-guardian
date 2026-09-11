@@ -312,7 +312,7 @@ Run the Python API contract tests separately from the repository root:
 pnpm run test:python
 ```
 
-These 26 tests do not require a running analytics service. They cover API contracts, FastAPI routes, and prediction, risk, and quality result semantics. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, management-token boundaries, CORS policy, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation.
+These 39 tests do not require a running analytics service. They cover API contracts, FastAPI routes, and prediction, risk, and quality result semantics. `test_api_contract.py` validates the request model and direct endpoint behavior; `test_api_routes.py` uses FastAPI `TestClient` to validate five 4D HTTP routes, management-token boundaries, CORS policy, 2xx responses, parameter forwarding, response echoing, empty results, and 422 validation. The command prefers the project `.venv` and falls back to `python3` in CI.
 
 Run linting:
 
