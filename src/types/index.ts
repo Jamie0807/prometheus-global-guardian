@@ -81,13 +81,6 @@ export interface HazardFeedResponse {
   };
 }
 
-export interface MapViewProps {
-  filter: string;
-  mapStyle: string;
-  onDataUpdate: (data: Hazard[]) => void;
-  onRefreshReady?: (fn: () => void) => void;
-}
-
 export interface SaveReportPayload {
   reportName: string;
   organization: string;

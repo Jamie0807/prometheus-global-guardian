@@ -1,26 +1,18 @@
-import { useEffect } from "react";
-
-import type { HazardFeedResponse, MapViewProps } from "../../types";
+import type { HazardFeedResponse } from "../../types";
+import { useMapState } from "./state/MapStateContext";
 import { useDeck3DTiles } from "./hooks/useDeck3DTiles";
-import { useHazardData } from "./hooks/useHazardData";
 import { useHazardHeatmap } from "./hooks/useHazardHeatmap";
 import { useHazardLodLayers } from "./hooks/useHazardLodLayers";
 import { useHazardMarkers } from "./hooks/useHazardMarkers";
 import { useMapboxInstance } from "./hooks/useMapboxInstance";
 
-const MapView = ({ filter, mapStyle, onDataUpdate, onRefreshReady }: MapViewProps) => {
+const MapView = () => {
+  const { filter, mapStyle, hazards, sourceMeta } = useMapState();
   const { containerRef, mapRef, mapRevision } = useMapboxInstance(mapStyle);
-  const { disasters, refresh, sourceMeta } = useHazardData(filter, onDataUpdate);
-  const { showHeatmap, toggleHeatmap } = useHazardHeatmap(mapRef, disasters, mapRevision);
-  const { setVisible } = useHazardMarkers(mapRef, disasters, filter, showHeatmap, mapRevision);
+  const { showHeatmap, toggleHeatmap } = useHazardHeatmap(mapRef, hazards, mapRevision);
+  const { setVisible } = useHazardMarkers(mapRef, hazards, filter, showHeatmap, mapRevision);
   useDeck3DTiles(mapRef, mapRevision);
-  useHazardLodLayers(mapRef, disasters, mapRevision, showHeatmap, setVisible);
-
-  useEffect(() => {
-    onRefreshReady?.(() => {
-      void refresh();
-    });
-  }, [onRefreshReady, refresh]);
+  useHazardLodLayers(mapRef, hazards, mapRevision, showHeatmap, setVisible);
 
   return (
     <>
@@ -43,7 +35,7 @@ const MapView = ({ filter, mapStyle, onDataUpdate, onRefreshReady }: MapViewProp
           {getSourceStatusLabel(sourceMeta)}
         </div>
       ) : null}
-      {sourceMeta && disasters.length === 0 ? (
+      {sourceMeta && hazards.length === 0 ? (
         <div
           style={{
             position: "absolute",

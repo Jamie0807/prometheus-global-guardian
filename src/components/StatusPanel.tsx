@@ -3,23 +3,13 @@ import { fetchHazardTypes } from "../services/hazards/hazardService";
 import { checkHealth } from "../services/analytics/analyticsService";
 import type { HazardType } from "../types";
 import DISPLAYED_TYPES from "../config/displayedTypes";
+import { useMapState } from "../features/map/state/MapStateContext";
 import { createClientLogger } from "../utils/logger";
 
 const logger = createClientLogger("status-panel");
 
-interface StatusPanelProps {
-  filter: string;
-  onFilterChange: (value: string) => void;
-  onRefresh: () => void;
-  totalCount?: number;
-}
-
-const StatusPanel: React.FC<StatusPanelProps> = ({
-  filter,
-  onFilterChange,
-  onRefresh,
-  totalCount = 0,
-}) => {
+const StatusPanel: React.FC = () => {
+  const { filter, hazards, refresh, setFilter } = useMapState();
   const [hazardTypes, setHazardTypes] = useState<HazardType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -68,7 +58,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
 
       <div className="total-count">
         <div className="count-label">Total Hazards</div>
-        <div className="count-value">{totalCount}</div>
+        <div className="count-value">{hazards.length}</div>
       </div>
 
       <div className="filter-section">
@@ -78,7 +68,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
         <select
           id="hazard-filter"
           value={filter}
-          onChange={(e) => onFilterChange(e.target.value)}
+          onChange={(e) => setFilter(e.target.value)}
           className="form-input"
           disabled={isLoading}
         >
@@ -95,7 +85,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
       <button
         className="btn btn-primary"
         style={{ width: "100%", marginTop: "12px" }}
-        onClick={onRefresh}
+        onClick={() => void refresh()}
       >
         Refresh Data
       </button>

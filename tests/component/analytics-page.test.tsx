@@ -1,12 +1,26 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AnalyticsHazard } from "../../src/features/analytics/types";
 import AnalyticsPage from "../../src/features/analytics/AnalyticsPage";
 import LegacyAnalyticsPage from "../../src/components/AnalyticsPage";
 import { parseStatistics } from "../../src/services/analytics/contracts/statistics";
 import { parsePredictions } from "../../src/services/analytics/contracts/predictions";
 import { parseRiskAssessment } from "../../src/services/analytics/contracts/risk";
+import { UIStateProvider } from "../../src/state/UIStateContext";
+
+const mapStateMocks = vi.hoisted(() => ({
+  hazards: [
+    {
+      id: "hazard-1",
+      title: "Test earthquake",
+      type: "EARTHQUAKE",
+      geometry: { type: "Point", coordinates: [116.4, 39.9] },
+      description: "Test event",
+      source: "USGS",
+      magnitude: 5.2,
+    },
+  ],
+}));
 
 const analyticsServiceMocks = vi.hoisted(() => ({
   assessDataQuality: vi.fn().mockResolvedValue({
@@ -103,6 +117,10 @@ vi.mock("../../src/features/analytics/hooks/useAnalyticsData", () => ({
   }),
 }));
 
+vi.mock("../../src/features/map/state/MapStateContext", () => ({
+  useMapState: () => mapStateMocks,
+}));
+
 vi.mock("../../src/components/ChartsPanel", () => ({
   default: () => <div>图表内容</div>,
 }));
@@ -123,25 +141,17 @@ const emptyModel = {
   confidence: null,
 };
 
-const hazards: AnalyticsHazard[] = [
-  {
-    id: "hazard-1",
-    title: "Test earthquake",
-    type: "EARTHQUAKE",
-    geometry: { type: "Point", coordinates: [116.4, 39.9] },
-    description: "Test event",
-    source: "USGS",
-    magnitude: 5.2,
-  },
-];
-
 describe("AnalyticsPage", () => {
   it("keeps the legacy import as the feature page compatibility entry", () => {
     expect(LegacyAnalyticsPage).toBe(AnalyticsPage);
   });
 
   it("renders analytics boundary values while switching all five tabs", async () => {
-    render(<AnalyticsPage hazards={hazards} onClose={vi.fn()} />);
+    render(
+      <UIStateProvider>
+        <AnalyticsPage />
+      </UIStateProvider>,
+    );
 
     expect(screen.getByText(/强度平均值（magnitude）：0\.00/)).toBeInTheDocument();
     expect(screen.getByText(/强度标准差（magnitude）：暂无数据/)).toBeInTheDocument();

@@ -10,10 +10,15 @@ import PredictionsTab from "./components/tabs/PredictionsTab";
 import RiskTab from "./components/tabs/RiskTab";
 import { useAnalyticsData } from "./hooks/useAnalyticsData";
 import { STYLES } from "./styles";
-import type { AnalyticsPageProps, AnalyticsTab } from "./types";
+import type { AnalyticsHazard, AnalyticsTab } from "./types";
 import { buildHazardsByType, buildIntensitySeries } from "./utils/analyticsTransforms";
+import { useMapState } from "../map/state/MapStateContext";
+import { useUIState } from "../../state/UIStateContext";
 
-export default function AnalyticsPage({ hazards, onClose }: AnalyticsPageProps) {
+export default function AnalyticsPage() {
+  const { hazards } = useMapState();
+  const { closeView } = useUIState();
+  const analyticsHazards = hazards as AnalyticsHazard[];
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("overview");
   const {
     serviceStatus,
@@ -25,18 +30,18 @@ export default function AnalyticsPage({ hazards, onClose }: AnalyticsPageProps) 
     loading,
     checkServiceStatus,
     resetAndRunAnalysis,
-  } = useAnalyticsData(hazards);
+  } = useAnalyticsData(analyticsHazards);
 
-  const hazardsByType = useMemo(() => buildHazardsByType(hazards), [hazards]);
-  const intensityData = useMemo(() => buildIntensitySeries(hazards), [hazards]);
+  const hazardsByType = useMemo(() => buildHazardsByType(analyticsHazards), [analyticsHazards]);
+  const intensityData = useMemo(() => buildIntensitySeries(analyticsHazards), [analyticsHazards]);
   const hasResults = statistics !== null || predictions !== null || riskAssessment !== null;
 
   return (
     <div style={STYLES.container}>
       <div style={{ maxWidth: "1200px", margin: "0 auto", color: "#fff" }}>
-        <AnalyticsHeader serviceStatus={serviceStatus} onClose={onClose} />
+        <AnalyticsHeader serviceStatus={serviceStatus} onClose={closeView} />
         <AnalyticsSummaryGrid
-          hazardCount={hazards.length}
+          hazardCount={analyticsHazards.length}
           hazardsByType={hazardsByType}
           serviceStatus={serviceStatus}
         />
@@ -61,7 +66,7 @@ export default function AnalyticsPage({ hazards, onClose }: AnalyticsPageProps) 
 
           {activeTab === "overview" && statistics ? (
             <OverviewTab
-              hazards={hazards}
+              hazards={analyticsHazards}
               hazardsByType={hazardsByType}
               intensityData={intensityData}
               statistics={statistics}
@@ -69,14 +74,14 @@ export default function AnalyticsPage({ hazards, onClose }: AnalyticsPageProps) 
               pivot4DRiskScores={pivot4DRiskScores}
             />
           ) : null}
-          {activeTab === "charts" ? <AnalyticsChartsTab hazards={hazards} /> : null}
+          {activeTab === "charts" ? <AnalyticsChartsTab hazards={analyticsHazards} /> : null}
           {activeTab === "predictions" && predictions ? (
             <PredictionsTab predictions={predictions} />
           ) : null}
           {activeTab === "risk" && riskAssessment ? (
             <RiskTab riskAssessment={riskAssessment} />
           ) : null}
-          {activeTab === "quality" ? <AnalyticsQualityTab hazards={hazards} /> : null}
+          {activeTab === "quality" ? <AnalyticsQualityTab hazards={analyticsHazards} /> : null}
         </AnalyticsControlPanel>
       </div>
     </div>

@@ -35,7 +35,7 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
-export function useHazardData(filter: string, onDataUpdate: (hazards: Hazard[]) => void) {
+export function useHazardData(filter: string) {
   const workerRef = useRef<Worker | null>(null);
   const mountedRef = useRef(false);
   const requestIdRef = useRef(0);
@@ -103,7 +103,6 @@ export function useHazardData(filter: string, onDataUpdate: (hazards: Hazard[]) 
 
           setSourceMeta(response.meta);
           setDisasters(cleaned);
-          onDataUpdate(cleaned);
         } catch (error: unknown) {
           if (!isAbortError(error)) {
             logger.error("hazard_feed_refresh_failed");
@@ -117,7 +116,7 @@ export function useHazardData(filter: string, onDataUpdate: (hazards: Hazard[]) 
       });
       return promise;
     },
-    [cancelInFlight, filter, isCurrentRequest, onDataUpdate],
+    [cancelInFlight, filter, isCurrentRequest],
   );
 
   useEffect(() => {

@@ -9,6 +9,7 @@
 - 每次需求、功能或缺陷修复都应先使用适用的 Superpowers 流程拆解、规划和验证；计划和进度记录使用中文。
 - 复杂需求拆成可验证任务；有两个或以上独立任务时，优先使用子智能体执行和复核。
 - 子智能体实现必须遵循“独立实现子智能体 + 任务级复核 + 最终整体复核”的流程。
+- 新需求默认使用 Git worktree 隔离开发；在独立 worktree 中完成实现、测试与复核，再按用户明确指令处理集成或提交。
 - 开发过程中遇到失败，先定位根因，再修改；不得用反复重跑代替分析。
 
 ## Git 与提交
@@ -32,7 +33,7 @@
 - 多步骤需求默认使用 `brainstorming`、`writing-plans`、`test-driven-development`、`subagent-driven-development`、`verification-before-completion` 和 `requesting-code-review`。
 - 适用时使用项目技术栈 skill：React、TypeScript、Vite、Express、Mapbox、Recharts、FastAPI、Playwright 等。
 - 实现前先阅读相关文件和现有模式；不要凭假设重写模块。
-- 新功能或缺陷修复优先采用 TDD：先写能够失败的测试，再写最小实现。
+- 新功能或缺陷修复默认必须遵循 TDD：先写并运行能够失败的测试（RED），再写最小实现使其通过（GREEN），随后只在测试保护下重构；仅文档、格式或纯配置调整可不新增测试，但仍须执行适用验证。
 - 完成前必须提供命令和实际输出作为验证证据，不以“应该可以”代替验证。
 
 ## 编码与格式

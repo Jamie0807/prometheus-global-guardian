@@ -14,15 +14,8 @@ import DOMPurify from "dompurify";
 import type { ChatMessage, DisasterContext } from "../services/ai/aiAssistantService";
 import { formatTime, QUICK_PROMPTS } from "../utils/aiAssistant";
 import { useAIChatSession } from "../hooks/useAIChatSession";
-import type { Hazard } from "../types";
-
-// ─── Props ────────────────────────────────────────────────────────────────────
-
-interface AIChatAssistantProps {
-  isOpen: boolean;
-  onClose: () => void;
-  hazards: Hazard[];
-}
+import { useMapState } from "../features/map/state/MapStateContext";
+import { useUIState } from "../state/UIStateContext";
 
 // ─── 辅助组件：消息气泡 ───────────────────────────────────────────────────────
 
@@ -129,7 +122,10 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
 
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
 
-const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, hazards }) => {
+const AIChatAssistant: React.FC = () => {
+  const { hazards } = useMapState();
+  const { activeModal, closeModal } = useUIState();
+  const isOpen = activeModal === "ai";
   const [contextEnabled, setContextEnabled] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -167,7 +163,7 @@ const AIChatAssistant: React.FC<AIChatAssistantProps> = ({ isOpen, onClose, haza
     clear,
     retry,
     close,
-  } = useAIChatSession(isOpen, onClose, contextEnabled ? disasterContext : undefined);
+  } = useAIChatSession(isOpen, closeModal, contextEnabled ? disasterContext : undefined);
 
   // 自动滚动到底部
   const scrollToBottom = useCallback(() => {

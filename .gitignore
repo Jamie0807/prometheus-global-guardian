@@ -15,6 +15,7 @@ dist-ssr
 *.local
 playwright-report/
 test-results/
+.worktrees/
 
 # Environment variables
 .env

@@ -1,20 +1,14 @@
 import React from "react";
+import { useMapState } from "../features/map/state/MapStateContext";
+import { useUIState } from "../state/UIStateContext";
 
-interface SettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onStyleChange: (style: string) => void;
-}
-
-const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen,
-  onClose,
-  onStyleChange
-}) => {
-  if (!isOpen) return null;
+const SettingsModal: React.FC = () => {
+  const { mapStyle, setMapStyle } = useMapState();
+  const { activeModal, closeModal } = useUIState();
+  if (activeModal !== "settings") return null;
 
   const handleStyleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onStyleChange(e.target.value);
+    setMapStyle(e.target.value);
   };
 
   return (
@@ -22,13 +16,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="modal-content">
         <div className="modal-header">
           <div className="modal-title">
-            <svg
-              width="24"
-              height="24"
-              fill="none"
-              stroke="#60a5fa"
-              viewBox="0 0 24 24"
-            >
+            <svg width="24" height="24" fill="none" stroke="#60a5fa" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -44,14 +32,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </svg>
             <span>Map Settings</span>
           </div>
-          <button className="close-btn" onClick={onClose}>
-            <svg
-              width="24"
-              height="24"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+          <button className="close-btn" onClick={closeModal}>
+            <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -69,6 +51,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <select
             id="map-style"
             className="form-input"
+            value={mapStyle}
             onChange={handleStyleChange}
           >
             <option value="dark-v11">Dark</option>
@@ -84,26 +67,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           style={{
             paddingTop: "16px",
             borderTop: "1px solid #374151",
-            marginTop: "16px"
+            marginTop: "16px",
           }}
         >
-          <h3 style={{ color: "white", fontWeight: 600, marginBottom: "8px" }}>
-            About
-          </h3>
+          <h3 style={{ color: "white", fontWeight: 600, marginBottom: "8px" }}>About</h3>
           <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
             Prometheus Space Technologies Global Guardian v1.0
           </p>
-          <p
-            style={{ color: "#9ca3af", fontSize: "0.75rem", marginTop: "8px" }}
-          >
-            – Real-time disaster monitoring. Data powered by DisasterAWARE, NASA, ESA, EONET, USGS, and GDACS.
+          <p style={{ color: "#9ca3af", fontSize: "0.75rem", marginTop: "8px" }}>
+            – Real-time disaster monitoring. Data powered by DisasterAWARE, NASA, ESA, EONET, USGS,
+            and GDACS.
           </p>
         </div>
 
         <button
           className="btn btn-primary"
           style={{ width: "100%", marginTop: "24px" }}
-          onClick={onClose}
+          onClick={closeModal}
         >
           Close
         </button>

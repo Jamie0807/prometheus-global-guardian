@@ -1,28 +1,37 @@
-### Task 4：迁移 AI 服务和所有剩余调用方
+### Task 4: 文档状态、全量验证与整体复核
 
-**文件：**
+**Files:**
 
-- 新增：`src/services/ai/aiAssistantService.ts`
-- 新增：`src/utils/aiAssistant.ts`
-- 修改：`src/api/aiAssistant.ts`
-- 修改：`src/components/AIChatAssistant.tsx`
-- 修改：`src/App.tsx`（如果任务 2 后仍有鉴权导入）
-- 测试：`tests/service-ai.test.ts`
+- Modify: `docs/PROJECT_OPTIMIZATION_BACKLOG.md`
+- Modify: `docs/superpowers/specs/2026-09-11-hazard-http-boundary-types-design.md`
+- Modify: `docs/superpowers/plans/2026-09-11-hazard-http-boundary-types.md`
 
-**接口：**
+**Interfaces:**
 
-```typescript
-export async function streamChatMessage(
-  messages: readonly ChatMessage[],
-  context: DisasterContext | undefined,
-  onChunk: (chunk: string) => void,
-  onDone: () => void,
-  onError: (message: string) => void,
-): Promise<void>;
+- 不新增运行时接口；优化清单将“Hazard/HTTP”前端边界范围标记为已完成，跨语言契约同步保持后续项。
+
+- [ ] **Step 1: 更新完成状态与实际测试证据**
+
+在优化清单的当前判断、优先级矩阵和已完成优化项中，把本批实现明确为“Hazard/HTTP 前端边界已完成”；保留“跨语言模型同步与 Python 契约测试统一门禁”待治理。设计稿状态改为“已实施并通过验证”，实施计划复选框与执行记录仅在实际完成后更新。
+
+- [ ] **Step 2: 执行项目质量门禁**
+
+依次运行：
+
+```bash
+pnpm run lint
+pnpm run format:check
+pnpm run typecheck:client
+pnpm run typecheck:contracts
+pnpm run typecheck:server
+pnpm run test:services
+pnpm run test:component
+pnpm run build
+git diff --check
 ```
 
-- [ ] **步骤 1：编写失败测试**，覆盖 BFF 请求结构、流式 Chat Completions 增量、`[DONE]`、畸形数据块、503 Demo 降级和非 Demo 错误。
-- [ ] **步骤 2：运行 `npm test`**，确认 service 实现迁移前新增测试失败。
-- [ ] **步骤 3：仅将网络请求和 Demo 降级逻辑移动到 `aiAssistantService.ts`**；消息 ID、时间格式化、快捷提示等纯展示辅助函数移动到 `src/utils/aiAssistant.ts`。
-- [ ] **步骤 4：将 `src/api/aiAssistant.ts` 改为兼容 facade**，并更新 `AIChatAssistant.tsx`，分别从 service 和 utils 导入。
-- [ ] **步骤 5：运行 `npm test`、`npm run lint` 和 `npm run build`**，确认浏览器仍只发送 `POST /api/ai/chat`，且不会读取 provider 凭据。
+预期：所有命令退出码为 0。另运行 `pnpm test`；若仍因沙箱禁止监听 `0.0.0.0` 导致 BFF 测试出现 `EPERM`，记录该环境限制与已通过的非监听测试，不能宣称全量测试通过。
+
+- [ ] **Step 3: 最终整体复核**
+
+检查所有 `requestJson` 调用点均处理 `unknown`，所有 Hazard Service 成功响应都经过解析器；检查 diff 不含凭据、响应正文、构建产物或 `.superpowers/sdd/progress.md`。复核失败时定位根因并修复后仅重跑受影响命令，再执行 `git diff --check`。

@@ -1,873 +1,99 @@
 # 项目待优化清单
 
-## 文档目的
-
-本文档从企业级工程项目的视角，记录 Prometheus Global Guardian 当前最值得优化的方向。重点关注可维护性、架构边界、运行稳定性和交付质量，而不是学习型说明。
-
-最近核对日期：2026-09-11。前后端错误信息与调试信息分级已在 `d9a08b0` 提交，AI 流式会话生命周期治理已在 `4ba0a1b` 提交；“已完成”表示所列实现范围已落地，不代表已部署。
-
-状态口径：**已完成**表示所列范围已落地；**阶段完成**表示当前阶段已落地但仍有后续工作；**待开始**表示尚未完成该条目的验收范围，可能已有基础能力。各章节原有测试数量与验证结果为对应实施阶段的历史记录，不代表本次重新执行结果。
+最近核对日期：2026-09-11。本文档以当前 `main` 分支代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
 
 ## 当前判断
 
-项目已经具备比较完整的产品能力：实时灾害可视化、多源灾害数据聚合、基于 Mapbox 的地理空间渲染、数据分析看板、AI 助手集成，以及 Python 分析服务。
+项目已具备 React + Vite 前端、Express BFF、FastAPI 分析服务、多源灾害聚合、Mapbox 地图、Analytics 看板与 AI 助手。当前适合结束本轮架构治理并整理简历；不部署的前提下，剩余事项不阻塞演示或代码归档。
 
-当前主要问题不是功能不够，而是功能已经长起来了，但工程组织方式还比较接近原型项目：
+- 前端业务请求统一收敛在 `src/services/`；Analytics、Hazard 和通用 HTTP 数据在进入领域层前均从 `unknown` 经运行时解析器校验。
+- Analytics 灾害请求使用 TypeScript 与 Python 共用的 JSON fixture；两端已对字段默认值、长度、坐标、数值、未知字段和非有限数的接受边界对齐。
+- BFF 仅代理声明的 DisasterAware 路由，并具备请求边界、服务端鉴权、超时、限流和脱敏错误契约；Python 管理接口已受令牌保护。
+- AI 流式会话已支持取消、失败终态、请求隔离、历史预算和手动重试；不提供自动续传或跨实例会话治理。
+- 地图与 UI 导航状态已分别由 `MapStateProvider` 和 `UIStateProvider` 归属；组件局部状态与跨实例持久化仍不在本轮范围内。
+- 质量门禁包含 lint、格式、三项 TypeScript 类型检查、BFF/Service/组件/E2E 测试、构建及 Python unittest。GitHub Actions 分别运行前端/BFF 基线和 Python 测试。
+- 本地 `pnpm test` 的 BFF 监听用例会受受限沙箱影响而出现 `listen EPERM`；这是运行环境限制。独立 Service、组件、Python 和构建门禁可在当前环境通过。
 
-- 前端 UI、Express BFF、Python 分析服务都放在仓库根目录，包边界不够清晰。
-- 地图和分析页面已完成模块拆分；部分复用组件和统计概览仍可继续细化职责。
-- API 已统一收敛到 `src/services`，组件不再依赖旧的 API facade。
-- 地图生命周期、数据、Marker、LOD、热力图和 3D 能力已拆为独立 Hook，后续重点是输出安全、数据来源和请求生命周期。
-- AI 流式会话已具备取消、断流失败识别、请求序列隔离、历史预算和手动重试；自动续传、成本配额和跨实例治理仍属于后续范围。
-- Analytics 前端两阶段的 16 个响应边界，以及 Hazard/通用 HTTP 前端边界，均已建立从 `unknown` 到运行时解析器再到明确领域类型的链路。Analytics 灾害请求会在浏览器发送前校验，并与 Python 使用同一份共享样本契约。
-- 灾害字段映射及 Analytics/4D 请求契约前两阶段已完成。TypeScript 与 Python 对字段默认值、文本长度、坐标、数值、未知字段和非有限数的接受边界已对齐；后续可扩展到响应与 4D 输出模型。
-- BFF 已完成受限 DisasterAware 代理、请求大小/查询边界、单进程限流和脱敏错误契约；Python 管理面令牌保护、CORS 和本地端口绑定已落地，公开 Analytics API 身份策略与多实例共享限流仍待治理。
-- React、Express BFF 和 Python 分析服务已统一日志等级与环境阈值；生产错误展示和日志上下文已收紧，集中式日志采集、告警和指标平台仍待建设。
-- 质量门禁已覆盖 BFF、Service、React 组件、关键 E2E 流程、lint、格式、类型检查、build 和 Python unittest；现有 CI 的前端/BFF 与 Python job 分别执行对应测试。Python 核心算法扩展、视觉回归和 CI/CD 增强仍待补齐。
+## 已完成能力
 
-## 开发与交付约束
+| 优化项                     | 当前结果                                                                                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 前后端错误与调试分级       | React、BFF 与 Python 使用统一日志等级和安全上下文；生产界面不展示原始异常或组件栈。                                                    |
+| Python 服务结构整理        | 应用装配、路由、schema、core 与 service 分层；`main.py` 保持兼容启动入口。                                                             |
+| AI 流式会话生命周期        | SSE 解码、取消、失败终态、请求序列隔离、历史预算与手动重试均有回归测试。                                                               |
+| API / Service 层统一       | 组件通过 Service 层访问业务接口；认证、灾害、Analytics 与 AI 请求具备明确边界。                                                        |
+| Analytics 前端边界类型治理 | 16 个 Analytics 响应边界及 Hazard/HTTP 边界均有运行时解析与稳定契约错误。                                                              |
+| 跨语言灾害请求契约         | `contracts/analytics-hazard-data.json` 被 TypeScript 与 Python 测试共同读取；浏览器会在请求前拒绝非法映射值。                          |
+| Python API 契约与可靠性    | 请求边界、稳定错误、缓存口径、线程隔离与核心算法异常语义已有实现和测试。                                                               |
+| BFF 与 Python 管理面边界   | BFF allowlist、query/body 限制、上游超时与脱敏错误已落地；Python 管理路由要求令牌、CORS 限制显式来源。                                 |
+| 地图与分析页面拆分         | MapView 已分为 feature 入口、Hook 与纯工具；Analytics 页面已拆为数据 Hook、转换与各 Tab。                                              |
+| 外部灾害数据韧性           | 多源聚合具备超时、一次重试、进程内缓存、陈旧标记与来源级状态；刷新请求具备取消、去重和竞态保护。                                       |
+| 前端状态归属梳理           | 地图数据、筛选、样式、刷新与来源元信息收口到地图状态域；页面、弹窗收口到 UI 状态域，App 仅保留授权和组合。                             |
+| 前端输出安全               | 地图 Popup 用本地 DOM 与 `textContent` 渲染外部字段，不使用 `setHTML()`。                                                              |
+| 最小 CI 与测试入口         | `.github/workflows/quality.yml` 使用 Node 20、pnpm 10 与 Python 3.13；`pnpm run test:python` 优先使用项目 `.venv`，CI 回退 `python3`。 |
 
-后续每个需求都遵循以下项目级约束：
+## 当前质量基线
 
-- 新增或重构的前端、BFF 代码统一使用 TypeScript；Python 分析服务继续使用 Python，不新增同职责 JavaScript 文件。
-- 涉及 AI provider、BFF 或服务端请求时，先确认 TypeScript、测试和构建配置完整，敏感凭据只能由服务端读取。
-- 每个需求开始前使用 Superpowers 流程完成上下文探索、方案设计、测试策略和验证；涉及新功能或行为变化时遵循测试驱动开发。
-- 每个需求完成后同步更新本文档，记录状态、实现内容、验证结果和遗留风险。
+当前脚本及职责如下：
+
+| 命令                           | 覆盖范围                                                  |
+| ------------------------------ | --------------------------------------------------------- |
+| `pnpm run lint`                | TypeScript、React、BFF 及配置的 ESLint 规则。             |
+| `pnpm run format:check`        | 已纳入清单的 Markdown、JSON、TypeScript、测试与配置格式。 |
+| `pnpm run typecheck:client`    | 前端 TypeScript 类型检查。                                |
+| `pnpm run typecheck:server`    | Express BFF TypeScript 类型检查。                         |
+| `pnpm run typecheck:contracts` | TypeScript 契约正反例类型检查。                           |
+| `pnpm run test:services`       | Service、解析器、请求边界与 AI 流协议回归；当前 177 项。  |
+| `pnpm run test:component`      | React Testing Library 组件回归；当前 59 项。              |
+| `pnpm run test:python`         | FastAPI 模型、路由、服务与算法 unittest；当前 39 项。     |
+| `pnpm run test:e2e`            | Playwright 桌面端关键流程冒烟。                           |
+| `pnpm run build`               | Vite 生产构建与 BFF 编译。                                |
+
+当前本地完整验证中，lint、格式、三项类型检查、177 项 Service 测试、59 项组件测试、39 项 Python 测试、构建与 `git diff --check` 均已通过。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
 
 ## 优先级矩阵
 
-下表只列剩余工作，已完成范围统一归入“已完成优化项”。默认按开发和演示阶段安排；执行批次与依赖以“建议执行顺序”为准。
+项目当前不计划部署。矩阵按后续开发价值排序；发布前项仅在决定公网部署后进入实施范围。
 
-| 优先级     | 剩余优化范围                                      | 建议批次          | 依赖与边界                                             |
-| ---------- | ------------------------------------------------- | ----------------- | ------------------------------------------------------ |
-| P1         | 报告下载闭环                                      | 6                 | 明确格式、字段、数据时间与来源                         |
-| P1         | 前端状态归属梳理                                  | 3 / 8             | 灾害状态随统一入口处理，剩余 UI 状态后移               |
-| P2         | 跨语言 Analytics 响应与 4D 输出契约扩展           | 后续              | 灾害请求共享样本已完成；评估输出模型覆盖范围与维护成本 |
-| P2         | 前端包体积预算与分包治理                          | 9                 | 先测首屏、交互及依赖贡献，再优化                       |
-| P2         | 可访问性与多语言界面                              | 9                 | 基础键盘支持随组件改动补齐                             |
-| P2         | 可观测性、集中错误上报和指标告警                  | 后续              | 日志等级与安全上下文已完成，剩余采集、检索、指标和告警 |
-| P2         | 仓库 / 包结构调整、依赖清理                       | 10                | 不作为前述优化的前置条件                               |
-| P2         | 运行时无关文件与仓库卫生                          | 10                | 影响构建或 CI 的问题随门禁处理                         |
-| P2         | 依赖、镜像和配置持续审计                          | 10                | 已确认的高风险问题优先处理                             |
-| 按发布条件 | 公开 Analytics API 身份、请求量限制与生产错误脱敏 | 公网发布前第 1 批 | 管理令牌不覆盖公开业务 API；多实例部署前再落实共享限流 |
+| 优先级 | 剩余优化范围                                    | 建议时机                 | 依赖与边界                                                                             |
+| ------ | ----------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
+| P1     | 报告下载闭环                                    | 需要对外演示或交付报告时 | 统一下载格式、字段、数据时间、来源、文件名与内容测试；当前 JSON 下载与界面文案需对齐。 |
+| P2     | 跨语言 Analytics 响应与 4D 输出契约扩展         | 输出模型稳定后           | 灾害请求共享样本已完成；评估覆盖响应模型、4D 输出或代码生成的收益。                    |
+| P2     | 前端包体积预算与分包治理                        | 性能优化前               | Mapbox 生产 chunk 约 1.8 MB；先采集首屏与交互数据，再建立分包和预算。                  |
+| P2     | 可访问性与多语言界面                            | UI 迭代时                | 补齐弹窗语义、焦点管理、键盘路径、locale 资源与移动端/视觉回归。                       |
+| P2     | 可观测性、集中错误上报和指标告警                | 需要持续运行服务时       | 已有安全日志；后续接入集中采集、错误聚合、指标、trace 与告警。                         |
+| P2     | 仓库/包结构调整与依赖清理                       | 大功能稳定后             | 评估 web、BFF 与 Python 的包边界、生产依赖、Docker 缓存与许可证/漏洞审计。             |
+| P2     | 仓库卫生与运行时无关文件                        | 下次维护批次             | 明确 `.superpowers` 过程记录、历史副本、锁文件和临时产物的保留策略。                   |
+| 发布前 | 公开 Analytics API 身份、共享限流与生产错误脱敏 | 决定公网部署前           | 管理令牌不覆盖公开业务 API；多实例限流需要网关或共享存储。                             |
 
-## 已完成优化项
+## 关键边界与遗留风险
 
-| 优化项                             | 状态                 | 结果                                                                                                                                  |
-| ---------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Docker 一键启动前后端              | 已完成               | 通过 Docker Compose 同时启动 Web / Express BFF 和 Python FastAPI 分析服务                                                             |
-| AI 助手 BFF 化改造                 | 已完成               | 通过 Express BFF 统一封装 ai-workflow 与火山方舟模型调用，前端只消费 `/api/ai/chat`                                                   |
-| BFF TypeScript 化                  | 已完成               | 服务端源码统一为 TypeScript，编译到 `dist-server` 后由生产环境启动                                                                    |
-| API / Service 层统一               | 已完成               | 增加统一 HTTP 错误契约，完成鉴权、灾害、Analytics、AI Service 拆分，移除旧 `src/api` facade                                           |
-| AI 助手智能路由                    | 已完成               | BFF 规则路由选择 Ark / Workflow，支持响应开始前的 provider 降级和结构化日志                                                           |
-| AI 流式会话生命周期治理            | 已完成（`4ba0a1b`）  | 浏览器与 BFF 支持取消、断流终态、请求序列隔离、历史预算和手动重试；不自动续传或重试                                                   |
-| 灾害数据与 Analytics API 契约      | 已完成（第二阶段）   | 统一字段映射、4D 请求参数和校验，补充 FastAPI HTTP 路由契约测试                                                                       |
-| Analytics 结果语义与展示一致性     | 已完成（第二阶段）   | 统一预测状态、风险建议、质量分数及中英文展示资源                                                                                      |
-| 前端边界类型治理                   | 阶段完成             | Analytics 的 16 个接口及 Hazard/HTTP 前端边界均由 `unknown` 经运行时解析器进入领域类型；Analytics 灾害请求已补齐跨语言共享样本契约    |
-| 跨语言灾害请求契约与 Python 门禁   | 已完成（当前范围）   | JSON fixture 由 TypeScript 与 Python 共同验证；前端发送前拒绝非法映射值，Python 也拒绝隐式数值转型；现有 CI 两个 job 分别执行对应测试 |
-| Python API 契约与分析可靠性        | 已完成               | 稳定内部错误与 request ID、真实综合分析缓存、线程隔离和算法边界回归测试                                                               |
-| 统计概览图表数据与坐标一致性       | 已完成               | 移除随机强度填充，保留有效数据原始编号，修正首尾坐标标签                                                                              |
-| 地图模块拆分                       | 已完成               | 拆为组合入口、6 个 Hook 和 3 个纯工具模块，增加地图工具与组件测试                                                                     |
-| 地图外部数据输出安全               | 已完成               | Popup 改用本地 DOM 节点与 `textContent`，外部文本不能创建可执行 DOM                                                                   |
-| 分析页面拆分                       | 已完成               | 页面、数据 Hook、纯转换和各 Tab 组件分离，保留兼容入口                                                                                |
-| BFF 代理与请求边界                 | 已完成（BFF 范围）   | 接入路径白名单、请求限制、服务端鉴权、超时、单进程限流和错误脱敏                                                                      |
-| Python 管理面边界                  | 已完成（`ba33d68`）  | 管理接口令牌保护、显式 CORS 来源和 Compose 本地端口绑定；公开 API 治理仍待推进                                                        |
-| 前端测试体系                       | 已完成（基线）       | 建立 Vitest / React Testing Library 组件测试和 Playwright 浏览器冒烟测试                                                              |
-| 测试基线建设                       | 已完成（前端 / BFF） | `test:baseline` 汇集格式、lint、类型、测试和构建；Python 与 CI 接入继续跟踪                                                           |
-| 最小 CI 门禁与 Python 测试入口     | 已完成               | GitHub Actions 并行执行 Node/BFF 基线与 Python unittest，失败时保留 Playwright 产物                                                   |
-| 统一灾害数据入口与来源级状态       | 已完成               | DisasterAWARE 优先，空结果或不可用时使用备用来源，并向地图返回来源级状态                                                              |
-| 外部数据源时效性与韧性             | 已完成               | 每源 8 秒超时、一次重试、5 分钟进程内来源缓存、陈旧标识与 `source:id` 去重；地图展示最近成功时间                                      |
-| 自动刷新与请求竞态保护             | 已完成               | 地图 5 分钟刷新、隐藏暂停、恢复即刷新、请求取消、同筛选去重和旧结果丢弃                                                               |
-| 统一请求体、数组长度和数值范围校验 | 已完成               | Analytics 请求模型统一限制数组规模、字符串长度、数值范围和时间区间；非法请求在业务处理前返回 422                                      |
-| 前后端错误信息与调试信息分级       | 已完成（`d9a08b0`）  | React、Express 与 Python 统一等级、环境阈值和安全上下文；生产界面隐藏内部异常与组件堆栈                                               |
-| Python 服务结构整理                | 已完成               | 以应用工厂、路由、schema、service 与 core 分层；保持 FastAPI API、部署入口和算法兼容                                                  |
+### AI 与会话
 
-上述成果的实施细节、测试入口和剩余范围见下方同名章节。核对依据包括现有源码与测试、`package.json` 验证脚本、`docs/superpowers/` 计划与规格，以及 Git 历史；不能仅凭计划文件判定功能已经完成。
+- AI Router 以规则匹配选择 Ark 或 Workflow，并只在响应开始前进行 provider 降级。
+- 自动续传、跨标签并发限制、成本配额、会话持久化与跨实例限流不在当前范围内。
 
-### Docker 一键启动前后端
+### Analytics 与数据模型
 
-已落地 Docker Compose 编排能力：
+- 请求侧 HazardData 已双端对齐；Analytics 响应、4D 输出和生成式跨语言类型仍未统一。
+- 预测置信度、风险阈值、估算 magnitude 与质量规则需要真实业务样本校准。
+- 多来源事件的 severity 与 magnitude 不天然可比较；如需统一强度排名，应先定义业务换算规则。
 
-- `docker-compose.yml` 编排 `web` 和 `analytics` 两个服务。
-- 根目录 `Dockerfile` 使用多阶段构建，先构建前端产物，再启动 Express 服务。
-- `python-analytics-service/Dockerfile` 使用 Python 3.13 运行 FastAPI 分析服务。
-- `.dockerignore` 排除本地依赖、构建产物和环境变量文件。
-- `.env.example` 增加 Docker 场景下 `VITE_PYTHON_API_URL` 的说明。
-- README 已补充 Docker 启动、停止、日志查看和健康检查说明。
-- README 英文和中文的“本地开发”章节已集中说明前端开发模式和 Docker 全栈一键启动方式，避免启动命令分散。
+### 安全与运行边界
 
-验证结果：
+- BFF 限流目前按单进程内存和直连 IP 计数；多实例环境须迁移到网关或共享存储，并显式配置可信代理。
+- 浏览器仍可访问公开的 Python Analytics API；不部署时不构成当前阻塞，公网环境必须补身份、入口和限流设计。
+- Popup 外部字段只按文本显示。若未来允许外部 URL 可点击，需要单独定义协议白名单、`rel` 属性和测试。
 
-- `docker compose build` 可以完成镜像构建。
-- `docker compose up -d` 可以启动前端、BFF 和 Python 分析服务。
-- `http://localhost:8080` 返回 Web 首页。
-- `http://localhost:8001/health` 返回 Python 服务健康状态。
-- `pnpm run build` 通过。
-- `pnpm run lint` 退出码为 0，但仍保留既有 warning。
+### 交付与测试
 
-### AI 助手 BFF 化改造
+- 当前 GitHub Actions 运行前端/BFF 基线和 Python unittest，但不自动部署、不做视觉回归，也未接入依赖、镜像、许可证或 secret 扫描。
+- `pnpm test` 在受限沙箱不能验证需要绑定 `0.0.0.0` 的 BFF 用例；应在本机或 CI 的正常网络命名空间执行完整 BFF 测试。
+- Prettier 不解析 shell 脚本；`scripts/test-python.sh` 由 Bash 严格模式和实际 `pnpm run test:python` 执行验证。
 
-已将 AI 助手从“前端直连模型服务”调整为“前端调用项目 BFF，再由 BFF 按 `AI_PROVIDER` 调用 ai-workflow 或火山方舟”：
+## 后续执行原则
 
-```text
-AIChatAssistant
-  -> POST /api/ai/chat
-  -> Express BFF
-  -> ai-workflow / Volcengine Ark Responses / Chat Completions API
-```
-
-已落地内容：
-
-- `server/ai/ai-provider.ts` 统一读取服务端环境变量 `AI_PROVIDER`、`VOLCENGINE_WORKFLOW_API_URL`、`VOLCENGINE_WORKFLOW_API_KEY`、`VOLCENGINE_ARK_API_KEY`、`VOLCENGINE_ARK_MODEL`、`VOLCENGINE_ARK_API_URL`、`VOLCENGINE_ARK_TIMEOUT_MS`。
-- `server/ai/ai-chat-route.ts` 新增 `POST /api/ai/chat`，负责请求校验、provider 调度、错误脱敏和 SSE 流式转发。
-- `AI_PROVIDER=workflow` 时，BFF 调用已发布 ai-workflow 应用，按开始节点契约发送 `user_input`、`hazard_context`、`location` 和 `language`，并在 JSON Body 中发送 `stream: true`。
-- Workflow provider 同时兼容 SSE 和普通 JSON：SSE 的 `complete.data.outputs.result` 会被转换成前端聊天流格式，普通 JSON 从 `data.outputs.result` 提取回答。
-- 当 `VOLCENGINE_ARK_API_URL` 为 `https://ark.cn-beijing.volces.com/api/plan/v3` 时，BFF 自动拼接 `/responses` 并使用 Responses API 请求格式。
-- BFF 将 Responses API 的流式增量转换成前端现有 Chat Completions 风格流，前端接口保持不变。
-- System Prompt 构建逻辑迁移到 BFF，前端不再承担 provider 请求细节。
-- `src/services/ai/aiAssistantService.ts` 默认请求 `/api/ai/chat`，未配置模型服务时继续保留 Demo 模式。
-- 已删除前端 provider 配置模块，浏览器端不再读取模型服务 Key。
-- BFF 增加模型服务响应超时保护，避免上游无响应时前端无限等待。
-- Docker Compose 只在 `web` 服务运行时注入服务端 AI 环境变量，不作为前端 build args 注入。
-- `.env.example` 和 README 已更新为服务端 AI 配置方式。
-- 已新增 `pnpm test`、`tests/ai-provider.test.ts` 和 `tests/ai-stream.test.ts`，覆盖 provider 配置、请求体构造、Responses SSE 转换、Workflow SSE/JSON 结果转换。
-
-验证结果：
-
-- `pnpm test` 通过，当前 BFF 29 个测试和 Service 17 个测试全部通过。
-- `pnpm run build` 通过，前端构建产物中未发现已配置的前端旧 Key。
-- `pnpm run lint` 退出码为 0，但仍保留既有 warning。
-- `docker compose up -d --build` 可以启动 Web / Express BFF 和 Python 分析服务。
-- `http://localhost:8080` 返回 Web 首页。
-- `http://localhost:8001/health` 返回 Python 服务健康状态。
-- `AI_PROVIDER=workflow` 时，Docker 容器内确认 provider 为 workflow，协议为 workflow，并会在请求 Body 中发送 `stream: true`。
-- 未配置所选 provider 必要参数时，`POST /api/ai/chat` 返回 503 配置缺失状态，前端会降级到 Demo 模式。
-
-### BFF TypeScript 化
-
-已完成 AI BFF 及其运行时依赖的 TypeScript 迁移：
-
-- `server.ts`、`server/hazards/hazard-source.ts`、`server/env.ts` 和 `server/ai/*.ts` 替代原有服务端 JavaScript 文件。
-- 新增 `tsconfig.server.json` 和 `tsconfig.server.test.json`，服务端使用 NodeNext ESM 和严格类型检查，输出到 `dist-server/`。
-- Node 测试迁移为 TypeScript 源码，先编译再由 Node 执行编译产物。
-- `pnpm run build` 同时完成前端和 BFF 构建，`pnpm start` 启动 `dist-server/server.js`。
-- Docker runtime 镜像只复制 `dist/` 和 `dist-server/`，不在生产容器内运行未编译源码。
-- 新增 `@types/express`，为 Express 请求、响应和 `rawBody` 中间件补充类型声明。
-
-验证结果：
-
-- `pnpm run typecheck:server` 通过。
-- `pnpm test` 通过，当前 46 个测试全部通过。
-- `pnpm run lint` 通过，保留既有 warning，无新增 error。
-- `pnpm run build` 和 Docker Web 镜像构建通过。
-
-遗留风险：
-
-- 仓库其他历史 JavaScript 配置文件仍保留；本次只迁移服务端运行时和 AI BFF，避免扩大改动范围。
-- 本机 Node 版本应遵循项目声明的 `>=20.19 <21`，以保持和 Docker runtime 一致。
-
-## P0：AI 助手智能路由
-
-当前 AI 助手通过 BFF 中的规则 Router 判断请求路径：
-
-- 普通闲聊、通用解释和不需要知识库的问题调用火山方舟模型。
-- 灾害专业知识、Guardian 规则、历史案例、应急预案和需要 RAG 检索的问题调用已发布 ai-workflow。
-- 前端继续只请求 `/api/ai/chat`，不感知具体 provider。
-- Router、火山方舟和 ai-workflow 统一由 BFF 编排，API Key 不进入浏览器。
-- 已记录路由结果、失败降级策略和每条路径的耗时；后续需要用指标和业务样本持续校准误路由率。
-
-### 实现状态
-
-已完成智能路由和 provider 降级：
-
-- `AI_PROVIDER=router` 为默认模式；`AI_PROVIDER=workflow` 和 `AI_PROVIDER=ark` 保留为强制单 provider 模式。
-- `server/ai/ai-router.ts` 根据最新用户消息和实时灾害上下文，将知识库、Guardian 规则、历史案例、应急预案、灾害专业问题和实时态势分析路由到 ai-workflow，其余普通对话路由到火山方舟。
-- router 模式下，目标 provider 在响应开始前发生配置缺失、超时、网络错误或非 2xx 响应时，BFF 会尝试另一个已配置 provider；已经开始流式输出后不拼接备用 provider 的结果。
-- 每次请求输出结构化路由日志，包含路由原因、最终 provider、是否降级、尝试次数、状态和耗时，不记录用户消息、API Key 或模型响应内容。
-- `.env.example`、Docker Compose 和 README 已统一为 router 默认配置，并保留单 provider 调试方式。
-
-验证结果：
-
-- `pnpm test` 通过，当前 BFF 29 个测试全部通过，其中 26 个覆盖路由、provider 和流式适配行为。
-- `pnpm run typecheck:server` 通过。
-- `pnpm run lint` 退出码为 0，仍保留项目既有 warning。
-
-遗留风险：
-
-- 当前 Router 使用 BFF 内的规则匹配，不额外消耗一次 LLM 请求；后续如需更复杂的语义分类，可替换为独立分类器，但需要重新评估延迟、成本和误路由风险。
-- provider 在已经返回流式响应头后才发生的错误只能结束当前流，无法无缝切换到另一个 provider。
-
-## 代码审计新增项（2026-09-03）
-
-本节基于当前工作区全部 TypeScript、React、Python、配置和测试代码整理，包含未提交变更。它记录的是代码已经暴露出的具体缺口，不把已经完成的 API / Service、AI Router、BFF TypeScript 化和 Docker 基础能力重复列为待办。
-
-## P0：统一灾害数据与 Analytics API 契约
-
-### 代码依据
-
-- `src/types/index.ts` 的 `Hazard` 使用顶层 `title`、`timestamp`、`severity`、`source` 和 `magnitude`。
-- `src/services/analytics/analyticsService.ts` 的 `formatHazards` 现在优先读取顶层字段，仅在顶层缺失时兼容读取 `properties.*`，并保留合法的 `0` 数值。
-- 5 个 4D Service 方法现在统一发送 `{ hazards: ... }`，并分别发送时间维度、地理维度、聚合函数、筛选条件和时间窗口。
-- `python-analytics-service/main.py` 的 `AnalysisRequest` 已显式声明 4D 字段，并用 Literal、二元时间范围和正数约束拒绝不符合契约的请求。
-- `sum` 和 `mean` 聚合使用数值型 `magnitude` 列，避免对字符串 `id` 做数值聚合。
-- `python-analytics-service/tests/test_api_routes.py` 使用 FastAPI `TestClient` 覆盖五个 4D HTTP 路由的合法响应、参数转发、响应回显、空结果和 422 校验。
-
-### 风险
-
-- 原先由顶层字段丢失导致的统计、预测、风险评估结果偏差已修复。
-- 原先 4D 请求使用 `data`、参数未声明而导致的 422 或静默忽略已修复；非法参数现在明确返回 422。
-- Analytics 灾害请求已由共享 JSON 样本锁定两端行为；响应模型、4D 输出模型与代码生成仍不在本批范围内。
-
-### 第一阶段已完成
-
-- 统一前端 `Hazard` 到 Python `HazardData` 的字段映射，真实灾害的标题、时间、严重性、来源和震级可进入 Analytics 请求。
-- 为前端和 Python 增加 4D 请求类型与契约测试，覆盖 `hazards` 请求体、筛选参数、时间窗口和聚合行为。
-- 验证合法 4D 参数按请求传入分析器，非法维度、聚合函数、时间范围和时间窗口在 Pydantic 边界被拒绝。
-
-### 第二阶段已完成
-
-- 增加真实 ASGI HTTP 路由契约测试，验证请求经过 FastAPI 路由和 Pydantic 边界，而不是只直接调用 Python 函数。
-- 为 `httpx` TestClient 依赖锁定版本；测试不需要启动服务、不访问真实外部数据源，并覆盖五个 4D 路由。
-- README 和测试基线已区分 Python 模型/端点单元测试、HTTP 路由测试、算法冒烟脚本和手工集成脚本。
-
-### 后续工作
-
-- 评估将共享样本扩展到 Analytics 响应、4D 输出或采用代码生成的收益与维护成本。
-- 继续补充 Python 核心算法边界测试。
-
-## P0：BFF 代理暴露面与请求边界治理
-
-### 已完成（BFF 与 Python 管理面）
-
-- 用显式 allowlist 替换通用 `/api` 代理，只允许三条 DisasterAware `GET` 灾害接口；未知路径返回 `API_ROUTE_NOT_FOUND`，方法不匹配返回 `API_METHOD_NOT_ALLOWED`。
-- 非安全方法请求体限制为 64 KiB；query 限制为最多 20 项、键和值最多 256 字符，并拒绝数组和嵌套形状。
-- 仅转发 `accept`、`accept-language`；客户端 authorization、cookie、代理头和自定义头不会抵达上游，认证始终使用 BFF 服务端 token。
-- 为 DisasterAware 鉴权和代理接入有上限的超时；上游失败返回稳定、脱敏的 502/504 错误。`/api/authorize`、`/api/ai/chat` 及灾害查询拥有独立的单进程固定窗口限流。
-- 新增 BFF 边界测试，覆盖 allowlist、编码路径绕过、方法、请求体、query、请求头、限流、超时、token 缓存和错误脱敏。
-- Python `/metrics` 和 `/cache/clear` 已改为管理接口：未配置或令牌无效时返回 404，有效 `X-Analytics-Admin-Token` 才可访问；比较使用恒定时间函数。
-- Python CORS 已限制为显式来源、`GET`/`POST`/`OPTIONS` 和必要请求头，关闭 Cookie 凭据；`ANALYTICS_CORS_ORIGINS` 可覆盖默认来源。Compose 的 Python 端口已绑定 `127.0.0.1`。
-
-### 剩余风险与后续工作
-
-- 目前限流按 BFF 进程内存和直连 IP 工作；多实例部署需要在入口网关或共享存储实现统一限流，并按部署拓扑显式配置可信代理。
-- 浏览器仍直接访问 Python `/api/v1/*`；生产环境需要独立设计该公开 Analytics API 的反向代理、身份与统一限流策略。
-- AI Provider 的流式连接已纳入完整响应体超时和客户端断连取消；成本配额、跨实例限流和统一指标仍需后续治理。
-
-## P0：地图外部数据输出安全
-
-### 已完成
-
-- 新增 `src/features/map/utils/hazardPopupContent.ts`，由本地代码创建 Popup 的标题、信息行和样式类名。
-- `title`、`type`、`severity` 和 `description` 一律通过 `textContent` 写入；`useHazardMarkers` 使用 `Popup#setDOMContent()`，不再调用 `setHTML()`。
-- 新增恶意标签、事件属性和 URL 文本回归测试，并在 MapView 集成测试中确认 Mapbox 接收的是安全 DOM 节点。
-
-### 验收与遗留范围
-
-- 外部字段中的 HTML、脚本和事件属性只能按纯文本展示，不能创建 Popup DOM 节点或执行代码。
-- 本轮不将外部 URL 变为可点击链接；若后续增加链接能力，需单独定义协议白名单、`rel` 属性和测试。
-
-## P1：统一请求体、数组长度和数值范围校验
-
-综合分析接口已有 1000 条数据截断，但 Python 各接口尚缺统一的请求体、数组长度和数值边界；`coordinates` 缺少经纬度范围与长度校验，`quality/history` 的 `limit` 直接使用。BFF 已具备请求体、query 和 AI 输入限制，本项重点补齐 Python 请求体大小、灾害数组上限、字符串长度、坐标范围和分页 limit，并复用已有 4D 时间窗口与枚举校验，为边界返回稳定的 4xx 错误契约。
-
-## 已完成：Python API 契约与分析可靠性
-
-### 完成内容
-
-- 五个分析接口通过 request ID 返回稳定、脱敏的内部错误契约；合法的 Pydantic 输入错误继续返回 422。
-- `/api/v1/analyze` 只缓存成功响应，使用完整请求语义生成键，指标和清缓存接口反映真实缓存状态。
-- Pandas、ETL、统计、预测和风险计算都通过线程边界从 FastAPI 事件循环移出。
-- 结果语义测试覆盖空数据、缺列、NumPy 非有限数值和模型异常；模型失败固定输出 `status="failed"` 与 `reason="model_error"`，不向调用方返回异常文本。
-
-### 后续风险
-
-- Python 服务已完成 routes / schemas / services / core 拆分；质量和透视接口的异常响应契约保持原样，原始异常文本治理应作为独立需求处理。
-- `unified_model.py` 的阈值、估算 magnitude、预测置信度和风险评分口径仍需要真实业务样本校准。
-- 本轮未设全局并发限制或队列；生产部署前应以事件循环响应、延迟和吞吐实测数据确定容量策略。
-
-## P1：Analytics 结果语义与展示一致性
-
-### 第一阶段已完成
-
-- Python 预测结果统一返回 `status`、`reason`、`dataPoints`、`minimumDataPoints` 和 `confidence`；样本不足、模型失败与可用结果可以被前端区分。
-- 风险建议增加 `recommendationDetails`，包含 `ruleId`、`severity`、`metrics` 和 `message`，同时保留旧的字符串建议字段兼容已有调用方。
-- 质量检查统一前端实际使用的枚举大小写与 `DisasterAWARE` 来源别名，质量分数限制在 `0-1`，避免出现负分或超过 100% 的展示结果。
-- 新增前端 Analytics 展示适配器，统一风险等级、趋势、状态、分数、百分比和质量问题文案；新增 Python 结果语义测试和前端适配器测试。
-
-验证入口：`tests/service-analytics-presentation.test.ts`、`python-analytics-service/tests/test_result_semantics.py`。
-
-剩余工作：将适配器继续拆分为正式 i18n 资源，补充页面组件级断言、移动端视觉回归，并继续校准预测算法和风险阈值。
-
-### 第二阶段已完成
-
-- 展示适配器增加 `zh-CN` 和 `en-US` 正式文案资源，状态、风险等级、趋势、严重程度和质量问题文案均可按 locale 输出。
-- 新增 `DataQualityMonitor` 组件测试，覆盖中文状态/分数/维度展示、问题建议本地化和异常分数边界。
-- 测试基线同步覆盖 62 项根目录自动化测试，保留算法校准、移动端视觉回归和完整页面覆盖为后续工作。
-
-### 后续剩余缺口
-
-- 继续校准预测算法、风险阈值和置信度定义，用真实业务样本建立可比较的效果基线。
-- 补充移动端视觉回归、低风险高关注项端到端验证，以及 Analytics 页面更多交互状态覆盖。
-
-## P1：统计概览图表数据与坐标一致性
-
-### 问题依据
-
-- 统计概览的灾害强度折线图原先没有优先读取标准 `Hazard.magnitude`，缺少数值时使用 `Math.random()` 填充，导致同一批数据重复渲染后图形变化，图表无法代表真实灾害强度。
-- X 轴标签按数据量抽样后，首尾标签仍使用居中定位；结合溢出裁剪时，最后的 `#846` 可能只显示为 `#8`，造成图形坐标与记录编号的视觉错位。
-- 数据源没有强度字段时，图表标题仍标记为“全部数据”，容易让使用者误以为每条记录都参与了强度计算。
-
-### 已完成
-
-- 新增 `src/utils/hazardMetrics.ts`，按顶层 `magnitude`、几何扩展字段和兼容属性字段顺序读取有限数值，保留合法的 `0`，无真实强度时返回 `null`。
-- `AnalyticsPage` 使用 `useMemo` 构建有效强度序列，缺少强度的记录不再生成随机点，并显示“有效强度数据：有效数 / 总数”。X 轴编号继续保留原始灾害记录编号。
-- `DataVisualization` 的首个标签左对齐、末个标签右对齐，中间标签居中，避免边缘标签被裁剪；单条数据时坐标位置也保持有效。
-- 新增强度字段读取测试和大数据量图表组件测试，覆盖 846 条记录最多显示 8 个标签、首尾标签完整显示及缺少强度数据的确定性行为。
-
-### 验证结果
-
-- `pnpm run test:component` 通过，7 项组件测试全部通过。
-- `pnpm exec vitest run tests/service-hazard-metrics.test.ts` 通过，3 项强度读取测试全部通过。
-- `pnpm run lint`、`pnpm run format:check`、`pnpm run typecheck:client` 和 `pnpm run build:client` 通过。
-
-### 后续风险
-
-- NASA、GDACS 和部分 DisasterAware 记录本身可能没有可比较的 magnitude；当前界面会明确显示有效数据量，但不会把严重程度等级伪装成数值强度。后续如需跨来源比较，应先定义统一的业务强度模型和来源转换规则。
-- 当前统计概览仍展示完整数据集的基础统计，但强度趋势图只展示具备真实强度的记录；后续可补充缺失原因筛选和数据来源分组，进一步降低解释成本。
-
-## P1：外部数据源时效性与韧性（已完成）
-
-- 每个外部来源请求使用 8 秒超时，并在失败后重试一次；来源缓存保留在进程内 5 分钟。
-- Live 请求两次失败时，未过期缓存以 `stale` 状态返回，响应 `meta.stale` 标识整批数据的陈旧性，并附带每个来源的 `fetchedAt`。
-- 地图状态条在陈旧数据时提示“数据可能已过期”，并显示所有陈旧来源中最早的最近成功时间。
-- 聚合结果按 `source:id` 去重，保留不同来源的同名或同 ID 事件。
-- 已覆盖单源缓存回退、缓存过期、超时重试和重复事件；自动刷新与请求竞态保护仍作为下一步独立任务。
-
-## P1：AI 流式会话生命周期治理（已完成）
-
-### 已完成
-
-- 浏览器流式 Service 支持 `AbortSignal` 和 `completed`、`cancelled`、`failed` 终态；SSE 解码覆盖 UTF-8 半包、CRLF/LF、多行 data、注释、尾部无换行、显式 `[DONE]` 及错误事件。没有完成标记、损坏 JSON 或 provider 错误都会返回稳定失败结果，不暴露上游正文。
-- `useAIChatSession` 统一管理活动请求、递增请求序号、关闭/清空/停止/卸载取消、已停止部分文本、手动重试快照和历史筛选。取消或失败的回答不会进入下一轮模型输入，重试不会重复添加用户消息。
-- 前端发送前复用 BFF 的 50 条消息、单条 8000 字符及 64 KiB UTF-8 请求预算；历史超过预算时从最早完整轮次裁剪，界面仍保留全部可见消息。
-- BFF provider attempt 的超时现在覆盖连接和完整响应体；响应体结束、失败、客户端断连或 workflow JSON 读取结束后才释放计时器。Responses provider 的 `response.failed` 和 `response.incomplete` 会转换为安全 SSE error 事件，只有明确完成事件才输出 `[DONE]`。
-- 组件测试覆盖关闭后的取消与晚到 chunk 隔离、失败后的无重复消息重试；Service 与 BFF 流协议测试覆盖取消、错误和不完整流。
-
-### 后续边界
-
-- 当前不会自动重连或自动重试已经开始输出的请求；如需恢复网络后的续传，必须由 provider 支持可验证的会话游标。
-- 成本配额、跨标签页并发限制、跨实例限流和会话持久化仍需在服务端增加统一存储后单独设计。
-
-## P1：前后端错误信息与调试信息分级（已完成）
-
-已在提交 `d9a08b0` 完成当前阶段：
-
-- `shared/logging.ts` 统一 `debug`、`info`、`warn`、`error` 和 `silent` 阈值，过滤令牌、请求/响应正文、异常、堆栈等敏感上下文。
-- 前端通过 `VITE_LOG_LEVEL` 配置等级，开发默认 `debug`、生产默认 `warn`；应用源码中的直接 `console.*` 已迁移为模块日志入口。
-- Express BFF 通过 `LOG_LEVEL` 配置等级，开发默认 `debug`、生产默认 `info`；启动、AI 路由、鉴权和代理失败均使用稳定事件名及有限上下文。
-- Python 分析服务集中配置标准 `logging`，支持 `LOG_LEVEL` 与 `APP_ENV`，移除业务模块的 `basicConfig`，动态异常文本不会进入日志输出。
-- `ErrorBoundary` 在生产环境只显示安全提示，不展示原始异常或组件栈；开发环境仍保留诊断详情。
-- `.env.example`、Dockerfile、Docker Compose 及中英文运行文档已说明等级、默认值和前端重新构建要求。
-
-验证结果：
-
-- `pnpm test` 通过：BFF 72 项、Service 45 项。
-- `pnpm run test:component` 通过：31 项。
-- `pnpm run lint`、`pnpm run format:check`、前后端类型检查、`pnpm run build` 和 `git diff --check` 通过。
-- Python 日志定向测试 7 项通过；本机系统 Python 缺少 `pandas` 和 `numpy`，因此未在本次本地环境重复运行 Python 全量 API 测试，CI 的固定依赖环境仍是完整回归入口。
-
-后续边界：本项不包含集中式日志平台、错误聚合服务、指标存储、告警规则和跨服务 trace；这些能力继续归入 P2 可观测性。
-
-## P1：CI/CD 与质量门禁接入
-
-分两阶段推进：第 2 批先建立最小 CI，运行已有根目录基线及 Python 自动化测试，固定可复现的运行环境并保留失败产物；不等待算法测试、移动端和视觉回归全部补齐。自动部署、扩展扫描和发布策略后续按交付需要安排。Python 现有测试使用 unittest，可直接复用，不以迁移 pytest 为接入条件。
-
-仓库当前没有 `.github/workflows` 或等价 CI 配置。最小 CI 复用 `pnpm run test:baseline`，并运行 `python -m unittest discover -s python-analytics-service/tests -p 'test_*.py'`；固定与项目兼容的 Node、pnpm 和 Python 环境，上传失败日志、截图或 trace。`test_service.py` 依赖已运行服务，`test_pivot_table.py` 是打印式脚本，两者不作为本轮自动化门禁；依赖/镜像扫描在后续持续审计中扩展。
-
-## P2：运行时无关文件与仓库卫生
-
-当前工作区可见未被构建使用的 `server 2.ts`，以及 `.superpowers/sdd/` 下的 review diff 和任务快照；根目录同时保留 `package-lock.json` 与 `pnpm-lock.yaml`。应明确哪些是提交资产、临时审查产物和个人本地文件，决定旧副本与双锁文件的保留策略，并在 `.gitignore`、README 和 CI 中固化规则。`server 2.ts` 和 review diff 不应被当作运行入口或项目结构组成部分。
-
-## P2：依赖、镜像和配置持续审计
-
-当前 Docker runtime 仍在镜像内重新安装 pnpm 和生产依赖，前端/BFF/测试依赖也共用一个 `package.json`，依赖大量使用 `^` 范围。建议增加 lockfile 一致性、依赖漏洞、许可证、容器镜像和 secret scanning；明确生产依赖边界并评估 pnpm store / 多阶段缓存策略。
-
-## P2：可访问性与多语言界面
-
-多个 Modal 使用自定义 div 和 inline style，缺少统一 `role="dialog"`、`aria-modal`、焦点陷阱、返回焦点和完整键盘行为；界面同时混用中英文，日期和错误消息也没有统一 locale。建议建立基础无障碍组件和 i18n 资源，覆盖键盘、读屏、移动端布局和中英文快照测试。
-
-## P1：报告下载闭环
-
-`SaveReportModal` 已能下载 JSON，界面提示却写成 HTML；`App.tsx` 的 `handleDownloadReport` 只记录日志。本项是格式承诺、内容与职责的闭环，不是从零实现下载。应明确报告格式、导出字段、数据时间与来源、编码、文件名和敏感数据处理，并以下载内容测试和文档同步为验收标准。默认排在数据可靠性之后；若报告成为近期交付核心，可提前最小闭环，后端存储另行评估。
-
-## P1：统一灾害数据入口与来源级状态
-
-本项负责统一入口、灾害数据归属和来源状态契约；“外部数据源时效性与韧性”在此基础上补超时、降级和新鲜度，“实现自动刷新与请求竞态保护”负责请求生命周期。三项按依赖连续推进，不另设重复的地图数据治理任务。
-
-当前 Express 已实现 `/api/hazards` 聚合入口，但 `MapView` 仍直接请求 USGS、NASA、GDACS，Service 层又把来源失败统一转换为空数组。建议让地图使用统一聚合入口，保留每个来源的成功/失败、请求耗时、最后成功时间、数据新鲜度和降级原因；验收需覆盖单源失败、部分成功、重复事件、过滤条件和旧数据保留策略。
-
-## P1：实现自动刷新与请求竞态保护（已完成）
-
-- 地图灾害请求使用 `AbortController`，筛选变化、自动刷新取消和组件卸载均会中止过期请求。
-- 相同筛选条件的手动、首次与定时刷新复用进行中的请求；请求序号确保网络或 Worker 晚到结果不能覆盖最新状态。
-- 使用 5 分钟刷新周期；页面隐藏时暂停周期，恢复可见后立即刷新并重新计时。
-- `fetchHazardFeed` 与 HTTP 客户端会转发调用方取消，不把调用方取消错误转换为超时或重试。
-- AI 流式与 Analytics 请求生命周期仍属于各自的后续优化项。
-
-## P2：前端包体积预算与分包治理
-
-当前 `vite.config.ts` 手动配置了 React、Mapbox、Recharts 和工具分包，但构建仍生成空的 vendor chunk，Mapbox 产物约 1.8 MB，且主要依靠提高 `chunkSizeWarningLimit`。建议按真实依赖图重做 manual chunks，懒加载地图/分析/3D 能力，建立 gzip/raw size budget，并在 CI 中对超预算失败或告警。
-
-## P2：前端边界类型治理（Analytics 两阶段与 Hazard/HTTP 前端边界已完成）
-
-### 第一阶段完成情况
-
-- statistics、predictions、risk-assessment、quality assess、quality thresholds、pivot create、pivot trend-analysis、pivot risk-score 共 8 个当前 React 消费的接口，均将 `response.json()` 结果先视为 `unknown`，再通过按领域拆分的运行时解析器返回明确类型。
-- 解析器验证成功响应外壳、必填字段、嵌套对象、数组成员、有限数值和字段范围；合法空结果、统计 `null`/`0`、预测模型失败、风险 0–100 与质量总分 0–100 保留各自语义，契约异常使用稳定的 `AnalyticsContractError`。
-- `useAnalyticsData`、Analytics 页面、ChartsPanel、InsightsPanel、DataQualityMonitor 和图表事件入口已迁移到验证后的领域类型，核心消费链路不再依赖未经验证的响应断言。
-- 第一阶段文件已将 `@typescript-eslint/no-explicit-any` 提升为 error；其他目录继续使用现有 warning。类型正反例由 `typecheck:contracts` 编译，并已接入 `test:baseline`。
-- 回归覆盖真实成功响应、合法空结果、损坏结构、null/0、总体预测失败、风险与质量分制、4D 判别联合及无效图表事件；验证入口包括 lint、Prettier、Service/组件测试、客户端/服务端/合同类型检查、构建和 `git diff --check`。
-
-### Analytics 第二阶段子批次完成情况
-
-- service info、quality history、ETL、unified transform/merge、comprehensive analysis、pivot query 和 pivot summary 已迁移到明确的运行时契约与领域返回类型。
-- JSON 记录按端点区分有限标量与安全递归结构；计数、分布、筛选回显和 Python 汇总字段均在响应边界验证，契约错误与业务错误保持稳定类型。
-- Analytics Service 已不再使用旧 `AnalyticsResult` 兜底；新增合同类型反例并继续由既有严格 lint 文件范围覆盖。
-
-### Hazard/HTTP 前端边界完成情况
-
-- `requestJson` 成功 JSON 明确返回 `unknown`；授权、BFF Hazard feed、DisasterAware、USGS、NASA EONET 与 GDACS 均在进入领域层前执行运行时解析。
-- BFF 与 DisasterAware 的顶层或必要字段错误被拒绝并按既有 Service 语义降级；公开来源保留合法混合列表中的逐条跳过与空数组降级。
-- 服务层回归覆盖 14 个文件、167 项测试；客户端、合同类型和服务端类型检查、格式检查、构建及 `git diff --check` 通过。`pnpm test` 的 BFF 监听测试在当前沙箱因 `listen EPERM: operation not permitted 0.0.0.0` 未能完成，不能据此宣称全量测试通过；命令同时显示 Node engine warning（当前 `v24.16.0`，声明范围为 `>=20.19 <21`）。
-
-### 后续范围
-
-- 导出、第三方组件与旧兼容路径中的动态结构继续按文件范围收敛。
-- 跨语言代码生成仍待评估；Analytics 灾害请求已使用共享 JSON 样本同步 TypeScript 与 Python，并由现有 CI 两个 job 分别执行测试。
-
-## P0：地图模块拆分
-
-### 本轮完成情况
-
-- 将原 `src/components/MapView.tsx` 拆分为 `src/features/map/MapView.tsx`、6 个地图 hook 和 3 个纯工具模块。
-- 地图实例、数据与 Worker、Marker、LOD、热力图、3D Tiles/建筑回退均有独立职责；组合组件只负责 hook 编排和热力图切换控件。
-- 新增 GeoJSON/LOD 单元测试及 Mapbox/Worker mock 组件测试，覆盖临界 zoom、坐标过滤、热力图切换与组件挂载。
-- `pnpm run test:baseline` 已通过：BFF 29、Service 36、组件 8、E2E 1，前后端构建通过。
-- Popup 安全、统一灾害入口、自动刷新竞态和包体积治理仍按各自待办继续跟踪。
-
-### 拆分前问题（历史背景）
-
-原 `src/components/MapView.tsx` 曾同时承担以下职责，现已迁入 feature 入口及独立 Hook：
-
-- Mapbox 地图初始化和生命周期管理。
-- 灾害数据加载。
-- DisasterAware 和备用数据源调度。
-- Web Worker 数据清洗。
-- DOM Marker 渲染。
-- GeoJSON Source 和 cluster 图层初始化。
-- Heatmap source 和 layer 更新。
-- 3D 建筑、deck.gl overlay 初始化。
-- 基于 zoom 的 LOD 可见性切换。
-
-这些职责集中曾增加维护风险；本轮已完成结构拆分，功能增强仍按独立待办推进。
-
-### 建议结构
-
-```text
-src/features/map/
-  MapView.tsx
-  hooks/
-    useMapboxInstance.ts
-    useHazardData.ts
-    useHazardMarkers.ts
-    useHazardLodLayers.ts
-    useHazardHeatmap.ts
-    useDeck3DTiles.ts
-  utils/
-    hazardGeojson.ts
-    mapLayerIds.ts
-    mapLod.ts
-```
-
-### 目标效果
-
-- `MapView.tsx` 变成组合型组件，只负责拼装地图能力。
-- LOD 逻辑独立出来，可以单独测试。
-- GeoJSON Feature 生成逻辑变成纯函数。
-- DOM Marker 渲染和 WebGL 图层渲染在代码结构上清晰分离。
-- Worker 数据清洗封装到 hook 或 service 中。
-
-### 验收标准
-
-- `MapView.tsx` 控制在 220 行以内。
-- LOD 图层初始化和 visibility 切换不再写在组件主体里。
-- Marker 生命周期有唯一清理路径。
-- GeoJSON 生成逻辑有测试，覆盖 id、坐标、颜色、筛选行为。
-- 地图样式切换后，自定义图层仍能正确恢复。
-
-## P0：分析页面拆分
-
-### 当前实现状态
-
-分析页面拆分已经完成：
-
-- `src/components/AnalyticsPage.tsx` 缩减为兼容转发入口。
-- `src/features/analytics/AnalyticsPage.tsx` 为 300 行以内的页面组合入口，只持有当前 Tab 状态。
-- Python 服务健康检查、自动分析、缓存、重试、手动重跑和 4D 分析编排统一进入 `useAnalyticsData`。
-- 灾害类型统计、有效强度序列和分析数据哈希进入纯转换模块。
-- 页头、摘要、服务控制区、Tab 导航、统计概览、图表、预测、风险和数据质量展示均拥有显式组件边界。
-- 现有 `ChartsPanel`、`ChartDrilldownModal` 和 `DataQualityMonitor` 继续复用，避免重复改造稳定模块。
-
-### 已落地结构
-
-```text
-src/features/analytics/
-  AnalyticsPage.tsx
-  styles.ts
-  types.ts
-  components/
-    AnalyticsHeader.tsx
-    AnalyticsSummaryGrid.tsx
-    AnalyticsControlPanel.tsx
-    AnalyticsTabs.tsx
-    PredictionStatusBadge.tsx
-    RiskRecommendationLine.tsx
-    tabs/
-      AnalyticsChartsTab.tsx
-      AnalyticsQualityTab.tsx
-      OverviewTab.tsx
-      PredictionsTab.tsx
-      RiskTab.tsx
-  hooks/
-    useAnalyticsData.ts
-  utils/
-    analyticsTransforms.ts
-```
-
-### 验收结果
-
-- feature 页面入口为 84 行，兼容入口为 1 行。
-- `analytics-transforms.test.tsx` 覆盖类型回退、未分类、无效强度过滤、原始编号和哈希规则。
-- `use-analytics-data.test.tsx` 覆盖服务检查、分析链路、缓存、空数据和手动重跑。
-- `analytics-page.test.tsx` 覆盖兼容入口和五个 Tab 切换。
-- 主统计、预测、风险和 4D 分析链路只由 `useAnalyticsData` 调用 Analytics Service；复用的图表与质量组件保留独立请求边界。
-- 图表自定义和钻取继续由既有独立组件管理。
-
-### 后续可选优化
-
-- `OverviewTab.tsx` 仍包含较多统计展示区块，可在需要独立演进 4D、关联性和趋势展示时继续按结果域拆分。
-- 本轮保持现有视觉和业务行为，不处理自动刷新竞态、异步卸载治理、国际化或视觉重构。
-
-## P0：API / Service 层统一
-
-### 当前实现状态
-
-本轮已完成统一 Service 层的第一阶段落地：
-
-- `src/services/http` 提供统一 JSON、文本和流式请求、超时、重试及 `ServiceError` 错误契约。
-- `src/services/auth` 通过 BFF 管理 DisasterAware 凭据和 token；浏览器不读取用户名、密码或真实 token。
-- `src/services/hazards` 集中处理 USGS、NASA、GDACS 和 DisasterAware 请求及数据适配。
-- `src/services/analytics` 接管 Python Analytics 请求，并保留原有导出能力。
-- `src/services/ai` 接管 AI SSE 请求和 Demo 降级；纯 UI 辅助函数放在 `src/utils/aiAssistant.ts`。
-- 已移除 `src/api` 兼容 facade，项目内部统一直接使用 Service 层。
-- `tests/service-*.test.ts` 使用 Vitest 覆盖 HTTP、适配器、Analytics 和 AI Service；BFF 继续使用 Node 原生测试。
-
-验证命令为 `pnpm test`、`pnpm run lint`、`pnpm run format:check`、`pnpm run typecheck:client`、`pnpm run typecheck:server` 和 `pnpm run build`。
-
-遗留风险：Analytics 后端返回字段仍有版本差异，分析 feature 的展示边界暂时使用兼容响应类型；后续可随着 FastAPI 响应契约稳定继续细化类型。
-
-### 迁移前问题
-
-前端 API 曾分布在多个文件中，返回结构、错误处理和 provider 适配方式不完全一致，导致 UI 组件需要知道过多外部服务细节。
-
-本轮已完成迁移，业务请求由 `src/services` 统一负责。
-
-### 已落地结构
-
-```text
-src/services/
-  http/
-    httpClient.ts
-    serviceError.ts
-  hazards/
-    hazardService.ts
-    hazardAdapters.ts
-  analytics/
-    analyticsService.ts
-    analyticsTypes.ts
-  ai/
-    aiAssistantService.ts
-  auth/
-    authService.ts
-```
-
-### 目标效果
-
-- 所有 API 调用使用统一的请求、超时、重试和失败契约。
-- provider 特有的数据解析放在 adapter 中。
-- UI 组件不直接处理外部 API 的异常结构。
-- AI provider 切换继续通过配置驱动。
-
-### 当前遗留项
-
-- Analytics 后端字段仍有一定版本差异，分析展示边界暂时使用兼容响应类型。
-- 分析页面已迁移到 `src/features/analytics/`；统计概览 Tab 可在后续按结果域继续细分。
-
-### 验收结果
-
-- 使用统一的 `ServiceError` 和等价的空结果降级策略处理可恢复错误。
-- DisasterAware、USGS、EONET、GDACS 的数据映射逻辑已独立。
-- AI 助手组件不直接暴露 provider 特有请求细节。
-- 网络错误、鉴权失败、响应结构异常已有统一处理方式。
-
-## P1：前端状态归属梳理
-
-### 当前状态
-
-当前重要状态分散在 `App.tsx` 和多个大型子组件中：
-
-- 灾害数据。
-- 当前筛选条件。
-- 弹窗显示状态。
-- 地图渲染状态。
-- 分析页状态。
-- 通知行为。
-
-目前能工作，但状态职责不够明确。
-
-### 推荐方向
-
-优先抽自定义 Hook，不要一开始就机械引入 Redux、Zustand 或多个 Context。
-
-```text
-src/hooks/
-  useDisclosure.ts
-
-src/features/hazards/
-  useHazardsStore.ts
-
-src/features/ui/
-  useAppPanels.ts
-```
-
-只有当多个远距离组件确实需要共享同一份可变状态时，再引入 Context 或外部状态库。
-
-### 关于“四个 Context + useReducer”
-
-“灾害数据 / 筛选条件 / UI 状态 / 通知”四个 Context 的方案可以作为一个演进方向，但不建议直接机械落地。
-
-更稳妥的路径：
-
-1. 先抽领域 Hook。
-2. 再确认哪里真的存在 props drilling。
-3. 只给跨层级共享的状态加 Context。
-4. 地图实例、markers、overlays 不进入全局 React 状态。
-
-### 验收标准
-
-- `App.tsx` 只负责顶层页面模式和组件组合。
-- 灾害数据的归属清晰。
-- 弹窗状态被统一管理。
-- 地图实例、Marker 和 overlay 仍由地图专属 Hook 管理。
-
-## 已完成：Python 服务结构整理
-
-### 实现结果
-
-`python-analytics-service/main.py` 已收敛为兼容入口，继续支持 `python main.py`、`uvicorn main:app`、Docker 和 `start.sh`。应用装配迁移至 `app/main.py`；请求/响应模型、应用状态、服务、HTTP 路由和中间件分别位于 `app/schemas`、`app/core`、`app/services` 与 `app/routes`。
-
-### 已落地结构
-
-```text
-python-analytics-service/
-  app/
-    main.py
-    routes/
-      analytics.py
-      health.py
-    schemas/
-      requests.py
-      responses.py
-    services/
-      analytics_service.py
-    core/
-      config.py
-  analytics/
-    etl_processor.py
-    pivot_table_analyzer.py
-    prediction_models.py
-    quality_monitor.py
-    risk_assessment.py
-    statistical_algorithms.py
-    unified_model.py
-```
-
-### 保持的边界
-
-- FastAPI 应用初始化和分析实现分离。
-- 请求 / 响应模型可以复用。
-- analytics 目录继续专注计算逻辑。
-- 服务启动、测试、部署都更清晰。
-
-### 验证结果
-
-- `create_app()` 为每个应用实例创建独立服务状态；同一实例的分析和质量服务共享 ETL/质量历史状态，保持原有观察语义。
-- Python 3.13 下 `unittest discover` 通过 34 项测试，覆盖应用工厂隔离、请求契约、服务调度、路由委托、管理边界、CORS、错误响应和算法结果语义。
-- `pnpm run lint`、`pnpm run format:check`、`pnpm test`、`pnpm run typecheck:client`、`pnpm run typecheck:server`、`pnpm run build` 与 `git diff --check` 通过；构建保留既有的大 bundle 提示。
-
-## P1：测试基线建设
-
-### 当前状态
-
-项目现已具备 BFF Node 原生测试、前端 Service 层 Vitest 测试、React Testing Library 组件测试、Playwright 浏览器冒烟测试，以及独立的 Python API 模型和 HTTP 路由契约测试。前端和 BFF 已通过 `pnpm run test:baseline` 纳入统一门禁；Python 核心算法测试、Python 测试统一接入、视觉回归和 CI/CD 接入仍待补齐。
-
-### 建议优先覆盖
-
-BFF：
-
-- AI provider 请求构造。
-- SSE 响应转换。
-
-前端测试体系单独覆盖组件和页面行为，详见下方“前端测试体系”条目。
-
-Python：
-
-- 风险评分。
-- 统计摘要。
-- 透视表分析。
-- 预测模型输入校验。
-- 数据质量监控边界情况。
-
-### 验收标准
-
-- 前端增加 `pnpm run test:services`，并由 `pnpm test` 与 BFF 测试统一执行。已完成。
-- Python 服务复用现有 unittest 自动化测试，并随算法可靠性工作扩展核心测试；不要求先迁移测试框架。
-- 本地质量基线包含 lint、格式、前后端类型检查、build、BFF 测试、Service 测试、React 组件测试和 Playwright 冒烟测试；Python 测试入口与最小 CI 在第 2 批一起落实，不互相等待。
-- 核心转换逻辑不依赖浏览器或 Mapbox 就能测试。
-
-## P1：前端测试体系
-
-### 当前状态
-
-前端 Service 层已有 Vitest 单元测试，覆盖统一 HTTP、灾害数据适配、Analytics 格式化和 AI 流式/Demo 降级；新增的 React Testing Library 和 Playwright 基线已覆盖状态面板、首页筛选、AI 助手打开及消息展示。视觉回归、移动端专门流程和更完整的组件状态覆盖仍属于后续增强。
-
-### 建议优先覆盖
-
-- 使用 Vitest 和 React Testing Library 持续扩展 AI 助手、弹窗、表单、错误状态和 Demo 降级测试。当前第一阶段已建立组件测试配置和状态面板行为测试。
-- 将灾害 API adapter、灾害筛选、通知触发规则、GeoJSON 生成和分析数据转换等纯函数纳入前端单元测试。
-- 使用 Playwright 测试地图首页、灾害筛选、AI 助手打开和 mock 流式响应展示。关键弹窗、路由跳转和移动端流程待后续扩展。
-- 对桌面端和移动端执行截图或视觉回归检查，重点关注地图、聊天面板、弹窗和表格布局，作为下一阶段建设项。
-- 为模型 API、灾害 API、Mapbox 和 Python 服务建立可控 mock，避免测试依赖真实外部服务。
-
-### 验收标准
-
-- 增加独立的 `pnpm run test:component` 命令，能够执行 React 组件行为测试。已完成。
-- 增加独立的 `pnpm run test:e2e` 命令，能够启动测试服务并执行 Playwright 浏览器流程。已完成。
-- 当前基线覆盖 AI 助手 mock 流式成功路径；请求失败、空响应和 Demo 降级属于现有 Service 测试及后续组件测试扩展范围。
-- 当前 E2E 失败时保留截图，重试时保留 trace；桌面端首页关键流程已覆盖，移动端和视觉回归待后续建设。
-- `pnpm run test:baseline` 已统一执行 lint、格式、类型检查、build、前端测试和 BFF 测试；第 2 批将其与 Python 自动化测试一起纳入最小 CI 门禁。
-
-## P2：仓库 / 包结构调整
-
-### 当前状态
-
-仓库根目录同时包含前端代码、Express 服务、Python 服务、脚本、Dockerfile 和文档。
-
-### 长期建议结构
-
-```text
-apps/
-  web/
-  bff/
-services/
-  analytics/
-packages/
-  shared-types/
-docs/
-scripts/
-```
-
-这是一次较大的迁移，建议在 P0 模块拆分完成后再做。
-
-### 验收标准
-
-- 前端和 BFF 依赖分离。
-- Python 服务拥有独立依赖和 Docker 上下文。
-- 共享契约可以版本化或自动生成。
-- 根目录仍保留简单的开发启动命令。
-
-## P2：依赖清理
-
-### 当前状态
-
-`package.json` 里混合了前端运行时依赖、BFF 依赖、开发工具和类型包。
-
-### 建议动作
-
-- 将仅开发使用的包移动到 `devDependencies`。
-- BFF 拆出后，分离后端依赖。
-- 检查大型可视化依赖是否仍然全部需要。
-- 增加生产构建体积分析。
-
-### 验收标准
-
-- `pnpm run build` 不再出现意外依赖警告。
-- 依赖分组能反映运行时归属。
-- 生产 bundle 体积可以被检查或周期性评估。
-
-## P2：可观测性、集中错误上报和指标告警
-
-### 建议动作
-
-- 将 React、BFF 和 Python 的结构化日志接入集中采集与检索平台。
-- 接入前端错误聚合服务，保留版本、环境和安全关联标识，不上传用户输入或敏感正文。
-- 采集数据刷新、API 失败、地图渲染模式等基础指标。
-- 建立按错误率、持续失败和服务健康度触发的告警规则，并定义告警负责人和降噪策略。
-
-### 验收标准
-
-- 外部 API 失败可排查，但不会暴露敏感请求信息。
-- 可以按环境、服务、模块、事件名和安全关联标识检索失败链路。
-- 核心错误率和健康度异常能触发可操作的告警，重复事件不会造成告警风暴。
-- 生产采集链路不上传凭证、用户输入、请求/响应正文或组件堆栈。
-
-## 建议执行顺序
-
-默认假设项目仍以开发和演示为主，尚未面向公网正式运营。以下按风险、依赖和验证成本排序；每项新增行为的测试随该项完成，不集中推迟到最后。
-
-1. **地图 Popup 输出安全。** 消除外部字段直接拼接 HTML 的路径，补安全回归测试。
-2. **最小 CI 门禁与 Python 测试入口。** 复用已有前端、BFF、组件、E2E 与 Python 测试，明确运行环境；自动部署另行安排。
-3. **统一灾害入口、数据归属和来源状态。** 确立唯一调度入口及成功、失败、无数据的状态契约，同步处理灾害状态归属。
-4. **请求生命周期。** 先实现取消、去重和竞态保护，再加自动刷新；来源日志与指标随功能落实。
-5. **Python 输入边界、错误语义和分析可靠性。** 限制计算量、隐藏内部异常、补确定性测试并验证缓存口径；同步收紧对应前端响应类型，根据负载证据选择并发方案。
-6. **报告下载闭环。** 统一格式承诺、导出字段、数据时间与来源，先交付可验证的最小版本。
-7. **结构与剩余状态整理。** 在测试保护下整理剩余前端 UI 状态；统计概览仅按实际维护需要继续拆分。
-8. **性能、可访问性与多语言。** 先测首屏和交互，再优化分包及依赖贡献；基础键盘支持随相关组件修改补齐，移动端和视觉回归按实际使用场景扩展。
-9. **仓库、包边界和深度依赖治理。** 处理结构迁移、依赖归属、镜像审计与完整观测平台；影响 CI 或构建的仓库卫生问题随门禁处理。
-
-公网发布前，将公开 Analytics API 的身份策略、请求量限制与生产错误脱敏提升到第 1 批。管理接口令牌不覆盖公开业务 API；共享限流在多实例部署前落实，不作为当前单实例演示的默认前置任务。若报告成为近期交付核心，可提前第 6 项的最小闭环。
-
-跨语言共享契约生成在响应模型稳定、手工同步成本明确后评估，不阻塞上述修复。下一批优先推进 **报告下载闭环 → 前端状态归属梳理 → 跨语言契约同步与 Python 契约测试统一门禁评估**。
-
-## 第一轮优化的非目标
-
-- 不替换 Mapbox，除非产品需求明确要求。
-- 不在状态职责未理清前引入 Redux 或 Zustand。
-- 不在最大文件拆分前迁移 monorepo 结构。
-- 仅做服务结构整理时，不重写 Python 分析算法。
-- 重构期间不改变现有看板核心交互行为。
-
-## 完成标准
-
-当满足以下条件时，可以认为第一阶段优化达标：
-
-- 核心功能文件已经小到可以轻松 review。
-- 数据请求、数据转换、地图渲染、UI 状态有清晰归属。
-- 地图渲染架构不仅写在文档里，也体现在代码结构上。
-- 分析逻辑可以在不加载完整页面的情况下测试。
-- 外部服务调用拥有统一错误处理方式。
-- 前端、BFF 和 Python 分析服务可以通过 Docker 一键启动。
-- AI 模型服务 Key 不进入浏览器构建产物，真实模型调用通过 BFF 完成。
-- 前后端数据契约有自动化测试，超限、未授权、错误响应和敏感输出均有明确门禁。
-- 报告导出、自动刷新、数据源降级和 AI 流式取消等核心操作有可重复的浏览器验证。
-- 新开发者不需要通读整个项目，也能定位对应模块。
+- 新增接口时，先定义输入/输出契约、失败语义和测试，再接入页面或路由。
+- 对外部数据、浏览器事件和 JSON 响应保持 `unknown` 边界，解析成功后再进入领域类型。
+- 服务端凭据只在 BFF 或 Python 服务端读取；不将模型 Key、DisasterAware 凭据或 Python 凭据打入前端构建产物。
+- 不部署阶段优先保持测试可复现和提交边界清晰；发布相关的身份、共享限流与告警按实际发布计划单独立项。

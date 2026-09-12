@@ -10,12 +10,23 @@ const serviceMocks = vi.hoisted(() => ({
   checkHealth: vi.fn<() => Promise<boolean>>(),
 }));
 
+const mapStateMocks = vi.hoisted(() => ({
+  hazards: [{ id: "hazard-1" }],
+  filter: "ALL",
+  refresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  setFilter: vi.fn<(filter: string) => void>(),
+}));
+
 vi.mock("../../src/services/hazards/hazardService", () => ({
   fetchHazardTypes: serviceMocks.fetchHazardTypes,
 }));
 
 vi.mock("../../src/services/analytics/analyticsService", () => ({
   checkHealth: serviceMocks.checkHealth,
+}));
+
+vi.mock("../../src/features/map/state/MapStateContext", () => ({
+  useMapState: () => mapStateMocks,
 }));
 
 const hazardTypes: HazardType[] = [
@@ -38,15 +49,16 @@ describe("StatusPanel", () => {
     serviceMocks.fetchHazardTypes.mockReset();
     serviceMocks.checkHealth.mockReset();
     serviceMocks.checkHealth.mockResolvedValue(true);
+    mapStateMocks.refresh.mockReset();
+    mapStateMocks.refresh.mockResolvedValue(undefined);
+    mapStateMocks.setFilter.mockReset();
   });
 
   it("loads displayed hazard types and disables the filter while loading", async () => {
     const deferredHazardTypes = createDeferred<HazardType[]>();
     serviceMocks.fetchHazardTypes.mockReturnValueOnce(deferredHazardTypes.promise);
 
-    render(
-      <StatusPanel filter="ALL" onFilterChange={vi.fn()} onRefresh={vi.fn()} totalCount={3} />,
-    );
+    render(<StatusPanel />);
 
     const filter = screen.getByLabelText("Filter by Type");
     expect(filter).toBeDisabled();
@@ -61,28 +73,26 @@ describe("StatusPanel", () => {
     expect(serviceMocks.checkHealth).toHaveBeenCalledTimes(1);
   });
 
-  it("notifies the parent when the selected hazard type changes", async () => {
+  it("updates the shared filter when the selected hazard type changes", async () => {
     const user = userEvent.setup();
-    const onFilterChange = vi.fn();
     serviceMocks.fetchHazardTypes.mockResolvedValue(hazardTypes);
 
-    render(<StatusPanel filter="ALL" onFilterChange={onFilterChange} onRefresh={vi.fn()} />);
+    render(<StatusPanel />);
 
     await screen.findByRole("option", { name: "Flood" });
     await user.selectOptions(screen.getByLabelText("Filter by Type"), "FLOOD");
 
-    expect(onFilterChange).toHaveBeenCalledWith("FLOOD");
+    expect(mapStateMocks.setFilter).toHaveBeenCalledWith("FLOOD");
   });
 
-  it("notifies the parent when Refresh Data is clicked", async () => {
+  it("refreshes the shared hazard data when Refresh Data is clicked", async () => {
     const user = userEvent.setup();
-    const onRefresh = vi.fn();
     serviceMocks.fetchHazardTypes.mockResolvedValue(hazardTypes);
 
-    render(<StatusPanel filter="ALL" onFilterChange={vi.fn()} onRefresh={onRefresh} />);
+    render(<StatusPanel />);
 
     await user.click(screen.getByRole("button", { name: "Refresh Data" }));
 
-    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(mapStateMocks.refresh).toHaveBeenCalledOnce();
   });
 });

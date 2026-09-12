@@ -1,19 +1,9 @@
 import React from "react";
 import NotificationCenter from "./NotificationCenter";
+import { useUIState } from "../state/UIStateContext";
 
-interface HeaderProps {
-  onOpenSaveModal: () => void;
-  onOpenSettingsModal: () => void;
-  onOpenAnalytics: () => void;
-  onOpenAI: () => void;
-}
-
-const Header: React.FC<HeaderProps> = ({
-  onOpenSaveModal,
-  onOpenSettingsModal,
-  onOpenAnalytics,
-  onOpenAI,
-}) => {
+const Header: React.FC = () => {
+  const { openModal, openView } = useUIState();
   return (
     <header className="header">
       <div className="header-content">
@@ -33,14 +23,9 @@ const Header: React.FC<HeaderProps> = ({
           <button
             className="btn btn-ai"
             aria-label="Open AI Disaster Analysis Assistant"
-            onClick={onOpenAI}
+            onClick={() => openModal("ai")}
           >
-            <svg
-              className="icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -54,14 +39,9 @@ const Header: React.FC<HeaderProps> = ({
           <button
             className="btn btn-analytics"
             aria-label="Open Analytics Dashboard"
-            onClick={onOpenAnalytics}
+            onClick={() => openView("analytics")}
           >
-            <svg
-              className="icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -71,18 +51,13 @@ const Header: React.FC<HeaderProps> = ({
             </svg>
             <span>Analytics</span>
           </button>
-          
+
           <button
             className="btn btn-primary"
             aria-label="Open Save Report Modal"
-            onClick={onOpenSaveModal}
+            onClick={() => openModal("save-report")}
           >
-            <svg
-              className="icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -96,14 +71,9 @@ const Header: React.FC<HeaderProps> = ({
           <button
             className="btn btn-secondary"
             aria-label="Open Settings Modal"
-            onClick={onOpenSettingsModal}
+            onClick={() => openModal("settings")}
           >
-            <svg
-              className="icon"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"

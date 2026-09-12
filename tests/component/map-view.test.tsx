@@ -109,6 +109,7 @@ vi.mock("../../src/services/hazards/hazardService", () => ({
 }));
 
 import MapView from "../../src/features/map/MapView";
+import { MapStateProvider, useMapState } from "../../src/features/map/state/MapStateContext";
 
 function pendingHazardFeed() {
   let resolve: (value: unknown) => void = () => undefined;
@@ -116,6 +117,31 @@ function pendingHazardFeed() {
     resolve = resolvePromise;
   });
   return { promise, resolve };
+}
+
+function MapStateControls() {
+  const { hazards, refresh, setFilter } = useMapState();
+
+  return (
+    <>
+      <div data-testid="map-state-hazard-ids">{hazards.map((hazard) => hazard.id).join(",")}</div>
+      <button type="button" onClick={() => void refresh()}>
+        refresh-map-data
+      </button>
+      <button type="button" onClick={() => setFilter("FLOOD")}>
+        filter-flood
+      </button>
+    </>
+  );
+}
+
+function renderMapView() {
+  return render(
+    <MapStateProvider>
+      <MapView />
+      <MapStateControls />
+    </MapStateProvider>,
+  );
 }
 
 describe("MapView", () => {
@@ -156,7 +182,7 @@ describe("MapView", () => {
   });
 
   it("renders the map container and toggles heatmap mode", async () => {
-    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+    renderMapView();
 
     const button = await screen.findByTitle("Show Heatmap");
     fireEvent.click(button);
@@ -165,7 +191,7 @@ describe("MapView", () => {
   });
 
   it("passes a DOM popup node to Mapbox for external hazard text", async () => {
-    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+    renderMapView();
 
     await waitFor(() => expect(mapMocks.popupSetDOMContent).toHaveBeenCalledTimes(1));
 
@@ -195,7 +221,7 @@ describe("MapView", () => {
       },
     });
 
-    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+    renderMapView();
 
     expect(await screen.findByRole("status")).toHaveTextContent(label);
     expect(mapMocks.fetchHazardsActive).not.toHaveBeenCalled();
@@ -231,7 +257,7 @@ describe("MapView", () => {
       },
     });
 
-    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+    renderMapView();
 
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent("数据可能已过期");
@@ -240,69 +266,75 @@ describe("MapView", () => {
 
   it("deduplicates matching manual refresh requests", async () => {
     const pending = pendingHazardFeed();
-    const onRefreshReady = vi.fn();
     mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
-    render(
-      <MapView
-        filter="ALL"
-        mapStyle="dark-v11"
-        onDataUpdate={vi.fn()}
-        onRefreshReady={onRefreshReady}
-      />,
-    );
+    renderMapView();
 
     await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
-    const refresh = onRefreshReady.mock.calls.at(-1)?.[0] as () => void;
-    refresh();
-    refresh();
+    fireEvent.click(screen.getByRole("button", { name: "refresh-map-data" }));
+    fireEvent.click(screen.getByRole("button", { name: "refresh-map-data" }));
 
     expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1);
   });
 
   it("cancels an obsolete filter request", async () => {
     const pending = pendingHazardFeed();
-    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
-    const onDataUpdate = vi.fn();
-    const view = render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={onDataUpdate} />);
+    mapMocks.fetchHazardFeed
+      .mockImplementationOnce(() => pending.promise)
+      .mockResolvedValueOnce({
+        hazards: [
+          {
+            id: "current-filter-hazard",
+            title: "Current filter result",
+            type: "FLOOD",
+            geometry: { type: "Point", coordinates: [120, 30] },
+            description: "Current request result",
+            source: "test",
+          },
+        ],
+        meta: null,
+      });
+    renderMapView();
 
     await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
     const firstSignal = mapMocks.fetchHazardFeed.mock.calls[0]?.[1] as AbortSignal;
-    view.rerender(<MapView filter="FLOOD" mapStyle="dark-v11" onDataUpdate={onDataUpdate} />);
+    fireEvent.click(screen.getByRole("button", { name: "filter-flood" }));
 
     await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(2));
     expect(firstSignal.aborted).toBe(true);
-    const updatesAfterNewFilter = onDataUpdate.mock.calls.length;
-    pending.resolve({ hazards: [], meta: null });
-    await Promise.resolve();
-    expect(onDataUpdate).toHaveBeenCalledTimes(updatesAfterNewFilter);
+    await waitFor(() =>
+      expect(screen.getByTestId("map-state-hazard-ids")).toHaveTextContent("current-filter-hazard"),
+    );
+
+    pending.resolve({
+      hazards: [
+        {
+          id: "stale-hazard",
+          title: "Stale result",
+          type: "FLOOD",
+          geometry: { type: "Point", coordinates: [120, 30] },
+          description: "Cancelled request result",
+          source: "test",
+        },
+      ],
+      meta: null,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-state-hazard-ids")).toHaveTextContent("current-filter-hazard"),
+    );
+    expect(screen.getByTestId("map-state-hazard-ids")).not.toHaveTextContent("stale-hazard");
   });
 
   it("cancels a manual request when the filter changes while hidden", async () => {
     Object.defineProperty(document, "hidden", { configurable: true, value: true });
     const pending = pendingHazardFeed();
-    const onRefreshReady = vi.fn();
     mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
-    const view = render(
-      <MapView
-        filter="ALL"
-        mapStyle="dark-v11"
-        onDataUpdate={vi.fn()}
-        onRefreshReady={onRefreshReady}
-      />,
-    );
+    renderMapView();
 
-    const refresh = onRefreshReady.mock.calls.at(-1)?.[0] as () => void;
-    refresh();
+    fireEvent.click(screen.getByRole("button", { name: "refresh-map-data" }));
     await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
     const signal = mapMocks.fetchHazardFeed.mock.calls[0]?.[1] as AbortSignal;
-    view.rerender(
-      <MapView
-        filter="FLOOD"
-        mapStyle="dark-v11"
-        onDataUpdate={vi.fn()}
-        onRefreshReady={onRefreshReady}
-      />,
-    );
+    fireEvent.click(screen.getByRole("button", { name: "filter-flood" }));
 
     expect(signal.aborted).toBe(true);
   });
@@ -310,7 +342,7 @@ describe("MapView", () => {
   it("pauses the refresh interval while hidden and refreshes immediately when visible", async () => {
     vi.useFakeTimers();
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
-    render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+    renderMapView();
 
     await vi.advanceTimersByTimeAsync(0);
     expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1);
@@ -333,7 +365,7 @@ describe("MapView", () => {
   it("aborts the active request when unmounted", async () => {
     const pending = pendingHazardFeed();
     mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
-    const view = render(<MapView filter="ALL" mapStyle="dark-v11" onDataUpdate={vi.fn()} />);
+    const view = renderMapView();
 
     await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
     const signal = mapMocks.fetchHazardFeed.mock.calls[0]?.[1] as AbortSignal;

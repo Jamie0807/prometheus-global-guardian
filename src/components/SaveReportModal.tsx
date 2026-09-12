@@ -1,38 +1,31 @@
 import React, { useState } from "react";
-import type { Hazard, SaveReportPayload } from "../types";
+import type { SaveReportPayload } from "../types";
+import { useMapState } from "../features/map/state/MapStateContext";
+import { useUIState } from "../state/UIStateContext";
+import { createClientLogger } from "../utils/logger";
 
-interface SaveReportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onDownload: (payload: SaveReportPayload) => void;
-  disasters: Hazard[];
-  filter: string;
-}
+const logger = createClientLogger("save-report-modal");
 
-const SaveReportModal: React.FC<SaveReportModalProps> = ({
-  isOpen,
-  onClose,
-  onDownload,
-  disasters,
-  filter,
-}) => {
+const SaveReportModal: React.FC = () => {
+  const { filter, hazards } = useMapState();
+  const { activeModal, closeModal } = useUIState();
   const [reportName, setReportName] = useState("");
   const [organization, setOrganization] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
 
-  if (!isOpen) return null;
+  if (activeModal !== "save-report") return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // 简化版报告生成 - Python微服务处理复杂分析
-    const reportData = {
+    const reportData: SaveReportPayload & { timestamp: string } = {
       reportName,
       organization,
       email,
       notes,
-      disasters,
+      disasters: hazards,
       filter,
       timestamp: new Date().toISOString(),
     };
@@ -47,8 +40,8 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
     link.click();
     URL.revokeObjectURL(url);
 
-    onDownload(reportData);
-    onClose();
+    logger.debug("report_download_requested", { hazardCount: hazards.length });
+    closeModal();
   };
 
   return (
@@ -66,7 +59,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
             </svg>
             <span>Save Disaster Report</span>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={closeModal}>
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -124,7 +117,7 @@ const SaveReportModal: React.FC<SaveReportModalProps> = ({
           </div>
 
           <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" onClick={closeModal}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary">

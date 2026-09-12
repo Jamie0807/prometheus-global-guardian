@@ -25,12 +25,6 @@ export type AnalyticsHazard = AppHazard & {
   };
 };
 
-export interface AnalyticsPageProps {
-  hazards: AnalyticsHazard[];
-  onClose: () => void;
-  onRefresh?: (data: AppHazard[]) => void;
-}
-
 export type NumberMap = Record<string, number>;
 export type StatisticsResponse = AnalyticsSuccess<StatisticsData>;
 export type PredictionsResponse = AnalyticsSuccess<PredictionsData>;
