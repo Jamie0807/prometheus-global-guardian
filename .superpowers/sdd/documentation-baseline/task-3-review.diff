@@ -1,0 +1,11 @@
+diff --git a/docs/PROJECT_OPTIMIZATION_BACKLOG.md b/docs/PROJECT_OPTIMIZATION_BACKLOG.md
+index 1b3b0e6..864161f 100644
+--- a/docs/PROJECT_OPTIMIZATION_BACKLOG.md
++++ b/docs/PROJECT_OPTIMIZATION_BACKLOG.md
+@@ -1,6 +1,6 @@
+ # 项目待优化清单
+
+-最近核对日期：2026-09-11。本文档以当前 `main` 分支代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
++最近核对日期：2026-09-12。本文档以当前 `main` 分支代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
+
+ ## 当前判断
