@@ -1,6 +1,6 @@
 # 项目待优化清单
 
-最近核对日期：2026-09-11。本文档以当前 `main` 分支代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
+最近核对日期：2026-09-12。本文档以当前 `main` 分支代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
 
 ## 当前判断
 
@@ -49,7 +49,7 @@
 | `pnpm run test:e2e`            | Playwright 桌面端关键流程冒烟。                           |
 | `pnpm run build`               | Vite 生产构建与 BFF 编译。                                |
 
-当前本地完整验证中，lint、格式、三项类型检查、177 项 Service 测试、59 项组件测试、39 项 Python 测试、构建与 `git diff --check` 均已通过。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
+最近一次完整验证结果：Service 177/177、组件 59/59；Python 39 项为最近一次已验证基线。本次重跑中，BFF 受沙箱 `listen` EPERM 限制，E2E 未启动，Python 3.13 不可用。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
 
 ## 优先级矩阵
 
