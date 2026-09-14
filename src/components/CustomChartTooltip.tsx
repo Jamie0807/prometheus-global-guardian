@@ -51,30 +51,30 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
             </div>
             <div className="tooltip-content">
               <div className="tooltip-row">
-                <span className="tooltip-label">Percentage:</span>
+                <span className="tooltip-label">占比：</span>
                 <span className="tooltip-value">{data.percentage}%</span>
               </div>
               <div className="tooltip-row">
-                <span className="tooltip-label">Total Hazards:</span>
+                <span className="tooltip-label">灾害总数：</span>
                 <span className="tooltip-value">{totalHazards}</span>
               </div>
               <div className="tooltip-row">
-                <span className="tooltip-label">Relative Impact:</span>
+                <span className="tooltip-label">相对影响：</span>
                 <span className="tooltip-value">
-                  {data.percentage > 30 ? "High" : data.percentage > 15 ? "Medium" : "Low"}
+                  {data.percentage > 30 ? "高" : data.percentage > 15 ? "中" : "低"}
                 </span>
               </div>
             </div>
-            <div className="tooltip-footer">💡 Click to view details</div>
+            <div className="tooltip-footer">💡 点击查看详情</div>
           </div>
         );
 
       case "severity": {
         const severityDescriptions: Record<string, string> = {
-          Extreme: "Immediate action required - life-threatening situation",
-          Severe: "Significant threat - prepare for impact",
-          Moderate: "Potential for damage - stay alert",
-          Minor: "Low risk - monitor situation",
+          Extreme: "需要立即处置，可能危及生命",
+          Severe: "威胁显著，请为影响做好准备",
+          Moderate: "可能造成损害，请保持警惕",
+          Minor: "风险较低，请持续关注",
         };
 
         return (
@@ -87,28 +87,26 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
             </div>
             <div className="tooltip-content">
               <div className="tooltip-description">
-                {severityDescriptions[data.severity] || "Unknown severity level"}
+                {severityDescriptions[data.severity] || "未知严重程度"}
               </div>
               <div className="tooltip-row">
-                <span className="tooltip-label">Percentage:</span>
+                <span className="tooltip-label">占比：</span>
                 <span className="tooltip-value">
                   {((data.count / totalHazards) * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="tooltip-row">
-                <span className="tooltip-label">Priority Level:</span>
+                <span className="tooltip-label">优先级：</span>
                 <span className="tooltip-value">
                   {data.severity === "Extreme" || data.severity === "Severe"
-                    ? "🔴 High"
+                    ? "🔴 高"
                     : data.severity === "Moderate"
-                      ? "🟡 Medium"
-                      : "🟢 Low"}
+                      ? "🟡 中"
+                      : "🟢 低"}
                 </span>
               </div>
             </div>
-            <div className="tooltip-footer">
-              💡 Click to view all {data.severity.toLowerCase()} hazards
-            </div>
+            <div className="tooltip-footer">💡 点击查看全部 {data.severity} 灾害</div>
           </div>
         );
       }
@@ -122,14 +120,7 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
         return (
           <div className="custom-tooltip">
             <div className="tooltip-header">
-              <h4>
-                {new Date(label || "").toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </h4>
+              <h4>{new Date(label || "").toLocaleDateString("zh-CN")}</h4>
             </div>
             <div className="tooltip-content timeline-tooltip">
               {payload.map((entry: TooltipPayloadEntry, index: number) => {
@@ -149,12 +140,12 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
               })}
               <div className="tooltip-divider" />
               <div className="tooltip-row tooltip-total">
-                <span className="tooltip-label">Total Events:</span>
+                <span className="tooltip-label">事件总数：</span>
                 <span className="tooltip-value">{totalForDate}</span>
               </div>
-              {totalForDate > 5 && <div className="tooltip-alert">⚠️ High activity day</div>}
+              {totalForDate > 5 && <div className="tooltip-alert">⚠️ 高活跃度日期</div>}
             </div>
-            <div className="tooltip-footer">💡 Click to view hazards on this date</div>
+            <div className="tooltip-footer">💡 点击查看当日灾害</div>
           </div>
         );
       }
@@ -170,23 +161,23 @@ const CustomChartTooltip: React.FC<CustomTooltipProps> = ({
             </div>
             <div className="tooltip-content">
               <div className="tooltip-row">
-                <span className="tooltip-label">Data Points:</span>
+                <span className="tooltip-label">数据点：</span>
                 <span className="tooltip-value">{data.count}</span>
               </div>
               <div className="tooltip-row">
-                <span className="tooltip-label">Coverage:</span>
+                <span className="tooltip-label">覆盖率：</span>
                 <span className="tooltip-value">
                   {((data.count / totalHazards) * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="tooltip-row">
-                <span className="tooltip-label">Reliability:</span>
+                <span className="tooltip-label">可靠性：</span>
                 <span className="tooltip-value">
-                  {data.count > 50 ? "⭐⭐⭐ High" : data.count > 20 ? "⭐⭐ Medium" : "⭐ Growing"}
+                  {data.count > 50 ? "⭐⭐⭐ 高" : data.count > 20 ? "⭐⭐ 中" : "⭐ 成长中"}
                 </span>
               </div>
             </div>
-            <div className="tooltip-footer">💡 Click to view all hazards from this source</div>
+            <div className="tooltip-footer">💡 点击查看该来源的全部灾害</div>
           </div>
         );
 

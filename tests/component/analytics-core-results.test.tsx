@@ -58,6 +58,12 @@ const failedModel = {
 };
 
 describe("validated analytics result consumers", () => {
+  it("最新灾害缺少严重程度时显示中文回退文案", () => {
+    render(<InsightsPanel hazards={hazards} />);
+
+    expect(screen.getByText("暂无 | 时间未知")).toBeInTheDocument();
+  });
+
   it.each([0, null])(
     "renders actual statistics fields with mean %s and legitimate zero values",
     (mean) => {
@@ -87,7 +93,7 @@ describe("validated analytics result consumers", () => {
       expect(screen.getAllByText("0.00").length).toBeGreaterThanOrEqual(2);
       expect(screen.getByText("✓ 集中")).toBeInTheDocument();
       expect(screen.getAllByText("暂无数据").length).toBeGreaterThan(0);
-      expect(screen.getByText(/强度平均值（magnitude）：/)).toHaveTextContent(
+      expect(screen.getByText(/强度平均值（震级）：/)).toHaveTextContent(
         mean === null ? "暂无数据" : "0.00",
       );
     },
@@ -143,6 +149,39 @@ describe("validated analytics result consumers", () => {
     expect(screen.queryByText("0.0")).not.toBeInTheDocument();
   });
 
+  it("用中文显示预测天数标签", () => {
+    const readyModel = {
+      status: "ready",
+      reason: "ready",
+      dataPoints: 3,
+      minimumDataPoints: 3,
+      confidence: 0.8,
+      accuracy: 80,
+      predictions: { next7Days: [1] },
+    };
+    const data = parsePredictions({
+      earthquakePrediction: readyModel,
+      volcanoPrediction: readyModel,
+      stormPrediction: readyModel,
+      floodPrediction: readyModel,
+      wildfirePrediction: readyModel,
+      overallRiskAssessment: {
+        status: "ready",
+        reason: "ready",
+        overallRiskScore: 20,
+        riskLevel: "LOW",
+        averageAccuracy: 80,
+        confidence: 0.8,
+        modelWeights: {},
+        recommendation: "",
+      },
+    });
+
+    render(<PredictionsTab predictions={{ success: true, data }} />);
+
+    expect(screen.getAllByText("第 1 天")).toHaveLength(5);
+  });
+
   it.each([0, 75])("uses the validated risk score %s without scaling it", async (score) => {
     serviceMocks.getRiskAssessment.mockResolvedValue({
       success: true,
@@ -163,7 +202,7 @@ describe("validated analytics result consumers", () => {
   it("selects magnitude statistics from column maps without formatting an object", async () => {
     serviceMocks.getStatistics.mockResolvedValue({ success: true, data: statistics });
     render(<ChartsPanel hazards={hazards} />);
-    expect(await screen.findByText("强度平均值（magnitude）")).toBeInTheDocument();
+    expect(await screen.findByText("强度平均值（震级）")).toBeInTheDocument();
     expect(screen.getByText("0.00")).toBeInTheDocument();
     expect(screen.getByText("暂无数据")).toBeInTheDocument();
   });

@@ -53,6 +53,22 @@ describe("AIChatAssistant", () => {
     serviceMocks.streamChatMessage.mockReset();
   });
 
+  it("展示中文品牌、状态和键盘操作提示", async () => {
+    const user = userEvent.setup();
+
+    renderWithAppState();
+    await user.click(screen.getByRole("button", { name: "open-ai" }));
+
+    expect(screen.getByText("全球灾害监控平台 AI 灾害分析助手")).toBeInTheDocument();
+    expect(screen.getByText(/\u7531 LLM \u63d0\u4f9b\u652f\u6301/)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("输入灾害分析问题……（按 Enter 发送，按 Shift+Enter 换行）"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("按 Enter 发送 · 按 Shift+Enter 换行 · 按 ESC 关闭"),
+    ).toBeInTheDocument();
+  });
+
   it("stops the active request on close and ignores a late chunk", async () => {
     const user = userEvent.setup();
     const result = deferred<AIStreamOutcome>();

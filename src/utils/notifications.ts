@@ -2,7 +2,7 @@
  * 通知系统
  */
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error';
+export type NotificationType = "info" | "success" | "warning" | "error";
 
 export interface NotificationItem {
   id: string;
@@ -27,24 +27,21 @@ class NotificationManager {
       title,
       message,
       timestamp: new Date(),
-      read: false
+      read: false,
     };
 
     this.notifications.unshift(notification);
-    
+
     // 最多保留50条通知
     if (this.notifications.length > 50) {
       this.notifications = this.notifications.slice(0, 50);
     }
 
     this.notifyListeners();
-    
+
     // 自动显示浏览器通知（如果允许）
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, {
-        body: message,
-        icon: '/prometheus-logo.png'
-      });
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body: message });
     }
 
     return notification;
@@ -54,7 +51,7 @@ class NotificationManager {
    * 标记为已读
    */
   markAsRead(id: string) {
-    const notification = this.notifications.find(n => n.id === id);
+    const notification = this.notifications.find((n) => n.id === id);
     if (notification) {
       notification.read = true;
       this.notifyListeners();
@@ -65,7 +62,7 @@ class NotificationManager {
    * 全部标记为已读
    */
   markAllAsRead() {
-    this.notifications.forEach(n => n.read = true);
+    this.notifications.forEach((n) => (n.read = true));
     this.notifyListeners();
   }
 
@@ -73,7 +70,7 @@ class NotificationManager {
    * 删除通知
    */
   remove(id: string) {
-    this.notifications = this.notifications.filter(n => n.id !== id);
+    this.notifications = this.notifications.filter((n) => n.id !== id);
     this.notifyListeners();
   }
 
@@ -96,7 +93,7 @@ class NotificationManager {
    * 获取未读数量
    */
   getUnreadCount(): number {
-    return this.notifications.filter(n => !n.read).length;
+    return this.notifications.filter((n) => !n.read).length;
   }
 
   /**
@@ -111,13 +108,13 @@ class NotificationManager {
    * 请求浏览器通知权限
    */
   async requestPermission() {
-    if ('Notification' in window && Notification.permission === 'default') {
+    if ("Notification" in window && Notification.permission === "default") {
       await Notification.requestPermission();
     }
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener([...this.notifications]));
+    this.listeners.forEach((listener) => listener([...this.notifications]));
   }
 }
 
@@ -126,10 +123,8 @@ export const notificationManager = new NotificationManager();
 
 // 便捷方法
 export const notify = {
-  info: (title: string, message: string) => notificationManager.add('info', title, message),
-  success: (title: string, message: string) => notificationManager.add('success', title, message),
-  warning: (title: string, message: string) => notificationManager.add('warning', title, message),
-  error: (title: string, message: string) => notificationManager.add('error', title, message),
+  info: (title: string, message: string) => notificationManager.add("info", title, message),
+  success: (title: string, message: string) => notificationManager.add("success", title, message),
+  warning: (title: string, message: string) => notificationManager.add("warning", title, message),
+  error: (title: string, message: string) => notificationManager.add("error", title, message),
 };
-
-

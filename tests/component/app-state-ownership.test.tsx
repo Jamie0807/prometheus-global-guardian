@@ -67,7 +67,7 @@ vi.mock("../../src/components/AnalyticsPage", async () => {
       <section>
         <div data-testid="analytics-hazard-count">{useMapState().hazards.length}</div>
         <button type="button" onClick={closeView}>
-          Close Analytics
+          关闭数据分析
         </button>
       </section>
     );
@@ -81,7 +81,7 @@ vi.mock("../../src/components/AnalyticsPage", async () => {
 vi.mock("../../src/components/SettingsModal", async () => {
   const { useUIState } = await import("../../src/state/UIStateContext");
   const SettingsModalMock = () =>
-    useUIState().activeModal === "settings" ? <div>Map Settings</div> : null;
+    useUIState().activeModal === "settings" ? <div>地图设置</div> : null;
 
   return {
     default: SettingsModalMock,
@@ -123,32 +123,34 @@ describe("App state ownership", () => {
 
     expect(screen.getByTestId("map-hazard-count")).toHaveTextContent("1");
 
-    await user.click(screen.getByRole("button", { name: "Open Analytics Dashboard" }));
+    await user.click(screen.getByRole("button", { name: "打开数据分析面板" }));
     expect(await screen.findByTestId("analytics-hazard-count")).toHaveTextContent("1");
-    await user.click(screen.getByRole("button", { name: "Close Analytics" }));
+    await user.click(screen.getByRole("button", { name: "关闭数据分析" }));
     expect(await screen.findByTestId("map-hazard-count")).toHaveTextContent("1");
 
-    await user.click(screen.getByRole("button", { name: "Open Save Report Modal" }));
-    const reportName = await screen.findByPlaceholderText("e.g., October 2025 Global Assessment");
-    await user.type(reportName, "September report");
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "打开保存报告弹窗" }));
+    const reportName = await screen.findByPlaceholderText("例如：2026 年 9 月全球灾害评估");
+    expect(screen.getByText(/JSON 文件/)).toBeInTheDocument();
+    await user.type(reportName, "9 月灾害报告");
+    await user.click(screen.getByRole("button", { name: "取消" }));
     await waitFor(() =>
-      expect(screen.queryByPlaceholderText("e.g., October 2025 Global Assessment")).toBeNull(),
+      expect(screen.queryByPlaceholderText("例如：2026 年 9 月全球灾害评估")).toBeNull(),
     );
 
-    await user.click(screen.getByRole("button", { name: "Open Save Report Modal" }));
-    expect(await screen.findByPlaceholderText("e.g., October 2025 Global Assessment")).toHaveValue(
-      "September report",
+    await user.click(screen.getByRole("button", { name: "打开保存报告弹窗" }));
+    expect(await screen.findByPlaceholderText("例如：2026 年 9 月全球灾害评估")).toHaveValue(
+      "9 月灾害报告",
     );
-    await user.click(screen.getByRole("button", { name: "Download Report" }));
+    await user.click(screen.getByRole("button", { name: "下载报告" }));
     expect(download).toHaveBeenCalledOnce();
+    expect(download.mock.instances[0]?.download).toMatch(/^9_月灾害报告_\d+\.json$/);
     expect(createObjectURL).toHaveBeenCalledOnce();
     expect(downloadedParts?.join("")).toContain('"id": "hazard-1"');
 
-    await user.click(screen.getByRole("button", { name: "Open Settings Modal" }));
-    expect(await screen.findByText("Map Settings")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "打开设置弹窗" }));
+    expect(await screen.findByText("地图设置")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Open AI Disaster Analysis Assistant" }));
+    await user.click(screen.getByRole("button", { name: "打开 AI 灾害分析助手" }));
     expect(await screen.findByTestId("ai-hazard-count")).toHaveTextContent("1");
   });
 });

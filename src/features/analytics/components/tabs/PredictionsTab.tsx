@@ -151,7 +151,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               {next7Days(predictions.data.earthquakePrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
-                    未来7天预测:
+                    未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.earthquakePrediction)?.map(
                     (count: number, idx: number) => (
@@ -164,7 +164,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           borderBottom: "1px solid #333",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>Day {idx + 1}</span>
+                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
                         <span style={{ color: "#4CAF50", fontSize: "11px", fontWeight: "bold" }}>
                           {count.toFixed(1)} 次
                         </span>
@@ -206,7 +206,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               {next7Days(predictions.data.volcanoPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
-                    未来7天预测:
+                    未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.volcanoPrediction)?.map(
                     (count: number, idx: number) => (
@@ -219,7 +219,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           borderBottom: "1px solid #333",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>Day {idx + 1}</span>
+                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
                         <span style={{ color: "#FF9800", fontSize: "11px", fontWeight: "bold" }}>
                           {count.toFixed(1)} 次
                         </span>
@@ -261,7 +261,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               {next7Days(predictions.data.stormPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
-                    未来7天预测:
+                    未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.stormPrediction)?.map(
                     (count: number, idx: number) => (
@@ -274,7 +274,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           borderBottom: "1px solid #333",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>Day {idx + 1}</span>
+                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
                         <span style={{ color: "#2196F3", fontSize: "11px", fontWeight: "bold" }}>
                           {count.toFixed(1)} 次
                         </span>
@@ -316,7 +316,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               {next7Days(predictions.data.floodPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
-                    未来7天预测:
+                    未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.floodPrediction)?.map(
                     (count: number, idx: number) => (
@@ -329,7 +329,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           borderBottom: "1px solid #333",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>Day {idx + 1}</span>
+                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
                         <span style={{ color: "#00BCD4", fontSize: "11px", fontWeight: "bold" }}>
                           {count.toFixed(1)} 次
                         </span>
@@ -371,7 +371,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               {next7Days(predictions.data.wildfirePrediction) ? (
                 <div style={{ marginTop: "12px" }}>
                   <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
-                    未来7天预测:
+                    未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.wildfirePrediction)?.map(
                     (count: number, idx: number) => (
@@ -384,7 +384,7 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           borderBottom: "1px solid #333",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>Day {idx + 1}</span>
+                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
                         <span style={{ color: "#FF5722", fontSize: "11px", fontWeight: "bold" }}>
                           {count.toFixed(1)} 次
                         </span>

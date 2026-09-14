@@ -30,9 +30,9 @@ const SettingsModal: React.FC = () => {
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            <span>Map Settings</span>
+            <span>地图设置</span>
           </div>
-          <button className="close-btn" onClick={closeModal}>
+          <button className="close-btn" onClick={closeModal} aria-label="关闭设置">
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -46,7 +46,7 @@ const SettingsModal: React.FC = () => {
 
         <div className="form-group">
           <label className="form-label" htmlFor="map-style">
-            Map Style
+            地图样式
           </label>
           <select
             id="map-style"
@@ -54,12 +54,12 @@ const SettingsModal: React.FC = () => {
             value={mapStyle}
             onChange={handleStyleChange}
           >
-            <option value="dark-v11">Dark</option>
-            <option value="light-v11">Light</option>
-            <option value="streets-v12">Streets</option>
-            <option value="outdoors-v12">Outdoors</option>
-            <option value="satellite-v9">Satellite</option>
-            <option value="satellite-streets-v12">Satellite Streets</option>
+            <option value="dark-v11">深色</option>
+            <option value="light-v11">浅色</option>
+            <option value="streets-v12">街道</option>
+            <option value="outdoors-v12">户外</option>
+            <option value="satellite-v9">卫星</option>
+            <option value="satellite-streets-v12">卫星街道</option>
           </select>
         </div>
 
@@ -70,13 +70,10 @@ const SettingsModal: React.FC = () => {
             marginTop: "16px",
           }}
         >
-          <h3 style={{ color: "white", fontWeight: 600, marginBottom: "8px" }}>About</h3>
-          <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
-            Prometheus Space Technologies Global Guardian v1.0
-          </p>
+          <h3 style={{ color: "white", fontWeight: 600, marginBottom: "8px" }}>关于</h3>
+          <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>全球灾害监控平台 v1.0</p>
           <p style={{ color: "#9ca3af", fontSize: "0.75rem", marginTop: "8px" }}>
-            – Real-time disaster monitoring. Data powered by DisasterAWARE, NASA, ESA, EONET, USGS,
-            and GDACS.
+            实时灾害监控。数据由 DisasterAWARE、NASA、ESA、EONET、USGS 和 GDACS 提供。
           </p>
         </div>
 
@@ -85,7 +82,7 @@ const SettingsModal: React.FC = () => {
           style={{ width: "100%", marginTop: "24px" }}
           onClick={closeModal}
         >
-          Close
+          关闭
         </button>
       </div>
     </div>

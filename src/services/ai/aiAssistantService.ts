@@ -339,7 +339,7 @@ async function runDemoMode(
 
   // 默认欢迎响应
   if (!response) {
-    response = `**👋 你好，我是 Prometheus AI 灾害分析助手**
+    response = `**👋 你好，我是全球灾害监控平台 AI 灾害分析助手**
 
 我基于 **LLM 大语言模型** 驱动，可以帮助你：
 

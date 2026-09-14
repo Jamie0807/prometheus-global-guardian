@@ -72,16 +72,26 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
 
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Prometheus Space Technologies" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Active Monitoring" })).toBeVisible();
-  await expect(page.getByText("Total Hazards", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Filter by Type")).toBeVisible();
+  await expect(page).toHaveTitle("全球灾害监控平台");
+  await expect(page.getByRole("heading", { name: "全球灾害监控平台", exact: true })).toBeVisible();
+  await expect(page.getByAltText("Prometheus Logo")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "打开 AI 灾害分析助手" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开数据分析面板" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开保存报告弹窗" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "打开设置弹窗" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "实时监控" })).toBeVisible();
+  await expect(page.getByText("灾害总数", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("按类型筛选")).toBeVisible();
 
-  const hazardFilter = page.getByLabel("Filter by Type");
+  const hazardFilter = page.getByLabel("按类型筛选");
+  await expect(hazardFilter.getByRole("option", { name: "洪水" })).toHaveAttribute(
+    "value",
+    "FLOOD",
+  );
   await hazardFilter.selectOption("FLOOD");
   await expect(hazardFilter).toHaveValue("FLOOD");
 
-  await page.getByRole("button", { name: "Open AI Disaster Analysis Assistant" }).click();
+  await page.getByRole("button", { name: "打开 AI 灾害分析助手" }).click();
   await expect(page.getByRole("heading", { name: "AI 灾害分析助手", exact: true })).toBeVisible();
 
   const chatInput = page.getByPlaceholder(/输入灾害分析问题/);

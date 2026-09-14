@@ -153,8 +153,8 @@ describe("AnalyticsPage", () => {
       </UIStateProvider>,
     );
 
-    expect(screen.getByText(/强度平均值（magnitude）：0\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/强度标准差（magnitude）：暂无数据/)).toBeInTheDocument();
+    expect(screen.getByText(/强度平均值（震级）：0\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/强度标准差（震级）：暂无数据/)).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: /统计概览/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /图表可视化/ })).toBeInTheDocument();

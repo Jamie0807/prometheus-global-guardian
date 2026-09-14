@@ -184,10 +184,11 @@ describe("MapView", () => {
   it("renders the map container and toggles heatmap mode", async () => {
     renderMapView();
 
-    const button = await screen.findByTitle("Show Heatmap");
+    const button = await screen.findByTitle("显示热力图");
+    expect(button).toHaveTextContent("热力图");
     fireEvent.click(button);
 
-    expect(screen.getByTitle("Show Markers")).toBeInTheDocument();
+    expect(screen.getByTitle("显示标记")).toHaveTextContent("标记");
   });
 
   it("passes a DOM popup node to Mapbox for external hazard text", async () => {

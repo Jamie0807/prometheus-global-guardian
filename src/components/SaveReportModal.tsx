@@ -36,7 +36,12 @@ const SaveReportModal: React.FC = () => {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${reportName.replace(/[^a-z0-9]/gi, "_")}_${Date.now()}.json`;
+    const fileName =
+      reportName
+        .trim()
+        .replace(/[^\p{L}\p{N}]+/gu, "_")
+        .replace(/^_+|_+$/g, "") || "灾害报告";
+    link.download = `${fileName}_${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
 
@@ -57,9 +62,9 @@ const SaveReportModal: React.FC = () => {
                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
               />
             </svg>
-            <span>Save Disaster Report</span>
+            <span>保存灾害报告</span>
           </div>
-          <button className="close-btn" onClick={closeModal}>
+          <button className="close-btn" onClick={closeModal} aria-label="关闭保存报告弹窗">
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -73,30 +78,30 @@ const SaveReportModal: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Report Name *</label>
+            <label className="form-label">报告名称 *</label>
             <input
               type="text"
               className="form-input"
               required
               value={reportName}
               onChange={(e) => setReportName(e.target.value)}
-              placeholder="e.g., October 2025 Global Assessment"
+              placeholder="例如：2026 年 9 月全球灾害评估"
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Organization</label>
+            <label className="form-label">组织</label>
             <input
               type="text"
               className="form-input"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
-              placeholder="Your organization name"
+              placeholder="请输入组织名称"
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Email</label>
+            <label className="form-label">邮箱</label>
             <input
               type="email"
               className="form-input"
@@ -107,18 +112,18 @@ const SaveReportModal: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Additional Notes</label>
+            <label className="form-label">补充说明</label>
             <textarea
               className="form-input"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any additional observations or comments..."
+              placeholder="请输入补充观察或说明……"
             />
           </div>
 
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeModal}>
-              Cancel
+              取消
             </button>
             <button type="submit" className="btn btn-primary">
               <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,14 +134,12 @@ const SaveReportModal: React.FC = () => {
                   d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
                 />
               </svg>
-              <span>Download Report</span>
+              <span>下载报告</span>
             </button>
           </div>
         </form>
 
-        <p className="form-note">
-          Report will be saved as an HTML file with all current disaster data and analytics
-        </p>
+        <p className="form-note">报告将以 JSON 文件保存，其中包含当前灾害数据和分析结果。</p>
       </div>
     </div>
   );

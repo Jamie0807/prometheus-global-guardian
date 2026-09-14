@@ -7,6 +7,9 @@ import { useMapState } from "../features/map/state/MapStateContext";
 import { createClientLogger } from "../utils/logger";
 
 const logger = createClientLogger("status-panel");
+const displayedTypeNames = new Map(
+  DISPLAYED_TYPES.map(({ type_id, type_name }) => [type_id, type_name]),
+);
 
 const StatusPanel: React.FC = () => {
   const { filter, hazards, refresh, setFilter } = useMapState();
@@ -18,9 +21,10 @@ const StatusPanel: React.FC = () => {
     try {
       const data = await fetchHazardTypes();
       setHazardTypes(
-        data.filter((item: HazardType) =>
-          DISPLAYED_TYPES.map((item) => item.type_id).includes(item.type_id),
-        ),
+        data.flatMap((item: HazardType) => {
+          const typeName = displayedTypeNames.get(item.type_id);
+          return typeName === undefined ? [] : [{ ...item, type_name: typeName }];
+        }),
       );
     } catch {
       logger.warn("hazard_types_load_failed");
@@ -51,19 +55,19 @@ const StatusPanel: React.FC = () => {
             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
           />
         </svg>
-        <h2>Active Monitoring</h2>
+        <h2>实时监控</h2>
       </div>
 
-      <p className="status-text">Real-time environmental hazards</p>
+      <p className="status-text">实时环境灾害</p>
 
       <div className="total-count">
-        <div className="count-label">Total Hazards</div>
+        <div className="count-label">灾害总数</div>
         <div className="count-value">{hazards.length}</div>
       </div>
 
       <div className="filter-section">
         <label className="filter-label" htmlFor="hazard-filter">
-          Filter by Type
+          按类型筛选
         </label>
         <select
           id="hazard-filter"
@@ -72,14 +76,14 @@ const StatusPanel: React.FC = () => {
           className="form-input"
           disabled={isLoading}
         >
-          <option value="ALL">All Hazards</option>
+          <option value="ALL">全部灾害</option>
           {hazardTypes.map((type) => (
             <option key={type.type_id} value={type.type_id}>
               {type.type_name}
             </option>
           ))}
         </select>
-        {isLoading && <p className="loading-text">Loading hazard types...</p>}
+        {isLoading && <p className="loading-text">正在加载灾害类型...</p>}
       </div>
 
       <button
@@ -87,7 +91,7 @@ const StatusPanel: React.FC = () => {
         style={{ width: "100%", marginTop: "12px" }}
         onClick={() => void refresh()}
       >
-        Refresh Data
+        刷新数据
       </button>
     </div>
   );

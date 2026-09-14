@@ -218,8 +218,8 @@ const AIChatAssistant: React.FC = () => {
             <div>
               <h2>AI 灾害分析助手</h2>
               <p className="ai-subtitle">
-                Powered by LLM ·{" "}
-                {hazards.length > 0 ? `监控 ${hazards.length} 条事件` : "加载数据中..."}
+                由 LLM 提供支持 ·{" "}
+                {hazards.length > 0 ? `监控 ${hazards.length} 条事件` : "正在加载数据……"}
               </p>
             </div>
           </div>
@@ -265,7 +265,7 @@ const AIChatAssistant: React.FC = () => {
           {messages.length === 0 && (
             <div className="ai-welcome">
               <div className="ai-welcome-icon">🛰️</div>
-              <h3>Prometheus AI 灾害分析助手</h3>
+              <h3>全球灾害监控平台 AI 灾害分析助手</h3>
               <p>基于大语言模型，实时分析全球灾害态势，提供专业风险研判与应急建议。</p>
             </div>
           )}
@@ -313,7 +313,7 @@ const AIChatAssistant: React.FC = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="输入灾害分析问题... (Enter 发送，Shift+Enter 换行)"
+              placeholder="输入灾害分析问题……（按 Enter 发送，按 Shift+Enter 换行）"
               rows={2}
               disabled={isStreaming}
             />
@@ -342,7 +342,9 @@ const AIChatAssistant: React.FC = () => {
             </button>
           </div>
           <p className="ai-hint">
-            {isStreaming ? "🔄 AI 正在生成分析结果..." : "Enter 发送 · Shift+Enter 换行 · ESC 关闭"}
+            {isStreaming
+              ? "🔄 AI 正在生成分析结果……"
+              : "按 Enter 发送 · 按 Shift+Enter 换行 · 按 ESC 关闭"}
           </p>
         </form>
       </div>

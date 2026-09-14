@@ -173,11 +173,9 @@ export default function OverviewTab({
 
       {/* 数据可靠性分析 */}
       <div style={{ marginBottom: "30px", color: "#fff" }}>
+        <div>强度平均值（震级）：{formatAnalyticsNumber(statistics.data.magnitudeMean, 2)}</div>
         <div>
-          强度平均值（magnitude）：{formatAnalyticsNumber(statistics.data.magnitudeMean, 2)}
-        </div>
-        <div>
-          强度标准差（magnitude）：
+          强度标准差（震级）：
           {formatAnalyticsNumber(statistics.data.magnitudeStandardDeviation, 2)}
         </div>
       </div>
@@ -1455,7 +1453,7 @@ export default function OverviewTab({
                 <div>
                   <div style={{ color: "#888", fontSize: "12px" }}>趋势方向</div>
                   <div style={{ color: "#4CAF50", fontSize: "16px", marginTop: "5px" }}>
-                    {statistics.data.timeSeriesAnalysis.trendAnalysis.trend || "N/A"}
+                    {statistics.data.timeSeriesAnalysis.trendAnalysis.trend || "暂无"}
                   </div>
                 </div>
                 <div>
@@ -1464,7 +1462,7 @@ export default function OverviewTab({
                     {formatAnalyticsNumber(
                       statistics.data.timeSeriesAnalysis.trendAnalysis.slope,
                       4,
-                    ) || "N/A"}
+                    ) || "暂无"}
                   </div>
                 </div>
                 <div>

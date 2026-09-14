@@ -24,6 +24,11 @@ describe("hazard popup content", () => {
     expect(content.querySelector(".popup-info")?.textContent).toContain(
       maliciousHazard.description,
     );
+    expect(content.querySelector(".popup-info")?.textContent).toContain("类型:");
+    expect(content.querySelector(".popup-info")?.textContent).toContain("严重程度:");
+    expect(content.querySelector(".popup-info")?.textContent).toContain("说明:");
+    expect(content.querySelector(".popup-info")?.textContent).toContain("平台:");
+    expect(content.querySelector(".popup-info")?.textContent).toContain("全球灾害监控平台");
     expect(content.querySelectorAll("script, img, a")).toHaveLength(0);
     expect(content.querySelector("[onerror], [onclick], [href]")).toBeNull();
   });

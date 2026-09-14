@@ -216,6 +216,20 @@ describe("AI 助手 Service", () => {
     },
   );
 
+  it("Demo 默认欢迎语使用平台中文标题", async () => {
+    vi.useFakeTimers();
+    mockResponse(demoResponse("AI_MODEL_MISSING"));
+    const chunks: string[] = [];
+    const pending = streamChatMessage([{ ...messages[0], content: "你好" }], undefined, {
+      onChunk: (chunk) => chunks.push(chunk),
+    });
+
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toEqual({ kind: "completed" });
+    expect(chunks.join("")).toContain("全球灾害监控平台 AI 灾害分析助手");
+    expect(chunks.join("")).not.toContain("Prometheus");
+  });
+
   it("Demo 等待期间取消会停止输出并清理定时器", async () => {
     vi.useFakeTimers();
     mockResponse(demoResponse("AI_MODEL_MISSING"));

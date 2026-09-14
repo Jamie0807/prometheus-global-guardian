@@ -544,7 +544,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             {pythonStats.descriptiveStatistics.basicStats && (
               <>
                 <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
-                  <div style={{ color: "#888" }}>强度平均值（magnitude）</div>
+                  <div style={{ color: "#888" }}>强度平均值（震级）</div>
                   <div style={{ color: "#fff", fontWeight: "bold" }}>
                     {formatAnalyticsNumber(
                       pythonStats.descriptiveStatistics.basicStats.mean.magnitude,
@@ -553,7 +553,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                   </div>
                 </div>
                 <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
-                  <div style={{ color: "#888" }}>强度标准差（magnitude）</div>
+                  <div style={{ color: "#888" }}>强度标准差（震级）</div>
                   <div style={{ color: "#fff", fontWeight: "bold" }}>
                     {formatAnalyticsNumber(
                       pythonStats.descriptiveStatistics.basicStats.std.magnitude,

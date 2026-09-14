@@ -7,22 +7,12 @@ const Header: React.FC = () => {
   return (
     <header className="header">
       <div className="header-content">
-        <div className="logo-section">
-          <img
-            src="/assets/prometheus-logo.jpeg"
-            alt="Prometheus Logo"
-            style={{ height: "60px" }}
-          />
-          <div className="logo-text">
-            <h1>Prometheus Space Technologies</h1>
-            <p>Global Guardian</p>
-          </div>
-        </div>
+        <h1 className="platform-title">全球灾害监控平台</h1>
 
         <div className="header-buttons">
           <button
             className="btn btn-ai"
-            aria-label="Open AI Disaster Analysis Assistant"
+            aria-label="打开 AI 灾害分析助手"
             onClick={() => openModal("ai")}
           >
             <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -38,7 +28,7 @@ const Header: React.FC = () => {
 
           <button
             className="btn btn-analytics"
-            aria-label="Open Analytics Dashboard"
+            aria-label="打开数据分析面板"
             onClick={() => openView("analytics")}
           >
             <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,12 +39,12 @@ const Header: React.FC = () => {
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               />
             </svg>
-            <span>Analytics</span>
+            <span>数据分析</span>
           </button>
 
           <button
             className="btn btn-primary"
-            aria-label="Open Save Report Modal"
+            aria-label="打开保存报告弹窗"
             onClick={() => openModal("save-report")}
           >
             <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,12 +55,12 @@ const Header: React.FC = () => {
                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
               />
             </svg>
-            <span>Save Report</span>
+            <span>保存报告</span>
           </button>
 
           <button
             className="btn btn-secondary"
-            aria-label="Open Settings Modal"
+            aria-label="打开设置弹窗"
             onClick={() => openModal("settings")}
           >
             <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,7 +77,7 @@ const Header: React.FC = () => {
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-            <span>Settings</span>
+            <span>设置</span>
           </button>
 
           <NotificationCenter />

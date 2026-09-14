@@ -20,10 +20,10 @@ export function createHazardPopupContent(hazard: Hazard): HTMLDivElement {
 
   const info = document.createElement("div");
   info.className = "popup-info";
-  appendTextRow(info, "Type", hazard.type.replace(/_/g, " "));
-  appendTextRow(info, "Severity", hazard.severity ?? "");
-  appendTextRow(info, "Description", hazard.description);
-  appendTextRow(info, "Platform", "Prometheus Global Guardian");
+  appendTextRow(info, "类型", hazard.type.replace(/_/g, " "));
+  appendTextRow(info, "严重程度", hazard.severity ?? "");
+  appendTextRow(info, "说明", hazard.description);
+  appendTextRow(info, "平台", "全球灾害监控平台");
 
   content.append(title, info);
   return content;

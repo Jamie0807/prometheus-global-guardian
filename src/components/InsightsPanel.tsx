@@ -74,7 +74,7 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
               {h.properties?.type || "未知类型"}
             </div>
             <div style={{ color: "#888", fontSize: "14px", marginTop: "4px" }}>
-              {h.properties?.severity || "N/A"} | {h.properties?.timestamp || "时间未知"}
+              {h.properties?.severity || "暂无"} | {h.properties?.timestamp || "时间未知"}
             </div>
           </div>
         ))

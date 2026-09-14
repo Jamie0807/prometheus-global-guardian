@@ -41,36 +41,11 @@ body {
   gap: 16px;
 }
 
-.logo-section {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.logo-section img {
-  height: 50px;
-  object-fit: contain;
-  display: block;
-  padding: 4px;
-}
-
-@media (max-width: 768px) {
-  .logo-section img {
-    height: 40px;
-  }
-}
-
-.logo-text h1 {
+.platform-title {
   color: white;
   font-size: 1.5rem;
   font-weight: bold;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.logo-text p {
-  color: #93c5fd;
-  font-size: 0.875rem;
-  font-weight: 500;
 }
 
 .header-buttons {
@@ -196,7 +171,8 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -1201,7 +1177,7 @@ textarea.form-input {
 }
 
 @media (max-width: 768px) {
-  .logo-text h1 {
+  .platform-title {
     font-size: 1.125rem;
   }
 
@@ -1851,11 +1827,11 @@ textarea.form-input {
     padding: 10px;
     padding-top: 70px;
   }
-  
+
   .analytics-header {
     padding: 15px;
   }
-  
+
   .analytics-header h1 {
     font-size: 0.75rem;
     padding: 6px 12px;
@@ -2661,7 +2637,9 @@ textarea.form-input {
   height: 100%;
   background: linear-gradient(90deg, #3b82f6 0%, #6366f1 100%);
   border-radius: 6px;
-  transition: width 0.3s, opacity 0.3s;
+  transition:
+    width 0.3s,
+    opacity 0.3s;
 }
 
 .forecast-value {
@@ -2894,12 +2872,14 @@ textarea.form-input {
   text-align: center;
 }
 
-.style-options, .font-size-options {
+.style-options,
+.font-size-options {
   display: flex;
   gap: 12px;
 }
 
-.style-btn, .font-size-btn {
+.style-btn,
+.font-size-btn {
   flex: 1;
   background: rgba(31, 41, 55, 0.6);
   border: 2px solid transparent;
@@ -2916,13 +2896,15 @@ textarea.form-input {
   text-transform: capitalize;
 }
 
-.style-btn:hover, .font-size-btn:hover {
+.style-btn:hover,
+.font-size-btn:hover {
   border-color: #60a5fa;
   background: rgba(31, 41, 55, 0.9);
   color: #e5e7eb;
 }
 
-.style-btn.active, .font-size-btn.active {
+.style-btn.active,
+.font-size-btn.active {
   border-color: #3b82f6;
   background: rgba(59, 130, 246, 0.2);
   color: #60a5fa;
@@ -2966,7 +2948,7 @@ textarea.form-input {
 }
 
 .toggle-checkbox::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 20px;
   height: 20px;
@@ -3021,7 +3003,8 @@ textarea.form-input {
   gap: 12px;
 }
 
-.customization-cancel-btn, .customization-save-btn {
+.customization-cancel-btn,
+.customization-save-btn {
   padding: 10px 20px;
   border-radius: 8px;
   font-weight: 600;
@@ -3101,7 +3084,8 @@ textarea.form-input {
     grid-template-columns: 1fr;
   }
 
-  .style-options, .font-size-options {
+  .style-options,
+  .font-size-options {
     flex-direction: column;
   }
 
@@ -3115,7 +3099,8 @@ textarea.form-input {
     width: 100%;
   }
 
-  .customization-cancel-btn, .customization-save-btn {
+  .customization-cancel-btn,
+  .customization-save-btn {
     flex: 1;
   }
 }
@@ -3165,8 +3150,14 @@ textarea.form-input {
 }
 
 @keyframes ai-slide-in {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* ── 头部 ── */
@@ -3280,8 +3271,12 @@ textarea.form-input {
   scroll-behavior: smooth;
 }
 
-.ai-messages::-webkit-scrollbar { width: 4px; }
-.ai-messages::-webkit-scrollbar-track { background: transparent; }
+.ai-messages::-webkit-scrollbar {
+  width: 4px;
+}
+.ai-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
 .ai-messages::-webkit-scrollbar-thumb {
   background: rgba(125, 211, 252, 0.2);
   border-radius: 2px;
@@ -3334,8 +3329,12 @@ textarea.form-input {
   max-width: 100%;
 }
 
-.ai-bubble-user  { flex-direction: row-reverse; }
-.ai-bubble-ai    { flex-direction: row; }
+.ai-bubble-user {
+  flex-direction: row-reverse;
+}
+.ai-bubble-ai {
+  flex-direction: row;
+}
 
 .ai-avatar {
   width: 32px;
@@ -3363,7 +3362,9 @@ textarea.form-input {
   max-width: calc(100% - 44px);
 }
 
-.ai-bubble-user-inner { align-items: flex-end; }
+.ai-bubble-user-inner {
+  align-items: flex-end;
+}
 
 .ai-bubble {
   padding: 12px 14px;
@@ -3387,7 +3388,9 @@ textarea.form-input {
 }
 
 /* ── Markdown 渲染 ── */
-.ai-markdown { color: #d1d5db; }
+.ai-markdown {
+  color: #d1d5db;
+}
 
 .ai-md-h3 {
   color: #7dd3fc;
@@ -3411,7 +3414,9 @@ textarea.form-input {
   margin: 6px 0 2px;
 }
 
-.ai-md-p { margin: 3px 0; }
+.ai-md-p {
+  margin: 3px 0;
+}
 
 .ai-md-li {
   margin: 3px 0 3px 14px;
@@ -3419,14 +3424,16 @@ textarea.form-input {
   display: list-item;
 }
 
-.ai-md-ol { list-style: decimal; }
+.ai-md-ol {
+  list-style: decimal;
+}
 
 .ai-md-table-row {
   font-family: monospace;
   font-size: 0.8rem;
   color: #9ca3af;
   padding: 2px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .ai-md-hr {
@@ -3435,7 +3442,9 @@ textarea.form-input {
   margin: 8px 0;
 }
 
-.ai-md-spacer { height: 4px; }
+.ai-md-spacer {
+  height: 4px;
+}
 
 /* 流式输出光标 */
 .ai-cursor {
@@ -3446,8 +3455,13 @@ textarea.form-input {
 }
 
 @keyframes ai-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .ai-ts {
@@ -3516,7 +3530,10 @@ textarea.form-input {
   border-color: rgba(125, 211, 252, 0.35);
   color: #bfdbfe;
 }
-.ai-quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ai-quick-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* ── 输入区域 ── */
 .ai-input-area {
@@ -3551,8 +3568,12 @@ textarea.form-input {
   border-color: rgba(125, 211, 252, 0.45);
   box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.08);
 }
-.ai-textarea::placeholder { color: #4b5563; }
-.ai-textarea:disabled { opacity: 0.5; }
+.ai-textarea::placeholder {
+  color: #4b5563;
+}
+.ai-textarea:disabled {
+  opacity: 0.5;
+}
 
 .ai-send-btn {
   width: 40px;
@@ -3572,8 +3593,13 @@ textarea.form-input {
   background: linear-gradient(135deg, #1e40af, #1d4ed8);
   box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
 }
-.ai-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.ai-send-btn.loading { background: rgba(37, 99, 235, 0.3); }
+.ai-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ai-send-btn.loading {
+  background: rgba(37, 99, 235, 0.3);
+}
 
 /* 发送中三点动画 */
 .ai-sending-dots {
@@ -3588,13 +3614,27 @@ textarea.form-input {
   border-radius: 50%;
   animation: ai-dot-bounce 1.2s infinite ease-in-out;
 }
-.ai-sending-dots span:nth-child(1) { animation-delay: 0s; }
-.ai-sending-dots span:nth-child(2) { animation-delay: 0.15s; }
-.ai-sending-dots span:nth-child(3) { animation-delay: 0.3s; }
+.ai-sending-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+.ai-sending-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ai-sending-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
 
 @keyframes ai-dot-bounce {
-  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-  40%           { transform: scale(1.1); opacity: 1; }
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }
 
 .ai-hint {
@@ -3606,6 +3646,10 @@ textarea.form-input {
 
 /* ── 响应式 ── */
 @media (max-width: 520px) {
-  .ai-panel { width: 100vw; }
-  .ai-quick-grid { grid-template-columns: 1fr; }
+  .ai-panel {
+    width: 100vw;
+  }
+  .ai-quick-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -32,7 +32,7 @@ vi.mock("../../src/features/map/state/MapStateContext", () => ({
 const hazardTypes: HazardType[] = [
   { type_id: "FLOOD", type_name: "Flood" },
   { type_id: "EARTHQUAKE", type_name: "Earthquake" },
-  { type_id: "UNSUPPORTED", type_name: "Unsupported" },
+  { type_id: "UNSUPPORTED", type_name: "Unsupported type" },
 ];
 
 function createDeferred<T>() {
@@ -60,38 +60,44 @@ describe("StatusPanel", () => {
 
     render(<StatusPanel />);
 
-    const filter = screen.getByLabelText("Filter by Type");
+    expect(screen.getByRole("heading", { name: "实时监控" })).toBeInTheDocument();
+    expect(screen.getByText("实时环境灾害")).toBeInTheDocument();
+    expect(screen.getByText("灾害总数")).toBeInTheDocument();
+    const filter = screen.getByLabelText("按类型筛选");
     expect(filter).toBeDisabled();
-    expect(screen.getByText("Loading hazard types...")).toBeInTheDocument();
+    expect(screen.getByText("正在加载灾害类型...")).toBeInTheDocument();
 
     deferredHazardTypes.resolve(hazardTypes);
 
-    expect(await screen.findByRole("option", { name: "Flood" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Earthquake" })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "Unsupported" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "洪水" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "地震" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "全部灾害" })).toHaveValue("ALL");
+    expect(screen.getByRole("option", { name: "洪水" })).toHaveValue("FLOOD");
+    expect(screen.queryByRole("option", { name: "Flood" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Unsupported type" })).not.toBeInTheDocument();
     await waitFor(() => expect(filter).toBeEnabled());
     expect(serviceMocks.checkHealth).toHaveBeenCalledTimes(1);
   });
 
-  it("updates the shared filter when the selected hazard type changes", async () => {
+  it("uses the stable English type ID when the localized type is selected", async () => {
     const user = userEvent.setup();
     serviceMocks.fetchHazardTypes.mockResolvedValue(hazardTypes);
 
     render(<StatusPanel />);
 
-    await screen.findByRole("option", { name: "Flood" });
-    await user.selectOptions(screen.getByLabelText("Filter by Type"), "FLOOD");
+    await screen.findByRole("option", { name: "洪水" });
+    await user.selectOptions(screen.getByLabelText("按类型筛选"), "FLOOD");
 
     expect(mapStateMocks.setFilter).toHaveBeenCalledWith("FLOOD");
   });
 
-  it("refreshes the shared hazard data when Refresh Data is clicked", async () => {
+  it("refreshes the shared hazard data when 刷新数据 is clicked", async () => {
     const user = userEvent.setup();
     serviceMocks.fetchHazardTypes.mockResolvedValue(hazardTypes);
 
     render(<StatusPanel />);
 
-    await user.click(screen.getByRole("button", { name: "Refresh Data" }));
+    await user.click(screen.getByRole("button", { name: "刷新数据" }));
 
     expect(mapStateMocks.refresh).toHaveBeenCalledOnce();
   });

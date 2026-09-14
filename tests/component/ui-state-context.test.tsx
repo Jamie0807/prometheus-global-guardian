@@ -95,8 +95,9 @@ describe("UIStateContext", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "open-settings-modal" }));
-    await user.selectOptions(screen.getByLabelText("Map Style"), "light-v11");
+    await user.selectOptions(screen.getByLabelText("地图样式"), "light-v11");
 
     expect(setMapStyle).toHaveBeenCalledWith("light-v11");
+    expect(screen.getByRole("option", { name: "浅色" })).toHaveValue("light-v11");
   });
 });

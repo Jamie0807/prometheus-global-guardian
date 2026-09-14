@@ -30,24 +30,24 @@ interface SourceDistributionRow {
 /**
  * Convert hazards data to CSV format
  */
-export const exportToCSV = (hazards: Hazard[], filename: string = "hazards-data.csv"): void => {
+export const exportToCSV = (hazards: Hazard[], filename: string = "灾害数据.csv"): void => {
   if (hazards.length === 0) {
-    alert("No data to export");
+    alert("没有可导出的数据");
     return;
   }
 
   // Define CSV headers
   const headers = [
-    "ID",
-    "Type",
-    "Title",
-    "Severity",
-    "Population Exposed",
-    "Source",
-    "Date",
-    "Latitude",
-    "Longitude",
-    "Description",
+    "编号",
+    "类型",
+    "标题",
+    "严重程度",
+    "暴露人口",
+    "来源",
+    "日期",
+    "纬度",
+    "经度",
+    "说明",
   ];
 
   // Convert hazards to CSV rows
@@ -55,9 +55,9 @@ export const exportToCSV = (hazards: Hazard[], filename: string = "hazards-data.
     hazard.id,
     hazard.type.replace(/_/g, " "),
     `"${hazard.title.replace(/"/g, '""')}"`, // Escape quotes
-    hazard.severity || "Unknown",
+    hazard.severity || "未知",
     hazard.magnitude || 0,
-    hazard.source || "Unknown",
+    hazard.source || "未知",
     hazard.timestamp || new Date().toISOString(),
     hazard.geometry.coordinates[1] || 0,
     hazard.geometry.coordinates[0] || 0,
@@ -88,40 +88,40 @@ export const exportAnalyticsToCSV = (
   severityData: SeverityDistributionRow[],
   timelineData: TimelineRow[],
   sourceData: SourceDistributionRow[],
-  filename: string = "analytics-data.csv",
+  filename: string = "分析数据.csv",
 ): void => {
   // Create comprehensive analytics CSV
   const sections = [];
 
   // Type Distribution
-  sections.push("TYPE DISTRIBUTION");
-  sections.push("Type,Count,Percentage");
+  sections.push("类型分布");
+  sections.push("类型,数量,占比");
   typeData.forEach((item) => {
     sections.push(`"${item.type.replace(/_/g, " ")}",${item.count},${item.percentage}%`);
   });
   sections.push("");
 
   // Severity Distribution
-  sections.push("SEVERITY DISTRIBUTION");
-  sections.push("Severity,Count,Percentage");
+  sections.push("严重程度分布");
+  sections.push("严重程度,数量,占比");
   severityData.forEach((item) => {
     sections.push(`${item.severity},${item.count},${item.percentage}%`);
   });
   sections.push("");
 
   // Timeline Data
-  sections.push("TIMELINE DATA");
-  sections.push("Date,Earthquakes,Volcanoes,Storms,Floods,Wildfires,Total");
+  sections.push("时间线数据");
+  sections.push("日期,地震,火山,风暴,洪水,野火,总计");
   timelineData.forEach((item) => {
     sections.push(
-      `${new Date(item.date).toLocaleDateString()},${item.earthquakes},${item.volcanoes},${item.storms},${item.floods},${item.wildfires},${item.total}`,
+      `${new Date(item.date).toLocaleDateString("zh-CN")},${item.earthquakes},${item.volcanoes},${item.storms},${item.floods},${item.wildfires},${item.total}`,
     );
   });
   sections.push("");
 
   // Source Distribution
-  sections.push("DATA SOURCES");
-  sections.push("Source,Count");
+  sections.push("数据来源");
+  sections.push("来源,数量");
   sourceData.forEach((item) => {
     sections.push(`${item.source},${item.count}`);
   });
@@ -144,7 +144,7 @@ export const exportAnalyticsToCSV = (
 /**
  * Export data as JSON
  */
-export const exportToJSON = (data: unknown, filename: string = "data.json"): void => {
+export const exportToJSON = (data: unknown, filename: string = "数据.json"): void => {
   const jsonContent = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonContent], { type: "application/json" });
   const link = document.createElement("a");

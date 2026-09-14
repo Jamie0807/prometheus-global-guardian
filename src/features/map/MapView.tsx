@@ -53,9 +53,9 @@ const MapView = () => {
           type="button"
           onClick={toggleHeatmap}
           className={`toggle-button ${showHeatmap ? "active" : ""}`}
-          title={showHeatmap ? "Show Markers" : "Show Heatmap"}
+          title={showHeatmap ? "显示标记" : "显示热力图"}
         >
-          <span>{showHeatmap ? "Markers" : "Heatmap"}</span>
+          <span>{showHeatmap ? "标记" : "热力图"}</span>
         </button>
       </div>
     </>
