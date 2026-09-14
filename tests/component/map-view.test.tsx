@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mapMocks = vi.hoisted(() => ({
@@ -202,67 +202,77 @@ describe("MapView", () => {
   });
 
   it.each([
-    ["success", false, "已更新"],
-    ["empty", true, "暂无数据 · 已显示备用数据"],
-    ["unavailable", true, "暂不可用 · 已显示备用数据"],
-  ] as const)("shows %s primary source status", async (status, fallbackUsed, label) => {
-    mapMocks.fetchHazardFeed.mockResolvedValueOnce({
-      hazards: [],
-      meta: {
-        primary: "disasteraware",
-        fallbackUsed,
-        stale: false,
-        generatedAt: "2026-09-09T00:00:00Z",
-        sources: [
-          { id: "disasteraware", status, count: 0 },
-          { id: "usgs", status: "fallback", count: 0 },
-          { id: "nasa-eonet", status: "fallback", count: 0 },
-          { id: "gdacs", status: "fallback", count: 0 },
+    ["success", false, false],
+    ["empty", true, false],
+    ["unavailable", true, false],
+    ["stale", false, true],
+  ] as const)(
+    "does not render a data source banner for %s source state",
+    async (status, fallbackUsed, stale) => {
+      mapMocks.fetchHazardFeed.mockResolvedValueOnce({
+        hazards: [
+          {
+            id: `hazard-${status}`,
+            title: "Test hazard",
+            type: "FLOOD",
+            geometry: { type: "Point", coordinates: [120, 30] },
+            description: "Test hazard",
+            source: "test",
+          },
         ],
-      },
-    });
+        meta: {
+          primary: "disasteraware",
+          fallbackUsed,
+          stale,
+          generatedAt: "2026-09-09T00:00:00Z",
+          sources: [
+            { id: "disasteraware", status, count: 1, fetchedAt: "2026-09-09T00:00:00Z" },
+            { id: "usgs", status: "fallback", count: 0 },
+            { id: "nasa-eonet", status: "fallback", count: 0 },
+            { id: "gdacs", status: "fallback", count: 0 },
+          ],
+        },
+      });
 
+      renderMapView();
+
+      await waitFor(() => expect(mapMocks.popupSetDOMContent).toHaveBeenCalled());
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.queryByText("暂无可用灾害数据")).not.toBeInTheDocument();
+      expect(mapMocks.fetchHazardsActive).not.toHaveBeenCalled();
+      expect(mapMocks.fetchUSGSEarthquakes).not.toHaveBeenCalled();
+      expect(mapMocks.fetchNASAEONET).not.toHaveBeenCalled();
+      expect(mapMocks.fetchGDACS).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not render diagnostics when source metadata has no hazards", async () => {
+    const pending = pendingHazardFeed();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
     renderMapView();
 
-    expect(await screen.findByRole("status")).toHaveTextContent(label);
-    expect(mapMocks.fetchHazardsActive).not.toHaveBeenCalled();
-    expect(mapMocks.fetchUSGSEarthquakes).not.toHaveBeenCalled();
-    expect(mapMocks.fetchNASAEONET).not.toHaveBeenCalled();
-    expect(mapMocks.fetchGDACS).not.toHaveBeenCalled();
-  });
-
-  it("shows the earliest stale source success time", async () => {
-    mapMocks.fetchHazardFeed.mockResolvedValueOnce({
-      hazards: [],
-      meta: {
-        primary: "disasteraware",
-        fallbackUsed: false,
-        stale: true,
-        generatedAt: "2026-09-09T00:10:00.000Z",
-        sources: [
-          {
-            id: "disasteraware",
-            status: "stale",
-            count: 1,
-            fetchedAt: "2026-09-09T00:00:00.000Z",
-          },
-          {
-            id: "usgs",
-            status: "stale",
-            count: 1,
-            fetchedAt: "2026-09-09T00:05:00.000Z",
-          },
-          { id: "nasa-eonet", status: "fallback", count: 0 },
-          { id: "gdacs", status: "fallback", count: 0 },
-        ],
-      },
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      pending.resolve({
+        hazards: [],
+        meta: {
+          primary: "disasteraware",
+          fallbackUsed: true,
+          stale: false,
+          generatedAt: "2026-09-09T00:00:00Z",
+          sources: [
+            { id: "disasteraware", status: "unavailable", count: 0 },
+            { id: "usgs", status: "fallback", count: 0 },
+            { id: "nasa-eonet", status: "fallback", count: 0 },
+            { id: "gdacs", status: "fallback", count: 0 },
+          ],
+        },
+      });
+      await pending.promise;
     });
 
-    renderMapView();
-
-    const status = await screen.findByRole("status");
-    expect(status).toHaveTextContent("数据可能已过期");
-    expect(status).toHaveTextContent(new Date("2026-09-09T00:00:00.000Z").toLocaleString("zh-CN"));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByText("暂无可用灾害数据")).not.toBeInTheDocument();
   });
 
   it("deduplicates matching manual refresh requests", async () => {

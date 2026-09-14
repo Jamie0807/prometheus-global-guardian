@@ -139,8 +139,9 @@ body {
   padding: 12px;
   margin-bottom: 16px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
 }
 
 .count-label {
@@ -160,6 +161,12 @@ body {
 
 .filter-section {
   margin-bottom: 12px;
+}
+
+.status-refresh-button {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
 }
 
 .loading-text {

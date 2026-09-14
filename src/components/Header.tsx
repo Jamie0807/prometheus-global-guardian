@@ -7,7 +7,7 @@ const Header: React.FC = () => {
   return (
     <header className="header">
       <div className="header-content">
-        <h1 className="platform-title">全球灾害监控平台</h1>
+        <h1 className="platform-title">实时全球环境灾害监控平台与可视化平台</h1>
 
         <div className="header-buttons">
           <button

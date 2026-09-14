@@ -1,48 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { fetchHazardTypes } from "../services/hazards/hazardService";
-import { checkHealth } from "../services/analytics/analyticsService";
-import type { HazardType } from "../types";
+import React from "react";
 import DISPLAYED_TYPES from "../config/displayedTypes";
 import { useMapState } from "../features/map/state/MapStateContext";
-import { createClientLogger } from "../utils/logger";
-
-const logger = createClientLogger("status-panel");
-const displayedTypeNames = new Map(
-  DISPLAYED_TYPES.map(({ type_id, type_name }) => [type_id, type_name]),
-);
 
 const StatusPanel: React.FC = () => {
   const { filter, hazards, refresh, setFilter } = useMapState();
-  const [hazardTypes, setHazardTypes] = useState<HazardType[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const data = await fetchHazardTypes();
-      setHazardTypes(
-        data.flatMap((item: HazardType) => {
-          const typeName = displayedTypeNames.get(item.type_id);
-          return typeName === undefined ? [] : [{ ...item, type_name: typeName }];
-        }),
-      );
-    } catch {
-      logger.warn("hazard_types_load_failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    checkPythonService();
-    const interval = setInterval(checkPythonService, 10000); // 每10秒检查一次
-    return () => clearInterval(interval);
-  }, []);
-
-  const checkPythonService = async () => {
-    await checkHealth();
-  };
 
   return (
     <div className="status-panel">
@@ -74,23 +35,17 @@ const StatusPanel: React.FC = () => {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           className="form-input"
-          disabled={isLoading}
         >
           <option value="ALL">全部灾害</option>
-          {hazardTypes.map((type) => (
+          {DISPLAYED_TYPES.map((type) => (
             <option key={type.type_id} value={type.type_id}>
               {type.type_name}
             </option>
           ))}
         </select>
-        {isLoading && <p className="loading-text">正在加载灾害类型...</p>}
       </div>
 
-      <button
-        className="btn btn-primary"
-        style={{ width: "100%", marginTop: "12px" }}
-        onClick={() => void refresh()}
-      >
+      <button className="btn btn-primary status-refresh-button" onClick={() => void refresh()}>
         刷新数据
       </button>
     </div>
