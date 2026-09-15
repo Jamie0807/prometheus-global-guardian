@@ -11,10 +11,10 @@
 - BFF 仅代理声明的 DisasterAware 路由，并具备请求边界、服务端鉴权、超时、限流和脱敏错误契约；Python 管理接口已受令牌保护。
 - AI 流式会话已支持取消、失败终态、请求隔离、历史预算和手动重试；不提供自动续传或跨实例会话治理。
 - 首页标题、状态面板筛选控件、Mapbox 聚合点展开、单点安全 Popup、AI 首包等待态和 HTML 报告均已完成本地回归验证。
-- 使用页面当前的 100 条灾害数据实际调用本机 FastAPI 的统计、预测和风险接口均返回 200，并可满足现有严格契约；Python 回归也覆盖代表性灾害下的三条核心成功信封。截图中的格式错误应按运行中的分析服务版本或临时状态排查，不能以放宽客户端解析处理。
+- 使用页面当前的 100 条灾害数据实际调用本机 FastAPI 的统计、预测和风险接口均返回 200，并可满足现有严格契约；风险评估对缺失震级的类型返回 `riskScore: 0` 和 `averageMagnitude: null`，正常震级数据仍按既有公式计算。截图中的格式错误应按运行中的分析服务版本或临时状态排查，不能以放宽客户端解析处理。
 - 地图与 UI 导航状态已分别由 `MapStateProvider` 和 `UIStateProvider` 归属；组件局部状态与跨实例持久化仍不在本轮范围内。
 - 质量门禁包含 lint、格式、三项 TypeScript 类型检查、BFF/Service/组件/E2E 测试、构建及 Python unittest。GitHub Actions 分别运行前端/BFF 基线和 Python 测试。
-- 本地 `pnpm test` 的 BFF 监听用例会受受限沙箱影响而出现 `listen EPERM`；这是运行环境限制。独立 Service、组件、Python 和构建门禁可在当前环境通过。
+- 受限沙箱中运行 `pnpm test` 的 BFF 监听用例会出现 `listen EPERM`；这是运行环境限制。在具备本地端口权限的环境中，BFF 与 Service 测试均可完整通过。
 
 ## 已完成能力
 
@@ -26,7 +26,7 @@
 | API / Service 层统一       | 组件通过 Service 层访问业务接口；认证、灾害、Analytics 与 AI 请求具备明确边界。                                                        |
 | Analytics 前端边界类型治理 | 16 个 Analytics 响应边界及 Hazard/HTTP 边界均有运行时解析与稳定契约错误。                                                              |
 | 跨语言灾害请求契约         | `contracts/analytics-hazard-data.json` 被 TypeScript 与 Python 测试共同读取；浏览器会在请求前拒绝非法映射值。                          |
-| Python API 契约与可靠性    | 请求边界、稳定错误、缓存口径、线程隔离与核心算法异常语义已有实现和测试。                                                               |
+| Python API 契约与可靠性    | 请求边界、稳定错误、缓存口径、线程隔离与核心算法异常语义已有实现和测试；风险结果覆盖缺失与正常震级两种语义。                           |
 | BFF 与 Python 管理面边界   | BFF allowlist、query/body 限制、上游超时与脱敏错误已落地；Python 管理路由要求令牌、CORS 限制显式来源。                                 |
 | 地图与分析页面拆分         | MapView 已分为 feature 入口、Hook 与纯工具；Analytics 页面已拆为数据 Hook、转换与各 Tab。                                              |
 | 外部灾害数据韧性           | 多源聚合具备超时、一次重试、进程内缓存、陈旧标记与来源级状态；刷新请求具备取消、去重和竞态保护。                                       |
@@ -48,11 +48,11 @@
 | `pnpm run typecheck:contracts` | TypeScript 契约正反例类型检查。                                     |
 | `pnpm run test:services`       | Service、解析器、请求边界、AI 流协议与 HTML 报告回归；当前 179 项。 |
 | `pnpm run test:component`      | React Testing Library 组件回归；当前 75 项。                        |
-| `pnpm run test:python`         | FastAPI 模型、路由、服务与算法 unittest；当前 40 项。               |
+| `pnpm run test:python`         | FastAPI 模型、路由、服务与算法 unittest；当前 44 项。               |
 | `pnpm run test:e2e`            | Playwright 桌面端关键流程冒烟。                                     |
 | `pnpm run build`               | Vite 生产构建与 BFF 编译。                                          |
 
-最近一次完整验证结果：BFF 74/74、Service 179/179、组件 75/75、Python 40/40、Playwright E2E 1/1；lint、格式、三项 TypeScript 类型检查、生产构建和差异检查均通过。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
+本轮验证结果：BFF 74/74、Service 179/179、Python 44/44；lint、格式、客户端/服务端 TypeScript 类型检查、生产构建和差异检查均通过。组件与 Playwright E2E 未因本轮 Analytics 语义和注释更新重跑，最近记录仍为组件 75/75、Playwright E2E 1/1。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
 
 ## 优先级矩阵
 
