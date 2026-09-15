@@ -47,6 +47,7 @@ function requestBytes(
 
 function completedConversation(messages: readonly ChatMessage[]): ChatMessage[] {
   const history: ChatMessage[] = [];
+  // 只重放已完成的用户/助手成对消息，避免把中断或失败的回复发给服务端。
   for (let index = 0; index < messages.length - 1; index += 1) {
     const user = messages[index];
     const assistant = messages[index + 1];
@@ -88,6 +89,7 @@ export function useAIChatSession(
     const active = activeRequestRef.current;
     if (!active) return;
 
+    // 先使当前请求失效，再 abort；迟到的分块会被 requestId 守卫忽略。
     activeRequestRef.current = undefined;
     requestSequenceRef.current += 1;
     active.controller.abort();
@@ -122,12 +124,14 @@ export function useAIChatSession(
         isStreaming: true,
       };
 
+      // 将活动请求写入 ref，使停止、关闭和卸载都能取消同一条流。
       activeRequestRef.current = activeRequest;
       setErrorText("");
       setRetrySnapshot(undefined);
       setMessages((current) => (appendUserMessage ? [...current, snapshot.userMessage] : current));
       setIsStreaming(true);
 
+      // 防止取消后的异步读取或旧请求分块覆盖当前会话状态。
       const isCurrentRequest = (): boolean => activeRequestRef.current?.requestId === requestId;
       const outcome = await streamChatMessage(snapshot.history, snapshot.context, {
         signal: controller.signal,
@@ -135,6 +139,7 @@ export function useAIChatSession(
           if (!isCurrentRequest()) return;
           if (!chunk.trim()) return;
           if (!activeRequest.assistantCreated) {
+            // 第一个有效分块才创建助手消息，空流不会留下空白气泡。
             activeRequest.assistantCreated = true;
             setMessages((current) => [...current, { ...assistantMessage, content: chunk }]);
             return;
@@ -179,6 +184,7 @@ export function useAIChatSession(
             ),
           );
         }
+        // 失败时保存本次请求快照，供 retry 原样重发。
         setErrorText(outcome.message);
         setRetrySnapshot(snapshot);
       }
@@ -238,9 +244,11 @@ export function useAIChatSession(
   }, [onClose, stop]);
 
   useEffect(() => {
+    // 面板隐藏时停止正在读取的响应流。
     if (!isOpen) stop();
   }, [isOpen, stop]);
 
+  // 组件卸载时同样取消流，避免在已卸载会话上更新状态。
   useEffect(() => stop, [stop]);
 
   return {

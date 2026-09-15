@@ -1,12 +1,5 @@
 /**
- * AIChatAssistant — AI 灾害分析助手面板
- *
- * 核心特性（参考 ai-flow 架构）：
- * - 流式 LLM 响应，逐字打印动画
- * - 灾害实时上下文自动注入
- * - 预设快捷分析工作流（Quick Prompts）
- * - 多轮对话历史管理
- * - Demo 模式降级（无 API Key 时）
+ * 渲染聊天面板、快捷提示和当前会话。
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -26,7 +19,7 @@ interface BubbleProps {
 const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
   const isUser = msg.role === "user";
 
-  // 简单 Markdown 渲染：粗体、标题、列表、表格行
+  // 按行格式化粗体、二三级标题、列表和管道分隔行。
   const renderMarkdown = (text: string) => {
     const lines = text.split("\n");
     return lines.map((line, i) => {
@@ -131,7 +124,7 @@ const AIChatAssistant: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 构建灾害上下文
+  // 将当前地图事件压缩为数量、类型和最多八条近期记录，作为可选请求上下文。
   const disasterContext = useMemo<DisasterContext>(() => {
     const byType: Record<string, number> = {};
     hazards.forEach((h) => {
@@ -165,7 +158,7 @@ const AIChatAssistant: React.FC = () => {
     close,
   } = useAIChatSession(isOpen, closeModal, contextEnabled ? disasterContext : undefined);
 
-  // 自动滚动到底部
+  // 每次消息数组变化后滚动到最新消息。
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -174,14 +167,14 @@ const AIChatAssistant: React.FC = () => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // 面板打开时聚焦输入框
+  // 面板打开后延迟聚焦，等待输入框挂载完成。
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [isOpen]);
 
-  // ESC 关闭
+  // 仅面板打开时响应 Escape，并由 close 取消活跃请求。
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) close();

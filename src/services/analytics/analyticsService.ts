@@ -2,10 +2,9 @@
  * Python Analytics Service API Client
  * 与 FastAPI 后端通信的客户端
  *
- * 优化特性：
+ * 客户端能力：
  * - 请求超时控制
  * - 自动重试机制
- * - 请求队列管理
  * - 错误处理增强
  */
 
@@ -139,7 +138,7 @@ async function readAnalyticsJson(response: Response): Promise<unknown> {
 export type { AnalysisRequest, HazardData } from "./analyticsTypes";
 
 /**
- * 检查服务健康状态（优化：添加超时控制）
+ * 在 5 秒超时内检查服务健康状态。
  */
 export async function checkHealth(): Promise<boolean> {
   try {
@@ -167,7 +166,7 @@ export async function getServiceInfo(): Promise<AnalyticsServiceInfo> {
 }
 
 /**
- * 统计分析（优化：添加重试和更好的错误处理）
+ * 请求统计分析；可重试暂时性失败。
  */
 export async function getStatistics(
   hazards: readonly HazardInput[],
@@ -200,7 +199,7 @@ export async function getStatistics(
 }
 
 /**
- * 预测分析（优化：添加重试和更好的错误处理）
+ * 请求预测分析；可重试暂时性失败。
  */
 export async function getPredictions(
   hazards: readonly HazardInput[],
@@ -266,7 +265,7 @@ export async function processETL(
 }
 
 /**
- * 风险评估（优化：添加重试和更好的错误处理）
+ * 请求风险评估；可重试暂时性失败。
  */
 export async function getRiskAssessment(
   hazards: readonly HazardInput[],
@@ -332,7 +331,7 @@ export async function getComprehensiveAnalysis(
 }
 
 /**
- * ========== 新增：数据质量监控和统一模型API ==========
+ * ========== 数据质量监控和统一模型 API ==========
  */
 
 /**

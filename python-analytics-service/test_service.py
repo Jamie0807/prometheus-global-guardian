@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试脚本 - 验证Python数据分析服务功能
+向本地服务发送健康检查、分析、预测和风险评估请求的冒烟脚本。
 """
 
 import requests
@@ -9,7 +9,6 @@ import json
 from datetime import datetime, timedelta
 import random
 
-# API基础URL
 BASE_URL = "http://localhost:8001"
 
 def generate_test_data(count=100):
@@ -72,7 +71,7 @@ def test_comprehensive_analysis():
         print(f"Processing Time: {result['processingTime']:.2f}s")
         print(f"Success: {result['success']}")
         
-        # 打印部分结果
+        # 仅输出响应中的统计摘要
         if 'data' in result and 'statistics' in result['data']:
             stats = result['data']['statistics']
             print("\nStatistics Overview:")

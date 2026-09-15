@@ -5,7 +5,7 @@ const logger = createClientLogger("config");
 function validateEnv() {
   const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-  // Mapbox token is required - provide a default for demo purposes
+  // 缺少 VITE_MAPBOX_TOKEN 时记录警告并使用下面的演示 token。
   if (!mapboxToken) {
     logger.warn("mapbox_token_missing");
   }
@@ -36,10 +36,10 @@ export const config = {
     maxRetries: 3,
     retryDelay: 1000, // 1 second
   },
-  // 3D Tiles 外部数据源（方案二）
+  // 外部 3D Tiles 数据源
   // 设置后优先使用外部精细建筑模型，空则回退到 fill-extrusion 模式
   tiles3d: {
-    // 示例公开数据集：NYC 建筑模型（可替换为任意支持 3D Tiles 的服务地址）
+    // 由 VITE_3D_TILES_URL 配置的 3D Tiles 服务地址
     url: import.meta.env.VITE_3D_TILES_URL || "",
     // Cesium ion 认证 token（访问 Cesium ion 资产时需要）
     cesiumIonToken: import.meta.env.VITE_CESIUM_ION_TOKEN || "",

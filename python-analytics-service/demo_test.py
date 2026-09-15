@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-测试Python数据分析服务
-演示各个API端点的功能
+向本地 Python 数据分析服务的部分端点发送示例请求。
 """
 
 import requests
 import json
 from datetime import datetime, timedelta
 
-# 服务地址
 BASE_URL = "http://localhost:8001"
 
-# 生成测试数据
 def generate_test_data(count=30):
     """生成测试灾害数据"""
     hazard_types = ["EARTHQUAKE", "VOLCANO", "STORM", "FLOOD", "WILDFIRE"]
@@ -38,7 +35,6 @@ print("=" * 80)
 print("🐍 Python数据分析微服务测试")
 print("=" * 80)
 
-# 1. 测试服务健康状态
 print("\n📊 1. 测试服务健康状态...")
 try:
     response = requests.get(f"{BASE_URL}/health")
@@ -46,7 +42,6 @@ try:
 except Exception as e:
     print(f"❌ 错误: {e}")
 
-# 2. 测试根端点
 print("\n📊 2. 测试服务信息...")
 try:
     response = requests.get(f"{BASE_URL}/")
@@ -57,13 +52,11 @@ try:
 except Exception as e:
     print(f"❌ 错误: {e}")
 
-# 3. 生成测试数据
 print("\n📊 3. 生成测试数据...")
 test_hazards = generate_test_data(30)
 print(f"✅ 生成了 {len(test_hazards)} 条测试灾害数据")
 
-# 4. 测试统计分析API
-print("\n📊 4. 测试23种统计算法...")
+print("\n📊 4. 测试统计分析...")
 try:
     response = requests.post(
         f"{BASE_URL}/api/v1/statistics",
@@ -87,7 +80,6 @@ try:
 except Exception as e:
     print(f"❌ 错误: {e}")
 
-# 5. 测试预测模型API
 print("\n📊 5. 测试5个预测模型...")
 try:
     response = requests.post(
@@ -111,7 +103,6 @@ try:
 except Exception as e:
     print(f"❌ 错误: {e}")
 
-# 6. 测试综合分析API
 print("\n📊 6. 测试综合数据分析...")
 try:
     response = requests.post(
@@ -133,7 +124,6 @@ try:
 except Exception as e:
     print(f"❌ 错误: {e}")
 
-# 7. 测试ETL处理API
 print("\n📊 7. 测试ETL数据处理...")
 try:
     response = requests.post(
@@ -153,7 +143,6 @@ try:
 except Exception as e:
     print(f"❌ 错误: {e}")
 
-# 8. 测试风险评估API
 print("\n📊 8. 测试风险评估...")
 try:
     response = requests.post(

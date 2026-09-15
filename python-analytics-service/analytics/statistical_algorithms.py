@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-统计分析算法模块 - 23种算法实现
-替代TypeScript自实现，使用Python成熟的数据科学生态
+统计分析算法模块
+提供描述性统计、推断统计、时间序列、相关性和异常检测。
 
-优化点：
-1. 添加数据缓存机制
-2. 批量处理优化
-3. 并行计算支持
-4. 更好的错误处理和数据验证
+特性：
+1. 基于输入结构的结果缓存
+2. 输入字段验证
+3. NumPy 结果的 JSON 安全转换
 """
 
 import pandas as pd
@@ -41,12 +40,12 @@ def clean_for_json(obj):
     return obj
 
 class StatisticalAnalyzer:
-    """统计分析器 - 实现23种核心算法
+    """统计分析器。
     
-    优化特性：
+    实现特性：
     - 缓存重复计算结果
-    - 数据验证和清洗
-    - 批量处理支持
+    - 验证分析所需字段
+    - 记录运行时间
     """
     
     def __init__(self):
@@ -57,7 +56,7 @@ class StatisticalAnalyzer:
     
     def _get_cache_key(self, df: pd.DataFrame) -> str:
         """生成数据框的缓存键"""
-        # 使用数据的哈希值作为缓存键
+        # 使用记录数、列名和类型分布生成缓存签名
         data_str = f"{len(df)}_{df.columns.tolist()}_{df['type'].value_counts().to_dict()}"
         return hashlib.md5(data_str.encode()).hexdigest()
     
@@ -97,13 +96,7 @@ class StatisticalAnalyzer:
         return True
         
     def run_comprehensive_analysis(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """运行全面统计分析，替代TypeScript的23种算法
-        
-        优化：
-        - 添加缓存机制
-        - 性能监控
-        - 并行计算（可选）
-        """
+        """运行综合统计分析并返回各分析部分及运行时间。"""
         start_time = datetime.now()
         
         try:
@@ -143,7 +136,7 @@ class StatisticalAnalyzer:
             raise
     
     def _descriptive_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """描述性统计 - 8种算法"""
+        """描述性统计。"""
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         
         results = {
@@ -252,7 +245,7 @@ class StatisticalAnalyzer:
         return results
     
     def _inferential_statistics(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """推断统计 - 6种算法"""
+        """推断统计。"""
         results = {
             "confidenceIntervals": {},
             "hypothesisTests": {},
@@ -277,7 +270,7 @@ class StatisticalAnalyzer:
                     "marginOfError": float(ci[1] - mean)
                 }
         
-        # 2-3. t检验、卡方检验
+        # 不同类型的震级 t 检验
         if 'type' in df.columns and 'magnitude' in df.columns:
             # 不同类型的震级比较
             earthquake_data = df[df['type'] == 'EARTHQUAKE']['magnitude'].dropna()
@@ -292,7 +285,7 @@ class StatisticalAnalyzer:
                     "significant": p_value < 0.05
                 }
         
-        # 4-6. 方差分析、回归分析
+        # 时间与震级的线性回归
         if len(df) > 10:
             # 简单线性回归：时间 vs 震级
             df_with_magnitude = df.dropna(subset=['magnitude'])
@@ -317,7 +310,7 @@ class StatisticalAnalyzer:
         return results
     
     def _time_series_analysis(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """时间序列分析 - 4种算法"""
+        """时间序列分析。"""
         results = {
             "movingAverages": {},
             "trendAnalysis": {},
@@ -393,7 +386,7 @@ class StatisticalAnalyzer:
         return results
     
     def _correlation_analysis(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """相关性分析 - 3种算法"""
+        """相关性分析。"""
         results = {
             "pearsonCorrelation": {},
             "spearmanCorrelation": {},
@@ -412,7 +405,7 @@ class StatisticalAnalyzer:
             spearman_corr = df[numeric_cols].corr(method='spearman')
             results["spearmanCorrelation"] = spearman_corr.to_dict()
         
-        # 3. 类型间相关性分析
+        # 按类型组合统计出现比例
         if 'type' in df.columns:
             type_counts = df.groupby('type').size()
             type_correlation = {}
@@ -431,7 +424,7 @@ class StatisticalAnalyzer:
         return results
     
     def _anomaly_detection(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """异常检测 - 2种算法"""
+        """异常检测。"""
         results = {
             "outlierDetection": {},
             "anomalyStatistics": {}
@@ -487,19 +480,16 @@ class StatisticalAnalyzer:
         return results
     
     def _calculate_performance_metrics(self, start_time: datetime = None) -> Dict[str, Any]:
-        """计算性能指标（优化：添加实际运行时间和缓存统计）"""
+        """计算运行时间和缓存状态。"""
         elapsed_ms = 0
         if start_time:
             elapsed_ms = (datetime.now() - start_time).total_seconds() * 1000
         
         return {
-            "algorithmCount": 23,
+            "analysisSections": 5,
             "processingTime": f"{elapsed_ms:.2f}ms" if elapsed_ms > 0 else "<50ms",
-            "processingOptimization": "70% memory reduction vs TypeScript",
-            "accuracyImprovement": "99.8% vs 98.5% (TypeScript)",
             "libraryBased": "NumPy + SciPy + Statsmodels + Scikit-learn",
-            "performanceGain": "3-10x faster than TypeScript implementation",
             "cacheEnabled": True,
             "cacheSize": len(self._cache),
-            "parallelProcessing": False  # 可以在未来添加多进程支持
+            "parallelProcessing": False
         }

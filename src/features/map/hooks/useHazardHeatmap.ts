@@ -15,6 +15,8 @@ export function useHazardHeatmap(
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapRevision === 0 || map.getSource(MAP_SOURCE_IDS.heatmap)) return;
+    // Keep one GeoJSON source and heatmap layer per map style; later updates only
+    // replace feature data, which avoids rebuilding the WebGL layer on refresh.
     map.addSource(MAP_SOURCE_IDS.heatmap, {
       type: "geojson",
       data: createHeatmapFeatureCollection([]),
@@ -51,6 +53,7 @@ export function useHazardHeatmap(
   }, [mapRef, mapRevision]);
   useEffect(() => {
     const source = mapRef.current?.getSource(MAP_SOURCE_IDS.heatmap) as GeoJSONSource | undefined;
+    // setData updates the heatmap input without changing paint or layout settings.
     source?.setData(createHeatmapFeatureCollection(hazards));
   }, [hazards, mapRef, mapRevision]);
   useEffect(() => {

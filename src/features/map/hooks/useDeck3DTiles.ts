@@ -17,6 +17,8 @@ export function useDeck3DTiles(mapRef: MutableRefObject<Map | null>, mapRevision
     const map = mapRef.current;
     if (!map || mapRevision === 0) return;
     if (config.tiles3d.enabled && config.tiles3d.url) {
+      // deck.gl shares Mapbox's WebGL canvas through an overlay, avoiding a second
+      // canvas while external 3D Tiles are configured.
       const overlay = new MapboxOverlay({ layers: [] });
       overlayRef.current = overlay;
       map.addControl(overlay as unknown as IControl);
@@ -35,10 +37,14 @@ export function useDeck3DTiles(mapRef: MutableRefObject<Map | null>, mapRevision
         ],
       });
       return () => {
+        // Removing the control disposes the deck.gl overlay before the Mapbox map
+        // is removed or its style is rebuilt.
         map.removeControl(overlay as unknown as IControl);
         overlayRef.current = null;
       };
     }
+    // Without an external tileset, use Mapbox's vector-building extrusion layer.
+    // Its minzoom postpones building geometry until it is useful to the viewer.
     if (map.getLayer(MAP_LAYER_IDS.buildings)) return;
     try {
       map.addLayer(

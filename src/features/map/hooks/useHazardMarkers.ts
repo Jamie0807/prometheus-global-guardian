@@ -14,6 +14,8 @@ export function useHazardMarkers(
 ) {
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const clearMarkers = useCallback(() => {
+    // Markers are DOM nodes rather than a WebGL layer; remove old nodes before
+    // reflecting a new filter or hazard set to avoid duplicate event targets.
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
   }, []);
@@ -28,6 +30,8 @@ export function useHazardMarkers(
     const map = mapRef.current;
     if (!map || mapRevision === 0) return;
     clearMarkers();
+    // The LOD layer renders the low-zoom representation. Markers are created only
+    // for valid coordinates and are initially hidden when another layer is active.
     const selected =
       filter === "ALL" ? hazards : hazards.filter((hazard) => hazard.type === filter);
     selected.forEach((hazard) => {

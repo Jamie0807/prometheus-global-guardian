@@ -81,6 +81,7 @@ function isBodyLimitError(error: unknown): boolean {
 }
 
 export function matchDisasterAwareRoute(method: string, pathname: string): DisasterAwareRouteMatch {
+  // BFF 代理只允许三个只读灾害接口，避免将任意路径转发到上游。
   if (
     pathname === "/hazards/types" ||
     pathname === "/hazards/active" ||
@@ -93,6 +94,7 @@ export function matchDisasterAwareRoute(method: string, pathname: string): Disas
 }
 
 export function createRawBodyMiddleware(limitBytes = REQUEST_BODY_LIMIT_BYTES): RequestHandler {
+  // 先读取受大小限制的原始请求体，后续路由自行解析 JSON。
   const limit = toPositiveInteger(limitBytes, REQUEST_BODY_LIMIT_BYTES);
 
   return async (request, response, next) => {
@@ -170,6 +172,7 @@ export function createForwardHeaders(
   request: Pick<Parameters<RequestHandler>[0], "headers">,
   accessToken: string,
 ): Record<string, string> {
+  // 仅转发白名单中的协商请求头，并由 BFF 注入服务端访问令牌。
   const headers: Record<string, string> = {};
 
   for (const name of FORWARDED_HEADER_NAMES) {
@@ -196,6 +199,7 @@ export async function fetchWithTimeout(
     throw new Error("Request aborted.");
   }
   const controller = new AbortController();
+  // 调用方取消和超时都终止同一个上游请求。
   let response: FetchResponse | undefined;
   const upstreamSignal = init.signal;
   const abortFromUpstream = () => controller.abort();
@@ -232,7 +236,7 @@ export async function fetchWithTimeout(
       destroyBody();
       throw new Error("Request aborted.");
     }
-    // DisasterAware responses are bounded and buffered while the deadline remains active.
+    // 在截止时间内将响应缓冲到内存；超过 8 MiB 立即销毁上游流。
     const chunks: Buffer[] = [];
     let size = 0;
     if (response.body) {
@@ -252,8 +256,7 @@ export async function fetchWithTimeout(
       headers: response.headers,
     });
   })();
-  // A mocked or misbehaving upstream can ignore abort. Consume a late rejection so it
-  // does not surface as an unhandled promise after the caller receives its timeout.
+  // 上游可能忽略 abort；消费迟到的拒绝，避免超时响应后出现未处理的 Promise 拒绝。
   void operation.catch(() => undefined);
 
   try {

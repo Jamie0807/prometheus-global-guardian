@@ -27,15 +27,15 @@ def clean_for_json(obj):
 class RiskAssessor:
     """风险评估器
     
-    优化特性：
-    - 动态权重调整
-    - 性能监控
-    - 更细粒度的风险分级
+    实现特性：
+    - 基于固定灾害权重的总体风险评分
+    - 按灾害类型的风险统计
+    - 基于坐标网格的事件热点列表
     """
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # 优化：可配置的风险权重
+        # 固定的灾害类型权重
         self.risk_weights = {
             'EARTHQUAKE': 0.25,
             'VOLCANO': 0.15,
@@ -43,7 +43,6 @@ class RiskAssessor:
             'FLOOD': 0.20,
             'WILDFIRE': 0.15
         }
-        # 优化：更细粒度的严重性权重
         self.severity_weights = {
             'CRITICAL': 2.0,
             'HIGH': 1.5,
@@ -65,13 +64,7 @@ class RiskAssessor:
         return True
         
     def calculate_comprehensive_risk(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """计算综合风险评估
-        
-        优化：
-        - 数据验证
-        - 性能监控
-        - 更好的错误处理
-        """
+        """计算综合风险评估及其组成指标。"""
         start_time = datetime.now()
         
         try:
@@ -111,7 +104,7 @@ class RiskAssessor:
         
         for hazard_type, weight in self.risk_weights.items():
             count = type_counts.get(hazard_type, 0)
-            weighted_score += count * weight * 10  # 归一化因子
+            weighted_score += count * weight * 10  # 固定计分系数
         
         # 严重性加权
         if 'severity' in df.columns:
@@ -141,20 +134,24 @@ class RiskAssessor:
             # 计算该类型的风险分数
             count = len(type_df)
             avg_magnitude = type_df['magnitude'].mean() if 'magnitude' in type_df.columns else 5.0
-            
-            risk_score = count * avg_magnitude * self.risk_weights.get(hazard_type, 0.1)
+            has_magnitude = not pd.isna(avg_magnitude)
+            risk_score = (
+                count * avg_magnitude * self.risk_weights.get(hazard_type, 0.1)
+                if has_magnitude
+                else 0
+            )
             
             type_risks[hazard_type] = {
                 "count": count,
                 "riskScore": round(risk_score, 2),
-                "averageMagnitude": round(avg_magnitude, 2) if not pd.isna(avg_magnitude) else None,
+                "averageMagnitude": round(avg_magnitude, 2) if has_magnitude else None,
                 "weight": self.risk_weights.get(hazard_type, 0.1)
             }
         
         return type_risks
     
     def _identify_high_risk_regions(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
-        """识别高风险地理区域"""
+        """返回事件数最多的坐标网格。"""
         if 'coordinates' not in df.columns or len(df) == 0:
             return []
         

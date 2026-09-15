@@ -1,10 +1,8 @@
 /**
- * AI Disaster Analysis Assistant — LLM Streaming API Client
+ * AI Disaster Analysis Assistant streaming client.
  *
- * 核心功能：
- * - 通过 Express BFF 调用已发布 ai-workflow 或火山方舟模型服务
- * - 流式输出（SSE / ReadableStream）实现逐字打印效果
- * - 自动注入灾害实时上下文，提供 Demo 降级模式（无 API Key 时）
+ * 将聊天消息和灾害上下文发送至 `/api/ai/chat`，并消费文本 SSE 分块。
+ * 仅在特定的服务端配置错误时返回演示回复。
  */
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
@@ -62,6 +60,7 @@ async function readChatCompletionEvents(
   let buffer = "";
   let completed = false;
   let cancellation: Promise<void> | undefined;
+  // 复用同一个取消操作，避免 abort 事件和 finally 重复取消 Reader。
   const cancel = () => {
     cancellation ??= reader.cancel().catch(() => undefined);
     return cancellation;
@@ -72,6 +71,7 @@ async function readChatCompletionEvents(
 
   function processEvent(event: string): boolean {
     if (options.signal?.aborted) return false;
+    // 一个 SSE 事件可包含多行 data，需按协议合并后再解析 JSON。
     const data: string[] = [];
     let eventType = "";
     for (const line of event.split(/\r?\n/)) {
@@ -102,6 +102,7 @@ async function readChatCompletionEvents(
       if (options.signal?.aborted) return { kind: "cancelled" };
       const { done, value } = await reader.read();
       if (options.signal?.aborted) return { kind: "cancelled" };
+      // 网络分块不一定与 SSE 事件边界对齐，未结束的事件保留到下一次读取。
       buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
       let boundary: RegExpExecArray | null;
       while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
@@ -169,6 +170,7 @@ export async function streamChatMessage(
 
       if (options.signal?.aborted) return { kind: "cancelled" };
       if (resp.status === 503 && DEMO_FALLBACK_CODES.has(code)) {
+        // 仅服务端明确标记为缺少 AI 配置时才使用本地演示回复。
         return await runDemoMode(messages, context, options);
       }
 
@@ -190,7 +192,7 @@ export async function streamChatMessage(
   }
 }
 
-// ─── Demo 演示模式（无 API Key 时的降级响应）────────────────────────────────
+// ─── Demo 演示模式（特定服务端配置错误时的降级响应）──────────────────────────
 
 const DEMO_RESPONSES: Array<{
   keywords: string[];
@@ -329,7 +331,7 @@ async function runDemoMode(
 
   let response = "";
 
-  // 匹配关键词选择预设响应
+  // 按最后一条消息的关键词选择预设回复。
   for (const template of DEMO_RESPONSES) {
     if (template.keywords.some((k) => last.includes(k))) {
       response = template.build(ctx);
@@ -337,7 +339,7 @@ async function runDemoMode(
     }
   }
 
-  // 默认欢迎响应
+  // 无关键词命中时返回通用演示回复。
   if (!response) {
     response = `**👋 你好，我是全球灾害监控平台 AI 灾害分析助手**
 
@@ -358,12 +360,12 @@ ${ctx ? `📡 当前平台正在监控 **${ctx.total} 条**活跃灾害事件。
 > ⚙️ **配置真实 LLM**：在 \`.env\` 中设置 \`VOLCENGINE_ARK_API_KEY\` 和 \`VOLCENGINE_ARK_MODEL\`，由 Express BFF 调用火山方舟模型服务（当前为 Demo 演示模式）。`;
   }
 
-  // 逐字流式输出，模拟打字效果
+  // 演示回复逐字符回调，以复用与真实 SSE 相同的消息更新路径。
   const chars = response.split("");
   for (let i = 0; i < chars.length; i++) {
     if (options.signal?.aborted) return { kind: "cancelled" };
     options.onChunk(chars[i]);
-    // 每隔几个字符稍作延迟，营造流畅打字感
+    // 每四个字符让出一次事件循环，同时允许 AbortSignal 尽快结束演示。
     if (i % 4 === 0) {
       await waitForDemoChunk(options.signal);
     }

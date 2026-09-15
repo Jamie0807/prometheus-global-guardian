@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-4维数据透视表功能测试
-测试 pivot_table_analyzer.py 的各项功能
+用于手动检查 `pivot_table_analyzer.py` 主要 API 的示例脚本。
 """
 
 import sys
@@ -19,7 +18,7 @@ def generate_test_data(n=1000):
     """生成测试数据"""
     np.random.seed(42)
     
-    # 时间范围：过去30天
+    # 生成过去 30 天的时间范围
     end_date = datetime.now()
     start_date = end_date - timedelta(days=30)
     

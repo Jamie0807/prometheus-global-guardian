@@ -52,6 +52,7 @@ export function buildProviderOrder(
     return [mode === "workflow" ? "workflow" : "volcengine"];
   }
 
+  // 路由模式先尝试命中的提供商，再尝试另一提供商。
   return [decision.target, decision.target === "workflow" ? "volcengine" : "workflow"];
 }
 
@@ -70,6 +71,7 @@ function configurationError(config: ServerAIProviderConfig): { code: string; mes
 }
 
 function setStreamHeaders(res: Response, contentType = "text/event-stream; charset=utf-8"): void {
+  // 对流式响应禁用缓存和转换，并立即发送响应头以建立 SSE 连接。
   res.status(200);
   res.setHeader("Content-Type", contentType);
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -220,6 +222,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
 
       attempts += 1;
       const controller = new AbortController();
+      // 请求超时或浏览器断开时停止对应提供商请求。
       const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
       let clientClosed = false;
       const abortOnClose = (): void => {
@@ -270,6 +273,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
     }
 
     if (!upstream || !selectedConfig || !providerRequest || !selectedController) {
+      // 所有候选提供商都不可用时，按最终失败类型向客户端返回配置、超时或上游错误。
       const primaryConfig = resolveServerAIProviderConfig(process.env, providers[0]);
       const allMissing =
         failures.length > 0 && failures.every((failure) => failure.code === "missing_config");
@@ -302,6 +306,7 @@ export function registerAIChatRoute(app: Application, middlewares: RequestHandle
       res.off("close", abortSelectedRequest);
     };
     function abortSelectedRequest(): void {
+      // 已选上游在客户端关闭后不再需要，主动中止并清理监听器与超时器。
       selectedController?.abort();
       finishSelectedRequest();
     }

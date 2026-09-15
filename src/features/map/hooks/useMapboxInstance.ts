@@ -16,6 +16,8 @@ export function useMapboxInstance(mapStyle: string): MapboxInstanceResult {
   const [mapRevision, setMapRevision] = useState(0);
 
   useEffect(() => {
+    // Mapbox Map owns a WebGL context. Keep this effect mount-only so a style
+    // change does not repeatedly allocate and destroy GPU resources.
     mapboxgl.accessToken = config.mapbox.token;
     const map = new mapboxgl.Map({
       container: containerRef.current!,
@@ -38,6 +40,7 @@ export function useMapboxInstance(mapStyle: string): MapboxInstanceResult {
     });
 
     return () => {
+      // remove() detaches listeners and releases the WebGL context on unmount.
       map.remove();
       mapRef.current = null;
     };
@@ -47,6 +50,7 @@ export function useMapboxInstance(mapStyle: string): MapboxInstanceResult {
     const map = mapRef.current;
     if (!map || initialStyleRef.current === mapStyle) return;
 
+    // Reuse the existing WebGL map and let dependent layer hooks rebuild after style.load.
     map.setStyle(`mapbox://styles/mapbox/${mapStyle}`);
     map.once("style.load", () => setMapRevision((revision) => revision + 1));
   }, [mapStyle]);

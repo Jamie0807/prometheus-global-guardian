@@ -19,7 +19,7 @@ async def root() -> dict[str, object]:
         "status": "running",
         "version": "1.0.0",
         "features": [
-            "23 Statistical Algorithms",
+            "Statistical Analysis",
             "5 Prediction Models",
             "ETL Processing",
             "Risk Assessment",

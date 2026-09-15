@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 预测模型模块 - 5个独立回归模型实现
-替代TypeScript predictions.ts，使用Scikit-learn专业机器学习库
 """
 
 import pandas as pd
@@ -17,13 +16,10 @@ from datetime import datetime, timedelta
 class PredictionEngine:
     """预测引擎 - 实现5个独立灾害预测模型
     
-    优化特性：
-    - 数据验证和清洗
-    - 更好的错误处理
-    - 性能监控
-    - 模型参数优化
-    - 特征工程增强
-    - 交叉验证
+    实现特性：
+    - 按灾害类型生成线性回归预测
+    - 记录模型运行时间
+    - 在数据不足或失败时返回结构化结果
     """
     
     def __init__(self):
@@ -81,13 +77,7 @@ class PredictionEngine:
         }
         
     def generate_predictions(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """生成所有类型的预测结果
-        
-        优化：
-        - 数据验证
-        - 性能监控
-        - 异常处理
-        """
+        """按灾害类型依次生成预测结果。"""
         start_time = datetime.now()
         
         try:
@@ -95,7 +85,7 @@ class PredictionEngine:
             if not self._validate_dataframe(df):
                 raise ValueError("Invalid dataframe for predictions")
             
-            # 并行生成所有预测（可以考虑使用ThreadPoolExecutor）
+            # 按灾害类型生成预测
             predictions = {
                 "earthquakePrediction": self._earthquake_prediction_model(df),
                 "volcanoPrediction": self._volcano_prediction_model(df),
@@ -125,8 +115,8 @@ class PredictionEngine:
     
     def _prepare_time_series_data(self, df: pd.DataFrame, hazard_type: str, 
                                    window_days: int = 30) -> Tuple[np.ndarray, np.ndarray]:
-        """准备时间序列数据用于线性回归（优化：添加移动平均特征）"""
-        # 筛选特定类型的灾害
+        """按日聚合指定类型的事件数，作为线性回归输入。"""
+        # 选择指定类型的灾害记录
         filtered_df = df[df['type'] == hazard_type].copy()
         
         if len(filtered_df) == 0:
@@ -151,7 +141,6 @@ class PredictionEngine:
             if len(daily_counts) > window_days:
                 daily_counts = daily_counts.tail(window_days)
             
-            # 特征工程：添加移动平均
             if len(daily_counts) >= 7:
                 daily_counts['ma_3'] = daily_counts['count'].rolling(window=3, min_periods=1).mean()
                 daily_counts['ma_7'] = daily_counts['count'].rolling(window=7, min_periods=1).mean()
@@ -164,9 +153,9 @@ class PredictionEngine:
         return np.array([]), np.array([])
     
     def _earthquake_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """地震预测模型 - 基于30天滑动窗口"""
+        """地震预测模型，使用日事件数的线性回归。"""
         try:
-            # 筛选震级 >= 4.0 的地震
+            # 统计达到震级阈值的事件，用于样本检查和平均震级输出
             earthquakes = df[(df['type'] == 'EARTHQUAKE') & (df['magnitude'] >= 4.0)].copy()
             
             if len(earthquakes) < 5:
@@ -219,7 +208,7 @@ class PredictionEngine:
             return self._prediction_status("EARTHQUAKE", "failed", "model_error", 0, 5)
     
     def _volcano_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """火山预测模型 - 关联地震数据分析"""
+        """火山预测模型，使用日事件数回归和地震日计数相关性。"""
         try:
             volcanoes = df[df['type'] == 'VOLCANO'].copy()
             earthquakes = df[df['type'] == 'EARTHQUAKE'].copy()
@@ -244,7 +233,7 @@ class PredictionEngine:
             
             r_squared = r2_score(y, model.predict(X))
             
-            # 计算地震-火山相关性（时延7-14天）
+            # 计算地震与火山的日事件数相关性
             correlation = self._calculate_delayed_correlation(earthquakes, volcanoes, delay_days=10)
             
             return {
@@ -270,7 +259,7 @@ class PredictionEngine:
             return self._prediction_status("VOLCANO", "failed", "model_error", 0, 3)
     
     def _storm_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """风暴预测模型 - 季节性分解"""
+        """风暴预测模型，使用日事件数回归和月度活动比例。"""
         try:
             storms = df[df['type'].isin(['STORM', 'HURRICANE', 'TYPHOON'])].copy()
             
@@ -298,7 +287,7 @@ class PredictionEngine:
             
             r_squared = r2_score(y, model.predict(X))
             
-            # 识别季节性模式
+            # 计算月度活动比例
             seasonal_boost = self._calculate_seasonal_boost(storms)
             
             return {
@@ -323,7 +312,7 @@ class PredictionEngine:
             return self._prediction_status("STORM", "failed", "model_error", 0, 5)
     
     def _flood_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """洪水预测模型 - 级联灾害建模"""
+        """洪水预测模型，使用日事件数的线性回归。"""
         try:
             floods = df[df['type'] == 'FLOOD'].copy()
             storms = df[df['type'].isin(['STORM', 'HURRICANE'])].copy()
@@ -348,7 +337,7 @@ class PredictionEngine:
             
             r_squared = r2_score(y, model.predict(X))
             
-            # 计算风暴-洪水相关性
+            # 计算风暴与洪水的日事件数相关性
             cascade_correlation = self._calculate_cascade_correlation(storms, floods)
             
             return {
@@ -374,7 +363,7 @@ class PredictionEngine:
             return self._prediction_status("FLOOD", "failed", "model_error", 0, 3)
     
     def _wildfire_prediction_model(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """野火预测模型 - 多因子回归"""
+        """野火预测模型，使用日事件数的线性回归。"""
         try:
             wildfires = df[df['type'] == 'WILDFIRE'].copy()
             
@@ -422,7 +411,7 @@ class PredictionEngine:
     def _aggregate_risk_assessment(
         self, df: pd.DataFrame, accuracies: List[float] | None = None
     ) -> Dict[str, Any]:
-        """多模型融合风险评估"""
+        """按灾害类型计数和固定权重汇总风险。"""
         try:
             # 加权风险聚合
             risk_weights = {
@@ -472,7 +461,7 @@ class PredictionEngine:
             }
     
     def _calculate_confidence_interval(self, y: np.ndarray, confidence: float = 0.95) -> Dict[str, float]:
-        """计算预测置信区间"""
+        """计算历史日计数均值的 t 区间。"""
         if len(y) < 2:
             return {"lower": 0, "upper": 0}
         
@@ -488,12 +477,12 @@ class PredictionEngine:
     
     def _calculate_delayed_correlation(self, df1: pd.DataFrame, df2: pd.DataFrame, 
                                        delay_days: int = 10) -> float:
-        """计算时延相关性（地震-火山）"""
+        """计算两个数据集日事件数的相关性。"""
         try:
             if len(df1) < 2 or len(df2) < 2:
                 return 0.0
             
-            # 简化计算：使用日计数的相关性
+            # 使用日事件数计算相关性
             df1['date'] = pd.to_datetime(df1['timestamp']).dt.date
             df2['date'] = pd.to_datetime(df2['timestamp']).dt.date
             
@@ -531,7 +520,7 @@ class PredictionEngine:
             return 35.0
     
     def _calculate_cascade_correlation(self, storms: pd.DataFrame, floods: pd.DataFrame) -> float:
-        """计算级联灾害相关性"""
+        """计算风暴和洪水日事件数的相关性。"""
         return self._calculate_delayed_correlation(storms, floods, delay_days=2)
     
     def _get_risk_level(self, score: float) -> str:

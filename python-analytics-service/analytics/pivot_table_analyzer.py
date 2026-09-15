@@ -4,8 +4,7 @@
 4维数据透视表分析引擎
 Four-Dimensional Pivot Table Analyzer
 
-实现时间×地理×类型×严重性的多维度数据分析
-支持动态切片、趋势分析、风险评分等高级功能
+实现时间、地理、类型和严重性维度的透视表、切片、趋势和风险计算。
 """
 
 import pandas as pd
@@ -22,8 +21,8 @@ class FourDimensionalPivotTable:
     """4维数据透视表分析引擎
     
     维度说明：
-    - 时间维度：year/quarter/month/week/day/hour
-    - 地理维度：region/continent/lat_bin/lng_bin
+    - 时间维度：year/quarter/month/week/day/hour/date_only/year_month
+    - 地理维度：region/continent/lat_bin/lng_bin/geo_grid
     - 类型维度：hazard type (EARTHQUAKE, VOLCANO, etc.)
     - 严重性维度：severity level (WARNING/WATCH/ADVISORY)
     
@@ -31,7 +30,7 @@ class FourDimensionalPivotTable:
     - 多维度透视表构建
     - 动态切片查询
     - 趋势分析
-    - 风险评分
+    - 按地理网格和类型的风险评分
     - 多维度联合查询
     """
     
@@ -135,7 +134,7 @@ class FourDimensionalPivotTable:
             return 'Other'
     
     def _classify_continent(self, row) -> str:
-        """大洲分类"""
+        """按预设经纬度范围分类，未匹配记录归为 Antarctica。"""
         lat, lng = row.get('lat', 0), row.get('lng', 0)
         
         if -10 <= lat <= 80 and 25 <= lng <= 180:
@@ -341,7 +340,7 @@ class FourDimensionalPivotTable:
         return pd.DataFrame.from_dict(results, orient='index')
     
     def risk_score_4d(self, time_window: int = 7) -> pd.DataFrame:
-        """4维风险评分：综合时间、地理、类型、严重性计算风险分数
+        """按时间窗口、地理网格、类型和严重性计算风险分数。
         
         Args:
             time_window: 时间窗口（天数）

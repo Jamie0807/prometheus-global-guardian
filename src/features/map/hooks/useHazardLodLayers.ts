@@ -25,6 +25,8 @@ export function useHazardLodLayers(
     (zoom: number) => {
       const map = mapRef.current;
       if (!map) return;
+      // At low zoom Mapbox renders clustered GeoJSON; individual DOM markers and
+      // buildings remain hidden until the viewport contains fewer visible features.
       const visibility = getMapLodVisibility(zoom, showHeatmap);
       MAP_LOD_LAYER_IDS.forEach((id) => {
         if (map.getLayer(id))
@@ -49,6 +51,8 @@ export function useHazardLodLayers(
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapRevision === 0 || map.getSource(MAP_SOURCE_IDS.lod)) return;
+    // Add this GPU-backed source once per loaded map style. Data updates below
+    // call setData instead of recreating layers for every hazard refresh.
     map.addSource(MAP_SOURCE_IDS.lod, {
       type: "geojson",
       data: createLodFeatureCollection([]),
@@ -98,6 +102,7 @@ export function useHazardLodLayers(
 
   useEffect(() => {
     const source = mapRef.current?.getSource(MAP_SOURCE_IDS.lod) as GeoJSONSource | undefined;
+    // Updating source data keeps the layer and its cluster configuration intact.
     source?.setData(createLodFeatureCollection(hazards));
   }, [hazards, mapRef, mapRevision]);
 
@@ -108,6 +113,8 @@ export function useHazardLodLayers(
     map.on("zoom", onZoom);
     onZoom();
     return () => {
+      // Map styles can be replaced while the component stays mounted; remove the
+      // listener so stale maps do not retain this closure.
       map.off("zoom", onZoom);
     };
   }, [applyLod, mapRef, mapRevision]);

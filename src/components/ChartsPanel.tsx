@@ -77,7 +77,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
     });
     return Object.entries(dateCount)
       .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-      .slice(-30) // 最近30天
+      .slice(-30) // 保留排序后的最后 30 个日期桶
       .map(([date, count]) => ({ date, count }));
   }, [hazards]);
 

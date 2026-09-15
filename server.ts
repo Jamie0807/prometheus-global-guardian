@@ -156,6 +156,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
   const upstreamFetch = options.fetchImpl ?? (fetch as unknown as UpstreamFetch);
   const fetchHazards = options.fetchHazards ?? fetchAllHazards;
   const now = options.now ?? (() => new Date());
+  // 两类上游请求分别限时：认证和代理使用较长限制，灾害源拉取使用较短限制。
   const upstreamTimeoutMs = readBoundedPositiveInteger(
     serverEnv,
     "DISASTERAWARE_REQUEST_TIMEOUT_MS",
@@ -178,7 +179,9 @@ export function createApp(options: CreateAppOptions = {}): Application {
     maxRequests: readBoundedPositiveInteger(serverEnv, "BFF_HAZARD_RATE_LIMIT_MAX", 120, 10_000),
   });
   let accessToken = "";
+  // 同一时间缺少令牌时复用同一个认证请求，认证结束后清除该 Promise。
   let authorizationRequest: Promise<string> | undefined;
+  // 每个灾害源单独缓存最近一次成功结果，供短暂上游故障时回退。
   const sourceCache = new Map<HazardSourceId, CachedHazardSource>();
 
   const loadSource = async (
@@ -211,6 +214,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
       Number.isFinite(fetchedAtMs) &&
       now().getTime() - fetchedAtMs <= HAZARD_SOURCE_CACHE_TTL_MS
     ) {
+      // 只在五分钟有效期内返回旧结果，并通过 stale 状态告知调用方。
       return {
         hazards: cached.hazards,
         status: {
@@ -226,7 +230,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
   };
 
   app.disable("x-powered-by");
-  // This BFF is directly addressable in development. Configure trusted proxy hops at deployment time.
+  // 禁用 trust proxy，因此客户端 IP 来自直接套接字连接。
   app.set("trust proxy", false);
 
   const authorizeUpstream = async (): Promise<string> => {
@@ -303,6 +307,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
   registerAIChatRoute(app, [aiRateLimit]);
 
   app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+    // 本地 API 各自限定一种 HTTP 方法；未列出的路径继续交给后续路由判断。
     const pathname = apiPath(req);
     const localMethods: Record<string, string> = {
       "/ai/chat": "POST",
@@ -348,6 +353,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
     const primaryStatus = primary.status;
 
     if (primaryStatus.status !== "success") {
+      // 主数据源空、失败或仅有旧缓存时，再请求公开灾害源作为补充或替代。
       fallbackUsed = true;
       try {
         const fallback = await fetchHazards({
@@ -417,6 +423,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
   });
 
   app.use("/api/hazards", hazardRateLimit, validateQuery, async (req: Request, res: Response) => {
+    // 代理只放行 matchDisasterAwareRoute 定义的 DisasterAWARE 读取路径。
     const pathname = apiPath(req);
     const route = matchDisasterAwareRoute(req.method, pathname);
     if (route.kind === "method_not_allowed") {

@@ -43,7 +43,7 @@ class UnifiedHazardModel:
         self.logger = logging.getLogger(__name__)
     
     def create_empty_dataframe(self) -> pd.DataFrame:
-        """创建符合统一Schema的空DataFrame"""
+        """创建具有统一字段和非字符串列类型的空 DataFrame。"""
         df = pd.DataFrame(columns=list(self.SCHEMA.keys()))
         # 应用数据类型
         for col, dtype in self.SCHEMA.items():
@@ -129,7 +129,7 @@ class UnifiedHazardModel:
         {
             "id": "EONET_12345",
             "title": "Wildfire - California",
-            "categories": [{"id": "wildfires"}],
+            "categories": [{"title": "wildfires"}],
             "geometry": [
                 {
                     "date": "2024-01-15T00:00:00Z",
@@ -165,8 +165,8 @@ class UnifiedHazardModel:
                 latest_geo = geometries[-1]
                 coords = latest_geo.get('coordinates', [0, 0])
                 
-                # NASA数据没有magnitude，使用估算值
-                estimated_magnitude = 500.0  # 默认中等强度
+                # NASA 记录未提供 magnitude，使用固定代理值。
+                estimated_magnitude = 500.0
                 
                 record = {
                     'id': event.get('id', ''),
@@ -269,7 +269,7 @@ class UnifiedHazardModel:
         return self._apply_schema(df)
     
     def _apply_schema(self, df: pd.DataFrame) -> pd.DataFrame:
-        """应用统一Schema的数据类型"""
+        """补齐统一字段并尝试转换为配置的数据类型。"""
         for col, dtype in self.SCHEMA.items():
             if col not in df.columns:
                 # 添加缺失列

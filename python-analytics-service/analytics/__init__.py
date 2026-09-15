@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Prometheus Analytics Package
-高性能数据分析算法库，替代TypeScript实现
+数据分析算法库
 """
 
 __version__ = "1.0.0"

@@ -20,7 +20,7 @@ const SaveReportModal: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 简化版报告生成 - Python微服务处理复杂分析
+    // 构建 HTML 报告并触发浏览器下载。
     const reportData: SaveReportPayload & { timestamp: string } = {
       reportName,
       organization,

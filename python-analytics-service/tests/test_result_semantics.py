@@ -111,6 +111,24 @@ class StatisticalResultSemanticsTests(unittest.TestCase):
 
 
 class RiskResultSemanticsTests(unittest.TestCase):
+    def test_risk_score_is_zero_when_a_type_has_no_magnitude(self):
+        frame = make_hazard_frame(count=1, hazard_type="WILDFIRE")
+        frame["magnitude"] = None
+
+        result = RiskAssessor().calculate_comprehensive_risk(frame)
+
+        self.assertEqual(result["typeRisks"]["WILDFIRE"]["riskScore"], 0)
+        self.assertIsNone(result["typeRisks"]["WILDFIRE"]["averageMagnitude"])
+
+    def test_risk_score_uses_the_average_when_magnitude_is_available(self):
+        frame = make_hazard_frame(count=2, hazard_type="WILDFIRE")
+        frame["magnitude"] = [2.0, 4.0]
+
+        result = RiskAssessor().calculate_comprehensive_risk(frame)
+
+        self.assertEqual(result["typeRisks"]["WILDFIRE"]["riskScore"], 0.9)
+        self.assertEqual(result["typeRisks"]["WILDFIRE"]["averageMagnitude"], 3.0)
+
     def test_risk_result_exposes_structured_recommendation_rules(self):
         frame = make_hazard_frame(count=51)
         result = RiskAssessor().calculate_comprehensive_risk(frame)

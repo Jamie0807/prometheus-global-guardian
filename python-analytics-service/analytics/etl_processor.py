@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ETL数据处理器 - 替代TypeScript的数据转换逻辑
-实现Extract-Transform-Load完整流程，集成统一数据模型和质量监控
+ETL数据处理器
+将传入的灾害记录转换为统一数据模型，并提供清洗和质量评估。
 """
 
 import pandas as pd
@@ -78,7 +78,7 @@ class ETLProcessor:
             
             return {
                 "overallScore": float(round(overall_score, 1)),
-                "targetScore": 95.0,  # 目标准确率
+                "targetScore": 95.0,  # 目标质量分数
                 "detailChecks": {
                     "completeness": quality_report['dimensions']['completeness']['score'],
                     "accuracy": quality_report['dimensions']['accuracy']['score'],
@@ -123,7 +123,8 @@ class ETLProcessor:
         返回:
         {
             'unified_data': DataFrame,
-            'quality_reports': {...},
+            'source_quality_reports': [...],
+            'merged_quality': {...},
             'source_comparison': {...}
         }
         """
@@ -259,7 +260,7 @@ class ETLProcessor:
         return 1.0
     
     def _check_validity(self, df: pd.DataFrame) -> float:
-        """检查数据有效性（优化：更全面的验证）"""
+        """检查震级、坐标、时间戳和类型字段的有效性。"""
         validity_scores = []
         
         # 震级有效性（0-10）
@@ -294,7 +295,7 @@ class ETLProcessor:
         return float(final_score) if not pd.isna(final_score) else 0.5
     
     def _check_timeliness(self, df: pd.DataFrame) -> float:
-        """检查数据时效性（优化：更准确的时效评分）"""
+        """根据记录时间与当前时间的差值计算时效评分。"""
         if 'timestamp' not in df.columns or len(df) == 0:
             return 0.5
         

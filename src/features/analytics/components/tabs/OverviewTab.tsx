@@ -823,7 +823,7 @@ export default function OverviewTab({
                       </div>
                     </div>
 
-                    {/* 详细数据展示 - 新增 */}
+                    {/* 详细数据展示 */}
                     <div
                       style={{
                         marginTop: "15px",
@@ -1500,7 +1500,7 @@ export default function OverviewTab({
             {(() => {
               // 生成模拟数据点（基于线性回归结果）
               const trendData = statistics.data.timeSeriesAnalysis.trendAnalysis;
-              const dataPoints = 30; // 30天数据
+              const dataPoints = 30; // 30 个模拟点
               const slope = trendData.slope ?? 0;
               const intercept = trendData.intercept ?? hazards.length / 2;
 

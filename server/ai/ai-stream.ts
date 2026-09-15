@@ -150,6 +150,7 @@ export function createWorkflowToChatCompletionsStream(): Transform {
 
   return new Transform({
     transform(chunk, _encoding, callback) {
+      // 上游 TCP 分块可能截断 SSE 事件；只转换以空行结束的完整事件。
       buffer += chunk.toString("utf8");
       const parts = buffer.split(/\r?\n\r?\n/);
       buffer = parts.pop() ?? "";
@@ -174,6 +175,7 @@ export function createResponsesToChatCompletionsStream(): Transform {
 
   return new Transform({
     transform(chunk, _encoding, callback) {
+      // 保留未完成的 SSE 帧，直到收到下一块数据或 flush。
       buffer += chunk.toString("utf8");
       const parts = buffer.split(/\r?\n\r?\n/);
       buffer = parts.pop() ?? "";

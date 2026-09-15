@@ -31,6 +31,13 @@ class ApiRouteTests(unittest.TestCase):
     def tearDown(self):
         self.client.close()
 
+    def test_service_info_describes_statistical_analysis_without_algorithm_count(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Statistical Analysis", response.json()["features"])
+        self.assertNotIn("23 Statistical Algorithms", response.json()["features"])
+
     def test_primary_routes_delegate_to_application_analytics_service(self):
         routes = {
             "/api/v1/analyze": ("comprehensive_analysis", AnalysisResponse(success=True, data={"processingInfo": {"totalRecords": 1}}, processingTime=0.0, timestamp="2026-09-10T00:00:00")),
@@ -55,6 +62,17 @@ class ApiRouteTests(unittest.TestCase):
                 body = response.json()
                 self.assertIs(body["success"], True)
                 self.assertIn("data", body)
+
+    def test_risk_assessment_serializes_zero_score_for_missing_magnitude(self):
+        response = self.client.post(
+            "/api/v1/risk-assessment",
+            json={"hazards": [{**HAZARD, "type": "WILDFIRE", "magnitude": None}]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        type_risk = response.json()["data"]["typeRisks"]["WILDFIRE"]
+        self.assertEqual(type_risk["riskScore"], 0)
+        self.assertIsNone(type_risk["averageMagnitude"])
 
     def test_primary_analysis_routes_hide_internal_errors_and_return_request_ids(self):
         methods = ["comprehensive_analysis", "statistics", "predictions", "etl", "risk_assessment"]

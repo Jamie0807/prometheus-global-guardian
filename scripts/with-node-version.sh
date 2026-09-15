@@ -16,8 +16,8 @@ if [[ "$#" -eq 0 ]]; then
   exit 1
 fi
 
-# Docker images and some CI runners already provide the exact project Node.js
-# version but do not install nvm. Reuse that runtime directly in this case.
+# Docker images and CI runners may provide a matching major/minor Node.js
+# version without nvm. Reuse that runtime directly in this case.
 REQUIRED_NODE_VERSION="${NODE_VERSION#v}"
 CURRENT_NODE_VERSION="$(node --version 2>/dev/null || true)"
 REQUIRED_NODE_MAJOR_MINOR="${REQUIRED_NODE_VERSION%.*}"
@@ -30,8 +30,8 @@ fi
 NVM_DIR="${NVM_DIR:-$ORIGINAL_HOME/.nvm}"
 export NVM_DIR
 
-# Isolate nvm from user npmrc files that may define prefix/globalconfig. The
-# temporary directory is removed after the requested command exits.
+# Isolate nvm from user npmrc files that may define prefix/globalconfig.
+# The cleanup handler attempts to remove the temporary directory after exit.
 TEMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/prometheus-node-home.XXXXXX")"
 cleanup() {
   rmdir "$TEMP_HOME" 2>/dev/null || true
