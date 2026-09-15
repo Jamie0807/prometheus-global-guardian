@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("loads the monitoring dashboard and opens the AI assistant", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.route("**/api/authorize", async (route) => {
     await route.fulfill({ json: { authorized: true } });
   });
@@ -82,6 +83,15 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
   await expect(page.getByRole("button", { name: "打开保存报告弹窗" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开设置弹窗" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "实时监控" })).toBeVisible();
+  const platformTitle = page.locator(".platform-title");
+  const statusPanel = page.locator(".status-panel");
+  const [platformTitleBox, statusPanelBox] = await Promise.all([
+    platformTitle.boundingBox(),
+    statusPanel.boundingBox(),
+  ]);
+  expect(platformTitleBox).not.toBeNull();
+  expect(statusPanelBox).not.toBeNull();
+  expect(platformTitleBox?.x).toBe(statusPanelBox?.x);
   await expect(page.getByText("灾害总数", { exact: true })).toBeVisible();
   await expect(page.getByLabel("按类型筛选")).toBeVisible();
   await expect(page.locator(".total-count")).toHaveCSS("gap", "12px");

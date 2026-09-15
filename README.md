@@ -36,8 +36,8 @@ The repository contains a React client, an Express BFF, a FastAPI analytics serv
 The platform is organized around four operational domains:
 
 - **Hazard ingestion**: combines DisasterAware with USGS, NASA EONET, and GDACS feeds and normalizes them into `Hazard` records.
-- **Geospatial operations**: renders active events with Mapbox GL markers, popups, heatmap mode, clustering, optional 3D Tiles, and configurable base styles.
-- **Analytics and reporting**: presents summaries, charts, risk and quality results from the Python service, then exports the current filtered hazards as a JSON report.
+- **Geospatial operations**: renders active events with Mapbox GL markers, popups, heatmap mode, clickable clustering, optional 3D Tiles, and configurable base styles.
+- **Analytics and reporting**: presents summaries, charts, risk and quality results from the Python service, then exports the current filtered hazards as a readable HTML report.
 - **AI-assisted analysis**: sends live hazard context through a streaming BFF endpoint for situation summaries and response recommendations.
 
 ### Core Capabilities
@@ -53,7 +53,7 @@ The platform is organized around four operational domains:
 #### Geospatial Visualization
 
 - Interactive global map powered by Mapbox GL.
-- Event markers, contextual popups, heatmap rendering, and zoom-sensitive clustering.
+- Event markers and contextual popups, with clickable clusters that expand to individual events, plus heatmap rendering and zoom-sensitive clustering.
 - Optional deck.gl / loaders.gl 3D Tiles overlay; Mapbox fill-extrusion buildings are the fallback when no tiles URL is configured.
 - User-selectable Mapbox base style.
 
@@ -67,7 +67,7 @@ The platform is organized around four operational domains:
 
 #### AI-Assisted Incident Analysis
 
-- Streaming chat interface with current hazards inserted as context.
+- Streaming chat interface with current hazards inserted as context; the assistant bubble appears only after the first response text arrives.
 - Quick prompts for global review, floods, seismic activity, wildfire threat, forecasting, and emergency response.
 - BFF smart routing: disaster-domain questions can use ai-workflow; general conversation can use Volcengine Ark.
 - Forced provider modes and a local demo fallback when no provider key is configured.
@@ -75,7 +75,7 @@ The platform is organized around four operational domains:
 
 #### Reporting and Notifications
 
-- Downloads a JSON report containing the report name, selected filter, current hazards, and export timestamp.
+- Downloads a readable HTML report containing report information, the selected filter, type totals, event details, and export time; it can be printed to PDF from a browser.
 - Provides in-memory notification subscriptions and optional browser notifications when permission is granted.
 - Includes settings, report, analytics, and AI workflows.
 
@@ -240,7 +240,7 @@ pnpm run test:component
 pnpm run test:python
 ```
 
-The current automated suites contain 177 frontend Service tests, 59 React component tests, and 39 Python unittest cases. They cover request and contract boundaries, hazard transformation, analytics presentation, AI streaming, map/UI state ownership, FastAPI routes, and analysis-result semantics. Component tests use Vitest, React Testing Library, and jsdom; Python tests do not require a running analytics service or real external data.
+The current automated suites contain 179 frontend Service tests, 75 React component tests, and 40 Python unittest cases. They cover request and contract boundaries, hazard transformation, analytics presentation, AI streaming, report generation, map/UI state ownership, FastAPI routes, and analysis-result semantics. Component tests use Vitest, React Testing Library, and jsdom; Python tests do not require a running analytics service or real external data.
 
 Useful commands:
 
@@ -341,7 +341,7 @@ It listens on `http://localhost:8080` by default. `pnpm run start:static` serves
 - `.env` is ignored by Git and must not be committed.
 - Never place server secrets under `VITE_`; those values become browser-visible build inputs.
 - The BFF allowlists DisasterAware routes and headers, limits request bodies, validates query shapes, applies process-local rate limits, and returns sanitized upstream errors.
-- Management tokens, DisasterAware credentials, and model-provider keys stay in server environments and out of logs, frontend bundles, and JSON reports.
+- Management tokens, DisasterAware credentials, and model-provider keys stay in server environments and out of logs, frontend bundles, and exported reports.
 
 ### Project Structure
 
@@ -406,8 +406,8 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 平台围绕四个业务域组织：
 
 - **灾害接入**：整合 DisasterAware、USGS、NASA EONET 和 GDACS，并统一为 `Hazard` 记录。
-- **地理态势**：以 Mapbox GL 呈现活动事件、标记、弹窗、热力图、聚合、可选 3D Tiles 和可配置底图。
-- **分析与报告**：调用 Python 服务呈现统计、图表、风险和质量结果，并把当前筛选后的灾害数据导出为 JSON 报告。
+- **地理态势**：以 Mapbox GL 呈现活动事件、标记、弹窗、热力图、可点击展开的聚合、可选 3D Tiles 和可配置底图。
+- **分析与报告**：调用 Python 服务呈现统计、图表、风险和质量结果，并把当前筛选后的灾害数据导出为可读 HTML 报告。
 - **AI 辅助研判**：将实时灾害上下文送入流式 BFF 接口，生成态势摘要和响应建议。
 
 ### 核心能力
@@ -423,7 +423,7 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 #### 地理态势可视化
 
 - 基于 Mapbox GL 的交互式全球地图。
-- 事件标记、上下文弹窗、热力图和随缩放变化的聚合。
+- 事件标记与上下文弹窗；点击聚合点会放大展开为单个事件，并支持热力图和随缩放变化的聚合。
 - 支持 deck.gl / loaders.gl 3D Tiles；未配置 Tiles 时可回退至 Mapbox 建筑挤出层。
 - 可选择 Mapbox 底图样式。
 
@@ -437,7 +437,7 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 
 #### AI 辅助研判
 
-- 流式聊天界面会注入当前灾害上下文。
+- 流式聊天界面会注入当前灾害上下文，首段回答到达前不显示空白助手气泡。
 - 提供全球态势、洪水风险、地震活动、野火威胁、预测和应急响应等快捷提示。
 - BFF 智能路由可把灾害领域问题送给 ai-workflow，把通用对话送给火山方舟。
 - 支持强制指定 Provider；未配置模型 Key 时使用本地演示回复。
@@ -445,7 +445,7 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 
 #### 报告与通知
 
-- 下载 JSON 报告，其中包括报告名称、筛选条件、当前灾害和导出时间。
+- 下载可读 HTML 报告，包含报告信息、筛选条件、类型汇总、灾害明细和导出时间；可在浏览器中打印为 PDF。
 - 提供内存通知订阅，浏览器授予权限后可使用系统通知。
 - 包含设置、报告、分析和 AI 工作流。
 
@@ -610,7 +610,7 @@ pnpm run test:component
 pnpm run test:python
 ```
 
-当前自动化套件包含 177 项前端 Service 测试、59 项 React 组件测试和 39 项 Python unittest。覆盖请求与契约边界、灾害转换、分析展示、AI 流式处理、地图/UI 状态归属、FastAPI 路由和分析结果语义。组件测试使用 Vitest、React Testing Library 和 jsdom；Python 测试不要求启动分析服务，也不访问真实外部数据。
+当前自动化套件包含 179 项前端 Service 测试、75 项 React 组件测试和 40 项 Python unittest。覆盖请求与契约边界、灾害转换、分析展示、AI 流式处理、报告生成、地图/UI 状态归属、FastAPI 路由和分析结果语义。组件测试使用 Vitest、React Testing Library 和 jsdom；Python 测试不要求启动分析服务，也不访问真实外部数据。
 
 常用命令：
 
@@ -711,7 +711,7 @@ pnpm start
 - `.env` 已被 Git 忽略，不能提交。
 - 不要把服务端秘密放在 `VITE_` 下；这些值会成为浏览器可见的构建输入。
 - BFF 对 DisasterAware 路由与请求头实施白名单，限制请求体、校验 query、执行进程内限流，并返回脱敏的上游错误。
-- 管理 token、DisasterAware 凭据和模型服务 Key 只存在于服务端环境，不能出现在日志、前端包或 JSON 报告中。
+- 管理 token、DisasterAware 凭据和模型服务 Key 只存在于服务端环境，不能出现在日志、前端包或导出报告中。
 
 ### 项目结构
 

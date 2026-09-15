@@ -47,6 +47,15 @@ class ApiRouteTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             service_method.assert_awaited_once()
 
+    def test_core_analysis_routes_return_success_envelopes_for_representative_hazard(self):
+        for path in ["/api/v1/statistics", "/api/v1/predictions", "/api/v1/risk-assessment"]:
+            with self.subTest(path=path):
+                response = self.client.post(path, json={"hazards": [HAZARD]})
+                self.assertEqual(response.status_code, 200)
+                body = response.json()
+                self.assertIs(body["success"], True)
+                self.assertIn("data", body)
+
     def test_primary_analysis_routes_hide_internal_errors_and_return_request_ids(self):
         methods = ["comprehensive_analysis", "statistics", "predictions", "etl", "risk_assessment"]
         paths = ["/api/v1/analyze", "/api/v1/statistics", "/api/v1/predictions", "/api/v1/etl/process", "/api/v1/risk-assessment"]

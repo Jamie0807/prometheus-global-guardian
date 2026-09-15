@@ -19,7 +19,7 @@ const StatusPanel: React.FC = () => {
         <h2>实时监控</h2>
       </div>
 
-      <p className="status-text">实时环境灾害</p>
+      <p className="status-text">实时监测全球环境灾害动态</p>
 
       <div className="total-count">
         <div className="count-label">灾害总数</div>
@@ -30,19 +30,24 @@ const StatusPanel: React.FC = () => {
         <label className="filter-label" htmlFor="hazard-filter">
           按类型筛选
         </label>
-        <select
-          id="hazard-filter"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="form-input"
-        >
-          <option value="ALL">全部灾害</option>
-          {DISPLAYED_TYPES.map((type) => (
-            <option key={type.type_id} value={type.type_id}>
-              {type.type_name}
-            </option>
-          ))}
-        </select>
+        <span className="status-filter-control">
+          <select
+            id="hazard-filter"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="form-input"
+          >
+            <option value="ALL">全部灾害</option>
+            {DISPLAYED_TYPES.map((type) => (
+              <option key={type.type_id} value={type.type_id}>
+                {type.type_name}
+              </option>
+            ))}
+          </select>
+          <svg aria-hidden="true" className="status-filter-chevron" fill="none" viewBox="0 0 24 24">
+            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+          </svg>
+        </span>
       </div>
 
       <button className="btn btn-primary status-refresh-button" onClick={() => void refresh()}>

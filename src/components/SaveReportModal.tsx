@@ -3,6 +3,7 @@ import type { SaveReportPayload } from "../types";
 import { useMapState } from "../features/map/state/MapStateContext";
 import { useUIState } from "../state/UIStateContext";
 import { createClientLogger } from "../utils/logger";
+import { buildReportHtml } from "../utils/reportHtml";
 
 const logger = createClientLogger("save-report-modal");
 
@@ -30,9 +31,7 @@ const SaveReportModal: React.FC = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // 下载JSON格式报告
-    const dataStr = JSON.stringify(reportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
+    const dataBlob = new Blob([buildReportHtml(reportData)], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
@@ -41,7 +40,7 @@ const SaveReportModal: React.FC = () => {
         .trim()
         .replace(/[^\p{L}\p{N}]+/gu, "_")
         .replace(/^_+|_+$/g, "") || "灾害报告";
-    link.download = `${fileName}_${Date.now()}.json`;
+    link.download = `${fileName}_${Date.now()}.html`;
     link.click();
     URL.revokeObjectURL(url);
 
@@ -139,7 +138,7 @@ const SaveReportModal: React.FC = () => {
           </div>
         </form>
 
-        <p className="form-note">报告将以 JSON 文件保存，其中包含当前灾害数据和分析结果。</p>
+        <p className="form-note">报告将以 HTML 文件保存，可在浏览器中查看或打印为 PDF。</p>
       </div>
     </div>
   );

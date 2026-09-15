@@ -17,7 +17,10 @@ const mapMocks = vi.hoisted(() => ({
   addControl: vi.fn(),
   removeControl: vi.fn(),
   setStyle: vi.fn(),
+  easeTo: vi.fn(),
   popupSetDOMContent: vi.fn(),
+  popupSetLngLat: vi.fn(),
+  popupAddTo: vi.fn(),
   fetchHazardFeed: vi.fn(),
   fetchHazardsActive: vi.fn(),
   fetchUSGSEarthquakes: vi.fn(),
@@ -72,6 +75,7 @@ vi.mock("mapbox-gl", () => ({
       addControl = mapMocks.addControl;
       removeControl = mapMocks.removeControl;
       setStyle = mapMocks.setStyle;
+      easeTo = mapMocks.easeTo;
     },
     Marker: class {
       setLngLat() {
@@ -94,6 +98,14 @@ vi.mock("mapbox-gl", () => ({
       }
       setDOMContent(content: HTMLDivElement) {
         mapMocks.popupSetDOMContent(content);
+        return this;
+      }
+      setLngLat(lngLat: unknown) {
+        mapMocks.popupSetLngLat(lngLat);
+        return this;
+      }
+      addTo(map: unknown) {
+        mapMocks.popupAddTo(map);
         return this;
       }
     },
@@ -197,6 +209,120 @@ describe("MapView", () => {
     await waitFor(() => expect(mapMocks.popupSetDOMContent).toHaveBeenCalledTimes(1));
 
     const content = mapMocks.popupSetDOMContent.mock.calls[0]?.[0] as HTMLDivElement;
+    expect(content.querySelector(".popup-title")?.textContent).toContain("<script>");
+    expect(content.querySelectorAll("script, img, a")).toHaveLength(0);
+  });
+
+  it("expands a clicked LOD cluster at its feature coordinates", async () => {
+    const getClusterExpansionZoom = vi.fn(
+      (clusterId: number, callback: (error: null, zoom: number) => void) => {
+        callback(null, 9);
+      },
+    );
+    mapMocks.getSource.mockReturnValue({ getClusterExpansionZoom, setData: vi.fn() });
+    mapMocks.getLayer.mockReturnValue({});
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.on).toHaveBeenCalledWith("click", "lod-clusters", expect.any(Function)),
+    );
+    const clusterClick = mapMocks.on.mock.calls.find(
+      ([event, layerId]) => event === "click" && layerId === "lod-clusters",
+    )?.[2] as (event: unknown) => void;
+
+    clusterClick({
+      features: [
+        {
+          properties: { cluster_id: 42 },
+          geometry: { type: "Point", coordinates: [120, 30] },
+        },
+      ],
+    });
+
+    expect(getClusterExpansionZoom).toHaveBeenCalledWith(42, expect.any(Function));
+    expect(mapMocks.easeTo).toHaveBeenCalledWith({ center: [120, 30], zoom: 9 });
+  });
+
+  it("does not expand a cluster after its click handler is cleaned up", async () => {
+    const callbacks: Array<(error: Error | null, zoom: number | null) => void> = [];
+    const getClusterExpansionZoom = vi.fn(
+      (_clusterId: number, callback: (error: Error | null, zoom: number | null) => void) => {
+        callbacks.push(callback);
+      },
+    );
+    mapMocks.getSource.mockReturnValue({ getClusterExpansionZoom, setData: vi.fn() });
+    mapMocks.getLayer.mockReturnValue({});
+    const view = renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.on).toHaveBeenCalledWith("click", "lod-clusters", expect.any(Function)),
+    );
+    const clusterClick = mapMocks.on.mock.calls.find(
+      ([event, layerId]) => event === "click" && layerId === "lod-clusters",
+    )?.[2] as (event: unknown) => void;
+    clusterClick({
+      features: [
+        {
+          properties: { cluster_id: 42 },
+          geometry: { type: "Point", coordinates: [120, 30] },
+        },
+      ],
+    });
+
+    view.unmount();
+    callbacks[0]?.(null, 9);
+
+    expect(mapMocks.easeTo).not.toHaveBeenCalled();
+  });
+
+  it("does not expand a cluster when Mapbox returns an error", async () => {
+    const getClusterExpansionZoom = vi.fn(
+      (_clusterId: number, callback: (error: Error, zoom: null) => void) => {
+        callback(new Error("cluster unavailable"), null);
+      },
+    );
+    mapMocks.getSource.mockReturnValue({ getClusterExpansionZoom, setData: vi.fn() });
+    mapMocks.getLayer.mockReturnValue({});
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.on).toHaveBeenCalledWith("click", "lod-clusters", expect.any(Function)),
+    );
+    const clusterClick = mapMocks.on.mock.calls.find(
+      ([event, layerId]) => event === "click" && layerId === "lod-clusters",
+    )?.[2] as (event: unknown) => void;
+    clusterClick({
+      features: [
+        {
+          properties: { cluster_id: 42 },
+          geometry: { type: "Point", coordinates: [120, 30] },
+        },
+      ],
+    });
+
+    expect(mapMocks.easeTo).not.toHaveBeenCalled();
+  });
+
+  it("opens a safe DOM popup for a clicked unclustered LOD hazard", async () => {
+    mapMocks.getSource.mockReturnValue({ setData: vi.fn() });
+    mapMocks.getLayer.mockReturnValue({});
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.on).toHaveBeenCalledWith("click", "lod-unclustered", expect.any(Function)),
+    );
+    const unclusteredClick = mapMocks.on.mock.calls.find(
+      ([event, layerId]) => event === "click" && layerId === "lod-unclustered",
+    )?.[2] as (event: unknown) => void;
+
+    unclusteredClick({
+      features: [{ properties: { id: "hazard-1" } }],
+      lngLat: { lng: 120, lat: 30 },
+    });
+
+    expect(mapMocks.popupSetLngLat).toHaveBeenCalledWith({ lng: 120, lat: 30 });
+    expect(mapMocks.popupAddTo).toHaveBeenCalledTimes(1);
+    const content = mapMocks.popupSetDOMContent.mock.calls.at(-1)?.[0] as HTMLDivElement;
     expect(content.querySelector(".popup-title")?.textContent).toContain("<script>");
     expect(content.querySelectorAll("script, img, a")).toHaveLength(0);
   });

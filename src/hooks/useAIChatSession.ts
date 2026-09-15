@@ -20,6 +20,7 @@ interface ActiveRequest {
   requestId: number;
   assistantId: string;
   controller: AbortController;
+  assistantCreated: boolean;
 }
 
 export interface AIChatSession {
@@ -107,7 +108,12 @@ export function useAIChatSession(
       const requestId = ++requestSequenceRef.current;
       const controller = new AbortController();
       const assistantId = generateMessageId();
-      const activeRequest: ActiveRequest = { requestId, assistantId, controller };
+      const activeRequest: ActiveRequest = {
+        requestId,
+        assistantId,
+        controller,
+        assistantCreated: false,
+      };
       const assistantMessage: ChatMessage = {
         id: assistantId,
         role: "assistant",
@@ -119,11 +125,7 @@ export function useAIChatSession(
       activeRequestRef.current = activeRequest;
       setErrorText("");
       setRetrySnapshot(undefined);
-      setMessages((current) =>
-        appendUserMessage
-          ? [...current, snapshot.userMessage, assistantMessage]
-          : [...current, assistantMessage],
-      );
+      setMessages((current) => (appendUserMessage ? [...current, snapshot.userMessage] : current));
       setIsStreaming(true);
 
       const isCurrentRequest = (): boolean => activeRequestRef.current?.requestId === requestId;
@@ -131,6 +133,12 @@ export function useAIChatSession(
         signal: controller.signal,
         onChunk: (chunk) => {
           if (!isCurrentRequest()) return;
+          if (!chunk.trim()) return;
+          if (!activeRequest.assistantCreated) {
+            activeRequest.assistantCreated = true;
+            setMessages((current) => [...current, { ...assistantMessage, content: chunk }]);
+            return;
+          }
           setMessages((current) =>
             current.map((message) =>
               message.id === assistantId
@@ -144,27 +152,33 @@ export function useAIChatSession(
       if (!isCurrentRequest()) return;
 
       if (outcome.kind === "completed") {
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === assistantId
-              ? { ...message, isStreaming: false, isComplete: true }
-              : message,
-          ),
-        );
+        if (activeRequest.assistantCreated) {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, isStreaming: false, isComplete: true }
+                : message,
+            ),
+          );
+        }
       } else if (outcome.kind === "cancelled") {
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === assistantId
-              ? { ...message, isStreaming: false, isCancelled: true }
-              : message,
-          ),
-        );
+        if (activeRequest.assistantCreated) {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId
+                ? { ...message, isStreaming: false, isCancelled: true }
+                : message,
+            ),
+          );
+        }
       } else {
-        setMessages((current) =>
-          current.map((message) =>
-            message.id === assistantId ? { ...message, isStreaming: false } : message,
-          ),
-        );
+        if (activeRequest.assistantCreated) {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === assistantId ? { ...message, isStreaming: false } : message,
+            ),
+          );
+        }
         setErrorText(outcome.message);
         setRetrySnapshot(snapshot);
       }

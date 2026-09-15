@@ -130,7 +130,7 @@ describe("App state ownership", () => {
 
     await user.click(screen.getByRole("button", { name: "打开保存报告弹窗" }));
     const reportName = await screen.findByPlaceholderText("例如：2026 年 9 月全球灾害评估");
-    expect(screen.getByText(/JSON 文件/)).toBeInTheDocument();
+    expect(screen.getByText(/HTML 文件/)).toBeInTheDocument();
     await user.type(reportName, "9 月灾害报告");
     await user.click(screen.getByRole("button", { name: "取消" }));
     await waitFor(() =>
@@ -143,9 +143,10 @@ describe("App state ownership", () => {
     );
     await user.click(screen.getByRole("button", { name: "下载报告" }));
     expect(download).toHaveBeenCalledOnce();
-    expect(download.mock.instances[0]?.download).toMatch(/^9_月灾害报告_\d+\.json$/);
+    expect(download.mock.instances[0]?.download).toMatch(/^9_月灾害报告_\d+\.html$/);
     expect(createObjectURL).toHaveBeenCalledOnce();
-    expect(downloadedParts?.join("")).toContain('"id": "hazard-1"');
+    expect(downloadedParts?.join("")).toContain("<!doctype html>");
+    expect(downloadedParts?.join("")).toContain("Test flood");
 
     await user.click(screen.getByRole("button", { name: "打开设置弹窗" }));
     expect(await screen.findByText("地图设置")).toBeInTheDocument();

@@ -27,10 +27,16 @@ describe("StatusPanel", () => {
     render(<StatusPanel />);
 
     expect(screen.getByRole("heading", { name: "实时监控" })).toBeInTheDocument();
-    expect(screen.getByText("实时环境灾害")).toBeInTheDocument();
+    expect(screen.getByText("实时监测全球环境灾害动态")).toBeInTheDocument();
     expect(screen.getByText("灾害总数")).toBeInTheDocument();
     const filter = screen.getByLabelText("按类型筛选");
     expect(filter).toBeEnabled();
+    expect(filter).toHaveClass("form-input");
+    expect(filter.parentElement).toHaveClass("status-filter-control");
+    expect(filter.parentElement?.querySelector(".status-filter-chevron")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     expect(screen.getAllByRole("option")).toHaveLength(DISPLAYED_TYPES.length + 1);
     expect(screen.getByRole("option", { name: "洪水" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "地震" })).toBeInTheDocument();

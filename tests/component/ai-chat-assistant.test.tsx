@@ -96,6 +96,35 @@ describe("AIChatAssistant", () => {
     expect(screen.queryByText("不应显示")).not.toBeInTheDocument();
   });
 
+  it("does not render an empty assistant bubble before the first response chunk", async () => {
+    const user = userEvent.setup();
+    const result = deferred<AIStreamOutcome>();
+    let options: StreamChatOptions | undefined;
+    serviceMocks.streamChatMessage.mockImplementation(
+      (_messages: unknown, _context: unknown, requestOptions: StreamChatOptions) => {
+        options = requestOptions;
+        return result.promise;
+      },
+    );
+
+    const { container } = renderWithAppState();
+    await user.click(screen.getByRole("button", { name: "open-ai" }));
+    await user.type(screen.getByRole("textbox"), "分析洪水");
+    await user.click(screen.getByTitle("发送"));
+
+    expect(screen.getByText("分析洪水")).toBeInTheDocument();
+    expect(screen.getByText("🔄 AI 正在生成分析结果……")).toBeInTheDocument();
+    expect(container.querySelector(".ai-bubble-ai")).toBeNull();
+    expect(container.querySelector(".ai-cursor")).toBeNull();
+
+    options?.onChunk("首段分析结果");
+
+    expect(await screen.findByText("首段分析结果")).toBeInTheDocument();
+    expect(container.querySelector(".ai-bubble-ai")).not.toBeNull();
+    expect(container.querySelector(".ai-cursor")).not.toBeNull();
+    result.resolve({ kind: "completed" });
+  });
+
   it("retries a failed request without adding another user message", async () => {
     const user = userEvent.setup();
     serviceMocks.streamChatMessage

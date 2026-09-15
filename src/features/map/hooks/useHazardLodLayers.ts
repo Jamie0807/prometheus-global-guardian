@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import type { MutableRefObject } from "react";
-import type { GeoJSONSource, Map } from "mapbox-gl";
+import mapboxgl from "mapbox-gl";
+import type { GeoJSONSource, Map, MapMouseEvent } from "mapbox-gl";
 
 import type { Hazard } from "../../../types";
 import { createLodFeatureCollection } from "../utils/hazardGeojson";
@@ -11,6 +12,7 @@ import {
   MAP_SOURCE_IDS,
 } from "../utils/mapLayerIds";
 import { getMapLodVisibility } from "../utils/mapLod";
+import { createHazardPopupContent } from "../utils/hazardPopupContent";
 
 export function useHazardLodLayers(
   mapRef: MutableRefObject<Map | null>,
@@ -109,6 +111,70 @@ export function useHazardLodLayers(
       map.off("zoom", onZoom);
     };
   }, [applyLod, mapRef, mapRevision]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      mapRevision === 0 ||
+      showHeatmap ||
+      !map.getSource(MAP_SOURCE_IDS.lod) ||
+      !map.getLayer(MAP_LAYER_IDS.clusters) ||
+      !map.getLayer(MAP_LAYER_IDS.unclustered)
+    ) {
+      return;
+    }
+    let active = true;
+
+    const onClusterClick = (event: MapMouseEvent) => {
+      const feature = event.features?.[0];
+      const clusterId = feature?.properties?.cluster_id;
+      const geometry = feature?.geometry;
+      if (
+        !Number.isSafeInteger(clusterId) ||
+        geometry?.type !== "Point" ||
+        !Number.isFinite(geometry.coordinates[0]) ||
+        !Number.isFinite(geometry.coordinates[1])
+      ) {
+        return;
+      }
+      const [longitude, latitude] = geometry.coordinates;
+      const source = map.getSource(MAP_SOURCE_IDS.lod) as GeoJSONSource | undefined;
+      source?.getClusterExpansionZoom(clusterId, (error, zoom) => {
+        if (
+          error ||
+          typeof zoom !== "number" ||
+          !Number.isFinite(zoom) ||
+          !active ||
+          mapRef.current !== map ||
+          !map.getSource(MAP_SOURCE_IDS.lod) ||
+          !map.getLayer(MAP_LAYER_IDS.clusters)
+        ) {
+          return;
+        }
+        map.easeTo({ center: [longitude, latitude], zoom });
+      });
+    };
+
+    const onUnclusteredClick = (event: MapMouseEvent) => {
+      const id = event.features?.[0]?.properties?.id;
+      if (typeof id !== "string") return;
+      const hazard = hazards.find((candidate) => candidate.id === id);
+      if (!hazard) return;
+      new mapboxgl.Popup()
+        .setLngLat(event.lngLat)
+        .setDOMContent(createHazardPopupContent(hazard))
+        .addTo(map);
+    };
+
+    map.on("click", MAP_LAYER_IDS.clusters, onClusterClick);
+    map.on("click", MAP_LAYER_IDS.unclustered, onUnclusteredClick);
+    return () => {
+      active = false;
+      map.off("click", MAP_LAYER_IDS.clusters, onClusterClick);
+      map.off("click", MAP_LAYER_IDS.unclustered, onUnclusteredClick);
+    };
+  }, [hazards, mapRef, mapRevision, showHeatmap]);
 
   return { applyLod };
 }

@@ -24,6 +24,7 @@
   ```
 
 - 提交信息遵循 Conventional Commits，例如 `feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`build:`、`chore:`。
+- 提交主题（`type(scope): subject` 的 `subject`）必须使用英文，除非用户明确要求使用其他语言。
 - 提交前确认暂存区只包含本次需求文件，不提交 `node_modules`、缓存、临时文件、构建产物或未确认的生成物。
 - 不执行 `git reset --hard`、`git checkout --`、强制推送等破坏性操作，除非用户明确要求并确认。
 

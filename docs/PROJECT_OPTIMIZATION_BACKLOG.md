@@ -1,6 +1,6 @@
 # 项目待优化清单
 
-最近核对日期：2026-09-12。本文档以当前 `main` 分支代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
+最近核对日期：2026-09-15。本文档以当前工作区代码、自动化测试脚本、GitHub Actions 与最近提交为准；已完成表示代码和验证入口已经落地，不表示项目已经部署。
 
 ## 当前判断
 
@@ -10,6 +10,8 @@
 - Analytics 灾害请求使用 TypeScript 与 Python 共用的 JSON fixture；两端已对字段默认值、长度、坐标、数值、未知字段和非有限数的接受边界对齐。
 - BFF 仅代理声明的 DisasterAware 路由，并具备请求边界、服务端鉴权、超时、限流和脱敏错误契约；Python 管理接口已受令牌保护。
 - AI 流式会话已支持取消、失败终态、请求隔离、历史预算和手动重试；不提供自动续传或跨实例会话治理。
+- 首页标题、状态面板筛选控件、Mapbox 聚合点展开、单点安全 Popup、AI 首包等待态和 HTML 报告均已完成本地回归验证。
+- 使用页面当前的 100 条灾害数据实际调用本机 FastAPI 的统计、预测和风险接口均返回 200，并可满足现有严格契约；Python 回归也覆盖代表性灾害下的三条核心成功信封。截图中的格式错误应按运行中的分析服务版本或临时状态排查，不能以放宽客户端解析处理。
 - 地图与 UI 导航状态已分别由 `MapStateProvider` 和 `UIStateProvider` 归属；组件局部状态与跨实例持久化仍不在本轮范围内。
 - 质量门禁包含 lint、格式、三项 TypeScript 类型检查、BFF/Service/组件/E2E 测试、构建及 Python unittest。GitHub Actions 分别运行前端/BFF 基线和 Python 测试。
 - 本地 `pnpm test` 的 BFF 监听用例会受受限沙箱影响而出现 `listen EPERM`；这是运行环境限制。独立 Service、组件、Python 和构建门禁可在当前环境通过。
@@ -31,40 +33,40 @@
 | 前端状态归属梳理           | 地图数据、筛选、样式、刷新与来源元信息收口到地图状态域；页面、弹窗收口到 UI 状态域，App 仅保留授权和组合。                             |
 | 前端输出安全               | 地图 Popup 用本地 DOM 与 `textContent` 渲染外部字段，不使用 `setHTML()`。                                                              |
 | 最小 CI 与测试入口         | `.github/workflows/quality.yml` 使用 Node 20、pnpm 10 与 Python 3.13；`pnpm run test:python` 优先使用项目 `.venv`，CI 回退 `python3`。 |
+| 监控交互与可读报告         | 标题与面板左对齐，筛选框使用无障碍自绘箭头；聚合点可展开、单点显示安全 Popup；AI 首包前无空白气泡；报告导出为可打印 HTML。             |
 
 ## 当前质量基线
 
 当前脚本及职责如下：
 
-| 命令                           | 覆盖范围                                                  |
-| ------------------------------ | --------------------------------------------------------- |
-| `pnpm run lint`                | TypeScript、React、BFF 及配置的 ESLint 规则。             |
-| `pnpm run format:check`        | 已纳入清单的 Markdown、JSON、TypeScript、测试与配置格式。 |
-| `pnpm run typecheck:client`    | 前端 TypeScript 类型检查。                                |
-| `pnpm run typecheck:server`    | Express BFF TypeScript 类型检查。                         |
-| `pnpm run typecheck:contracts` | TypeScript 契约正反例类型检查。                           |
-| `pnpm run test:services`       | Service、解析器、请求边界与 AI 流协议回归；当前 177 项。  |
-| `pnpm run test:component`      | React Testing Library 组件回归；当前 59 项。              |
-| `pnpm run test:python`         | FastAPI 模型、路由、服务与算法 unittest；当前 39 项。     |
-| `pnpm run test:e2e`            | Playwright 桌面端关键流程冒烟。                           |
-| `pnpm run build`               | Vite 生产构建与 BFF 编译。                                |
+| 命令                           | 覆盖范围                                                            |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `pnpm run lint`                | TypeScript、React、BFF 及配置的 ESLint 规则。                       |
+| `pnpm run format:check`        | 已纳入清单的 Markdown、JSON、TypeScript、测试与配置格式。           |
+| `pnpm run typecheck:client`    | 前端 TypeScript 类型检查。                                          |
+| `pnpm run typecheck:server`    | Express BFF TypeScript 类型检查。                                   |
+| `pnpm run typecheck:contracts` | TypeScript 契约正反例类型检查。                                     |
+| `pnpm run test:services`       | Service、解析器、请求边界、AI 流协议与 HTML 报告回归；当前 179 项。 |
+| `pnpm run test:component`      | React Testing Library 组件回归；当前 75 项。                        |
+| `pnpm run test:python`         | FastAPI 模型、路由、服务与算法 unittest；当前 40 项。               |
+| `pnpm run test:e2e`            | Playwright 桌面端关键流程冒烟。                                     |
+| `pnpm run build`               | Vite 生产构建与 BFF 编译。                                          |
 
-最近一次完整验证结果：Service 177/177、组件 59/59；Python 39 项为最近一次已验证基线。本次重跑中，BFF 受沙箱 `listen` EPERM 限制，E2E 未启动，Python 3.13 不可用。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
+最近一次完整验证结果：BFF 74/74、Service 179/179、组件 75/75、Python 40/40、Playwright E2E 1/1；lint、格式、三项 TypeScript 类型检查、生产构建和差异检查均通过。Node 运行时应使用项目声明的 `>=20.19 <21`；其他 Node 版本会输出 engine warning。
 
 ## 优先级矩阵
 
 项目当前不计划部署。矩阵按后续开发价值排序；发布前项仅在决定公网部署后进入实施范围。
 
-| 优先级 | 剩余优化范围                                    | 建议时机                 | 依赖与边界                                                                             |
-| ------ | ----------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
-| P1     | 报告下载闭环                                    | 需要对外演示或交付报告时 | 统一下载格式、字段、数据时间、来源、文件名与内容测试；当前 JSON 下载与界面文案需对齐。 |
-| P2     | 跨语言 Analytics 响应与 4D 输出契约扩展         | 输出模型稳定后           | 灾害请求共享样本已完成；评估覆盖响应模型、4D 输出或代码生成的收益。                    |
-| P2     | 前端包体积预算与分包治理                        | 性能优化前               | Mapbox 生产 chunk 约 1.8 MB；先采集首屏与交互数据，再建立分包和预算。                  |
-| P2     | 可访问性与多语言界面                            | UI 迭代时                | 补齐弹窗语义、焦点管理、键盘路径、locale 资源与移动端/视觉回归。                       |
-| P2     | 可观测性、集中错误上报和指标告警                | 需要持续运行服务时       | 已有安全日志；后续接入集中采集、错误聚合、指标、trace 与告警。                         |
-| P2     | 仓库/包结构调整与依赖清理                       | 大功能稳定后             | 评估 web、BFF 与 Python 的包边界、生产依赖、Docker 缓存与许可证/漏洞审计。             |
-| P2     | 仓库卫生与运行时无关文件                        | 下次维护批次             | 明确 `.superpowers` 过程记录、历史副本、锁文件和临时产物的保留策略。                   |
-| 发布前 | 公开 Analytics API 身份、共享限流与生产错误脱敏 | 决定公网部署前           | 管理令牌不覆盖公开业务 API；多实例限流需要网关或共享存储。                             |
+| 优先级 | 剩余优化范围                                    | 建议时机           | 依赖与边界                                                                                                |
+| ------ | ----------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| P2     | 跨语言 Analytics 响应与 4D 输出契约扩展         | 输出模型稳定后     | 灾害请求共享样本和核心 FastAPI 成功信封回归已完成；后续补固定跨语言响应样本或代码生成，防止响应字段漂移。 |
+| P2     | 前端包体积预算与分包治理                        | 性能优化前         | Mapbox 生产 chunk 约 1.8 MB；先采集首屏与交互数据，再建立分包和预算。                                     |
+| P2     | 可访问性与多语言界面                            | UI 迭代时          | 补齐弹窗语义、焦点管理、键盘路径、locale 资源与移动端/视觉回归。                                          |
+| P2     | 可观测性、集中错误上报和指标告警                | 需要持续运行服务时 | 已有安全日志；后续接入集中采集、错误聚合、指标、trace 与告警。                                            |
+| P2     | 仓库/包结构调整与依赖清理                       | 大功能稳定后       | 评估 web、BFF 与 Python 的包边界、生产依赖、Docker 缓存与许可证/漏洞审计。                                |
+| P2     | 仓库卫生与运行时无关文件                        | 下次维护批次       | 明确 `.superpowers` 过程记录、历史副本、锁文件和临时产物的保留策略。                                      |
+| 发布前 | 公开 Analytics API 身份、共享限流与生产错误脱敏 | 决定公网部署前     | 管理令牌不覆盖公开业务 API；多实例限流需要网关或共享存储。                                                |
 
 ## 关键边界与遗留风险
 
