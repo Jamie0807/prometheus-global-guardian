@@ -520,10 +520,11 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
 
 function toCoordinates(value: unknown, path: string): HazardData["coordinates"] | undefined {
   if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.length !== 2) {
+  if (!Array.isArray(value) || value.length < 2) {
     throw new AnalyticsContractError(path);
   }
 
+  // GeoJSON Position may contain a third altitude or depth value; Analytics uses longitude/latitude.
   const [longitude, latitude] = value;
   if (
     typeof longitude !== "number" ||

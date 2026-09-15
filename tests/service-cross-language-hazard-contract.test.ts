@@ -62,4 +62,15 @@ describe("cross-language analytics hazard contract", () => {
       formatHazards([{ id: "bad", geometry: { type: "Point", coordinates: [181, 0] } }]),
     ).toThrow(AnalyticsContractError);
   });
+
+  it("uses longitude and latitude from a GeoJSON position with altitude", () => {
+    expect(
+      formatHazards([
+        {
+          id: "earthquake-with-depth",
+          geometry: { type: "Point", coordinates: [-156.47, 56.191, 17.8] },
+        },
+      ]),
+    ).toMatchObject([{ coordinates: [-156.47, 56.191] }]);
+  });
 });
