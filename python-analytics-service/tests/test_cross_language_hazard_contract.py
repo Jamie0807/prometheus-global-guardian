@@ -1,3 +1,5 @@
+"""验证跨语言灾害数据契约在 Python 端的兼容性。"""
+
 import json
 import sys
 import unittest

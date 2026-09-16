@@ -1,3 +1,6 @@
+/**
+ * 提供应用根组件并组织主要界面区域。
+ */
 import React, { lazy, Suspense, useEffect } from "react";
 import { authorize } from "./services/auth/authService";
 import Header from "./components/Header";
@@ -39,7 +42,7 @@ function useAuthorization() {
         await authorize();
       } catch {
         logger.warn("initial_authorization_failed");
-        // App can still work with other data sources
+        // 应用仍可使用其他数据源运行。
       }
     })();
   }, []);

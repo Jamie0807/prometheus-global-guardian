@@ -1,3 +1,4 @@
+/** 验证错误边界捕获渲染异常并展示可恢复的中文界面。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";

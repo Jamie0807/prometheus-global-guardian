@@ -1,3 +1,6 @@
+/**
+ * 提供地图灾害数据加载与刷新 Hook。
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { config } from "../../../config";

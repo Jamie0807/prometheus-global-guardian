@@ -1,3 +1,5 @@
+"""创建并装配数据分析 FastAPI 应用。"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

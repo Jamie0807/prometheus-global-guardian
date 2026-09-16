@@ -42,7 +42,7 @@ class DataQualityMonitor:
 
     @staticmethod
     def _bounded_score(value: Any) -> float:
-        """Keep quality scores finite and within the documented 0..1 range."""
+        """确保质量评分为有限值，并处于文档定义的 0..1 范围内。"""
         try:
             numeric_value = float(value)
         except (TypeError, ValueError):

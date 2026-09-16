@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务信息契约与解析逻辑。
+ */
 import { parseRecord, parseString, parseStringArray } from "./common";
 
 export interface AnalyticsServiceInfo {

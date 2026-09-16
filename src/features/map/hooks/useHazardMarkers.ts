@@ -1,3 +1,6 @@
+/**
+ * 提供地图灾害标记的创建、更新与清理 Hook。
+ */
 import { useCallback, useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 
@@ -14,8 +17,8 @@ export function useHazardMarkers(
 ) {
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const clearMarkers = useCallback(() => {
-    // Markers are DOM nodes rather than a WebGL layer; remove old nodes before
-    // reflecting a new filter or hazard set to avoid duplicate event targets.
+    // 标记是 DOM 节点而非 WebGL 图层；应用新筛选条件或灾害集合前移除旧节点，
+    // 以避免重复的事件目标。
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
   }, []);
@@ -30,8 +33,8 @@ export function useHazardMarkers(
     const map = mapRef.current;
     if (!map || mapRevision === 0) return;
     clearMarkers();
-    // The LOD layer renders the low-zoom representation. Markers are created only
-    // for valid coordinates and are initially hidden when another layer is active.
+    // LOD 图层负责低缩放级别的呈现。仅为有效坐标创建标记，
+    // 其他图层激活时，标记初始保持隐藏。
     const selected =
       filter === "ALL" ? hazards : hazards.filter((hazard) => hazard.type === filter);
     selected.forEach((hazard) => {

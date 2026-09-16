@@ -1,3 +1,6 @@
+/**
+ * 提供灾害图表展示与钻取组件。
+ */
 import React, { useState, useEffect, useCallback } from "react";
 import { getStatistics } from "../services/analytics/analyticsService";
 import type { StatisticsData } from "../services/analytics/contracts/statistics";

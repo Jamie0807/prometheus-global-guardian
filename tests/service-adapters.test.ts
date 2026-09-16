@@ -1,3 +1,4 @@
+/** 验证公共灾害源响应适配及灾害类型标准化。 */
 import { describe, expect, it } from "vitest";
 
 import {

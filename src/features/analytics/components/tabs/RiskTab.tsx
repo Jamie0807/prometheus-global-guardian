@@ -1,3 +1,6 @@
+/**
+ * 提供风险分析标签页内容组件。
+ */
 import {
   formatAnalyticsNumber,
   formatAnalyticsSignedPercent,

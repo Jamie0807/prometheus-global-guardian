@@ -1,3 +1,6 @@
+/**
+ * 提供图表标签格式化与显示工具。
+ */
 const DEFAULT_X_AXIS_LABEL_COUNT = 8;
 
 export function getXAxisLabelIndexes(

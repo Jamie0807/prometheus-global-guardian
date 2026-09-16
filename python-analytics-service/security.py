@@ -1,4 +1,4 @@
-"""Security boundaries for the Analytics service management plane."""
+"""定义数据分析服务管理面的安全边界。"""
 
 import os
 import secrets

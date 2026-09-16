@@ -1,3 +1,6 @@
+/**
+ * 提供外部 3D Tiles 图层的管理 Hook。
+ */
 import { useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { MapboxOverlay } from "@deck.gl/mapbox";
@@ -17,8 +20,8 @@ export function useDeck3DTiles(mapRef: MutableRefObject<Map | null>, mapRevision
     const map = mapRef.current;
     if (!map || mapRevision === 0) return;
     if (config.tiles3d.enabled && config.tiles3d.url) {
-      // deck.gl shares Mapbox's WebGL canvas through an overlay, avoiding a second
-      // canvas while external 3D Tiles are configured.
+      // deck.gl 通过覆盖层复用 Mapbox 的 WebGL canvas，外部 3D Tiles 配置时无需创建第二个
+      // canvas。
       const overlay = new MapboxOverlay({ layers: [] });
       overlayRef.current = overlay;
       map.addControl(overlay as unknown as IControl);
@@ -37,14 +40,13 @@ export function useDeck3DTiles(mapRef: MutableRefObject<Map | null>, mapRevision
         ],
       });
       return () => {
-        // Removing the control disposes the deck.gl overlay before the Mapbox map
-        // is removed or its style is rebuilt.
+        // 移除控件会在 Mapbox 地图移除或重建样式前释放 deck.gl 覆盖层。
         map.removeControl(overlay as unknown as IControl);
         overlayRef.current = null;
       };
     }
-    // Without an external tileset, use Mapbox's vector-building extrusion layer.
-    // Its minzoom postpones building geometry until it is useful to the viewer.
+    // 没有外部瓦片集时，使用 Mapbox 的矢量建筑拉伸图层。
+    // 其 minzoom 会延后建筑几何体的创建，直至它对查看者有用。
     if (map.getLayer(MAP_LAYER_IDS.buildings)) return;
     try {
       map.addLayer(

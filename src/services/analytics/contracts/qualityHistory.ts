@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的数据质量历史契约与解析逻辑。
+ */
 import {
   AnalyticsContractError,
   parseFiniteNumber,

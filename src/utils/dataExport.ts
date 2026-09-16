@@ -1,3 +1,6 @@
+/**
+ * 提供灾害数据的 CSV 与 JSON 导出工具。
+ */
 import type { Hazard } from "../types";
 
 interface TypeDistributionRow {
@@ -28,7 +31,7 @@ interface SourceDistributionRow {
 }
 
 /**
- * Convert hazards data to CSV format
+ * 将灾害数据转换为 CSV 格式
  */
 export const exportToCSV = (hazards: Hazard[], filename: string = "灾害数据.csv"): void => {
   if (hazards.length === 0) {
@@ -36,7 +39,7 @@ export const exportToCSV = (hazards: Hazard[], filename: string = "灾害数据.
     return;
   }
 
-  // Define CSV headers
+  // 定义 CSV 表头
   const headers = [
     "编号",
     "类型",
@@ -50,24 +53,24 @@ export const exportToCSV = (hazards: Hazard[], filename: string = "灾害数据.
     "说明",
   ];
 
-  // Convert hazards to CSV rows
+  // 将灾害数据转换为 CSV 行
   const rows = hazards.map((hazard) => [
     hazard.id,
     hazard.type.replace(/_/g, " "),
-    `"${hazard.title.replace(/"/g, '""')}"`, // Escape quotes
+    `"${hazard.title.replace(/"/g, '""')}"`, // 转义引号
     hazard.severity || "未知",
     hazard.magnitude || 0,
     hazard.source || "未知",
     hazard.timestamp || new Date().toISOString(),
     hazard.geometry.coordinates[1] || 0,
     hazard.geometry.coordinates[0] || 0,
-    `"${(hazard.description || "").replace(/"/g, '""')}"`, // Escape quotes
+    `"${(hazard.description || "").replace(/"/g, '""')}"`, // 转义引号
   ]);
 
-  // Combine headers and rows
+  // 合并表头与数据行
   const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 
-  // Create blob and download
+  // 创建 Blob 并下载
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
@@ -81,7 +84,7 @@ export const exportToCSV = (hazards: Hazard[], filename: string = "灾害数据.
 };
 
 /**
- * Export analytics data including charts data
+ * 导出包含图表数据的分析数据
  */
 export const exportAnalyticsToCSV = (
   typeData: TypeDistributionRow[],
@@ -90,10 +93,10 @@ export const exportAnalyticsToCSV = (
   sourceData: SourceDistributionRow[],
   filename: string = "分析数据.csv",
 ): void => {
-  // Create comprehensive analytics CSV
+  // 创建综合分析 CSV
   const sections = [];
 
-  // Type Distribution
+  // 类型分布
   sections.push("类型分布");
   sections.push("类型,数量,占比");
   typeData.forEach((item) => {
@@ -101,7 +104,7 @@ export const exportAnalyticsToCSV = (
   });
   sections.push("");
 
-  // Severity Distribution
+  // 严重度分布
   sections.push("严重程度分布");
   sections.push("严重程度,数量,占比");
   severityData.forEach((item) => {
@@ -109,7 +112,7 @@ export const exportAnalyticsToCSV = (
   });
   sections.push("");
 
-  // Timeline Data
+  // 时间线数据
   sections.push("时间线数据");
   sections.push("日期,地震,火山,风暴,洪水,野火,总计");
   timelineData.forEach((item) => {
@@ -119,7 +122,7 @@ export const exportAnalyticsToCSV = (
   });
   sections.push("");
 
-  // Source Distribution
+  // 数据源分布
   sections.push("数据来源");
   sections.push("来源,数量");
   sourceData.forEach((item) => {
@@ -128,7 +131,7 @@ export const exportAnalyticsToCSV = (
 
   const csvContent = sections.join("\n");
 
-  // Create blob and download
+  // 创建 Blob 并下载
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
@@ -142,7 +145,7 @@ export const exportAnalyticsToCSV = (
 };
 
 /**
- * Export data as JSON
+ * 将数据导出为 JSON
  */
 export const exportToJSON = (data: unknown, filename: string = "数据.json"): void => {
   const jsonContent = JSON.stringify(data, null, 2);

@@ -1,3 +1,4 @@
+/** 验证分析服务各领域响应契约的解析和失败语义。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsContractError } from "../src/services/analytics/contracts/common";

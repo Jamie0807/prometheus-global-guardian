@@ -1,3 +1,4 @@
+/** 实施 BFF 请求体、查询参数、路由白名单和上游请求的安全边界。 */
 import type { RequestHandler } from "express";
 import { Readable } from "node:stream";
 import getRawBody from "raw-body";

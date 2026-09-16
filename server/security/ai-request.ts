@@ -1,3 +1,4 @@
+/** 校验 AI 聊天请求的结构、字段类型和内容长度边界。 */
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CONTENT_LENGTH = 8_000;
 const MAX_CONTEXT_RECENT_ITEMS = 50;

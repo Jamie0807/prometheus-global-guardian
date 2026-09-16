@@ -1,3 +1,6 @@
+/**
+ * 提供应用设置弹窗组件。
+ */
 import React from "react";
 import { useMapState } from "../features/map/state/MapStateContext";
 import { useUIState } from "../state/UIStateContext";

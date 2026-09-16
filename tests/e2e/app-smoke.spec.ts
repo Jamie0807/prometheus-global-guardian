@@ -1,3 +1,4 @@
+/** 验证监控仪表盘及 AI 助手的端到端基础可用性。 */
 import { expect, test } from "@playwright/test";
 
 test("loads the monitoring dashboard and opens the AI assistant", async ({ page }) => {

@@ -1,3 +1,4 @@
+/** 验证灾害地图弹窗对外部字段的转义和安全文本渲染。 */
 import { describe, expect, it } from "vitest";
 
 import type { Hazard } from "../../src/types";

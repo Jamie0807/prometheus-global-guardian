@@ -1,3 +1,4 @@
+/** 验证数据可视化组件的图表渲染和横轴标签抽样。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";

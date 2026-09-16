@@ -1,3 +1,4 @@
+/** 验证辅助界面的中文本地化、交互和导出行为。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

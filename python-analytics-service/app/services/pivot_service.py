@@ -1,3 +1,5 @@
+"""封装四维数据透视表的服务操作。"""
+
 import logging
 import time
 from datetime import datetime

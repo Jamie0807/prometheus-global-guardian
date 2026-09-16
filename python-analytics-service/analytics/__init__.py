@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Prometheus Analytics Package
-数据分析算法库
+Prometheus 数据分析包。
+
+提供灾害数据处理、统计分析、预测、质量监控和风险评估能力。
 """
 
 __version__ = "1.0.0"

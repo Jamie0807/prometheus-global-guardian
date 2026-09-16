@@ -1,3 +1,6 @@
+/**
+ * 提供风险建议文本展示组件。
+ */
 import { formatRiskRecommendation } from "../../../services/analytics/analyticsPresentation";
 import type { RiskRecommendation } from "../types";
 

@@ -1,3 +1,6 @@
+/**
+ * 定义应用运行时环境与地图服务配置。
+ */
 import { createClientLogger } from "../utils/logger";
 
 const logger = createClientLogger("config");
@@ -32,9 +35,9 @@ export const config = {
     gdacs: "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH",
   },
   ui: {
-    refreshInterval: 300000, // 5 minutes
+    refreshInterval: 300000, // 5 分钟
     maxRetries: 3,
-    retryDelay: 1000, // 1 second
+    retryDelay: 1000, // 1 秒
   },
   // 外部 3D Tiles 数据源
   // 设置后优先使用外部精细建筑模型，空则回退到 fill-extrusion 模式

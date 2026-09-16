@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的透视表汇总契约与解析逻辑。
+ */
 import { AnalyticsContractError, parseFiniteNumber, parseRecord, parseString } from "./common";
 
 export interface PivotSummaryData {

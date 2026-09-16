@@ -1,3 +1,4 @@
+/** 验证分析页面及其兼容入口的加载、交互和数据展示。 */
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";

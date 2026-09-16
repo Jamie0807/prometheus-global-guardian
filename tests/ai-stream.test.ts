@@ -1,3 +1,4 @@
+/** 验证 AI 流式响应在不同 SSE 协议间的转换结果。 */
 import test from "node:test";
 import assert from "node:assert/strict";
 

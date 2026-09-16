@@ -177,7 +177,7 @@ def test_trend_analysis():
         for direction, count in direction_counts.items():
             print(f"    {direction}: {count}")
         
-        # 显示Top 5上升趋势
+        # 显示前 5 个上升趋势
         increasing_trends = trends[trends['trend_direction'] == 'increasing'].sort_values('trend_slope', ascending=False)
         if len(increasing_trends) > 0:
             print(f"\n  Top 5 上升趋势:")
@@ -207,7 +207,7 @@ def test_risk_scoring():
         print(f"  最高风险分: {risk_scores['risk_score'].max():.2f}")
         print(f"  平均风险分: {risk_scores['risk_score'].mean():.2f}")
         
-        # Top 10高风险区域
+        # 前 10 个高风险区域
         print(f"\n  Top 10 高风险区域:")
         for idx, row in risk_scores.head(10).iterrows():
             print(f"    {row['region']} - {row['type']}: {row['risk_score']:.2f} (频率={row['frequency']:.2f}, 严重性={row['severity']:.2f})")

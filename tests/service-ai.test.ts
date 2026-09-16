@@ -1,3 +1,4 @@
+/** 验证客户端 AI 服务的流式请求、事件解析和错误处理。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { streamChatMessage, type ChatMessage } from "../src/services/ai/aiAssistantService";
 

@@ -1,3 +1,4 @@
+/** 验证灾害数据源客户端的请求、契约解析和元数据处理。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { requestJsonMock } = vi.hoisted(() => ({ requestJsonMock: vi.fn() }));

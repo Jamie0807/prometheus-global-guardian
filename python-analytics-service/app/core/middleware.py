@@ -1,3 +1,5 @@
+"""为 HTTP 请求附加可追踪的请求标识。"""
+
 import uuid
 
 from fastapi import Request, Response

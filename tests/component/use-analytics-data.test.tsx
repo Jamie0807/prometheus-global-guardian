@@ -1,3 +1,4 @@
+/** 验证分析数据 Hook 的加载、错误处理和并发请求控制。 */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsHazard } from "../../src/features/analytics/types";

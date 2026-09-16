@@ -1,3 +1,6 @@
+/**
+ * 定义分析页面的共享样式常量。
+ */
 import type { CSSProperties } from "react";
 
 export const STYLES = {

@@ -1,3 +1,6 @@
+/**
+ * 定义服务请求错误类型及其分类逻辑。
+ */
 export type ServiceErrorCode = "network" | "timeout" | "http" | "invalid_json" | "invalid_response";
 
 export interface ServiceErrorOptions {

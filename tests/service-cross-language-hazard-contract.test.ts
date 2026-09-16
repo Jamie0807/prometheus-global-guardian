@@ -1,3 +1,4 @@
+/** 验证前端与分析服务共享的灾害输入契约保持兼容。 */
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";

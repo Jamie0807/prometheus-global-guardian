@@ -1,3 +1,6 @@
+/**
+ * 提供 AI 聊天会话的状态管理与流式交互 Hook。
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   streamChatMessage,

@@ -1,3 +1,4 @@
+/** 在工作流、Responses 和聊天补全 SSE 格式之间转换 AI 流式响应。 */
 import { Transform } from "stream";
 
 interface WorkflowStreamState {
@@ -50,7 +51,7 @@ export function convertResponsesSSEToChatCompletionsSSE(sseText: string): string
         );
       }
     } catch {
-      // Ignore malformed provider chunks; the next chunk may still be valid SSE.
+      // 忽略格式错误的提供商分块；下一分块仍可能是有效的 SSE。
     }
   }
 
@@ -137,7 +138,7 @@ export function convertWorkflowSSEToChatCompletionsSSE(
         output += "data: [DONE]\n\n";
       }
     } catch {
-      // Ignore malformed provider chunks; the next chunk may still be valid SSE.
+      // 忽略格式错误的提供商分块；下一分块仍可能是有效的 SSE。
     }
   }
 

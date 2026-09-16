@@ -1,3 +1,6 @@
+/**
+ * 定义应用共享的领域数据类型。
+ */
 export interface Hazard {
   id: string;
   title: string;

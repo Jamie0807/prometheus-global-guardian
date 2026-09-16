@@ -1,3 +1,6 @@
+/**
+ * 提供应用通知中心组件。
+ */
 import React, { useState, useEffect } from "react";
 import { notificationManager } from "../utils/notifications";
 import type { NotificationItem } from "../utils/notifications";

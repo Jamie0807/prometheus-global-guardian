@@ -1,3 +1,6 @@
+/**
+ * 提供应用顶部导航栏组件。
+ */
 import React from "react";
 import NotificationCenter from "./NotificationCenter";
 import { useUIState } from "../state/UIStateContext";

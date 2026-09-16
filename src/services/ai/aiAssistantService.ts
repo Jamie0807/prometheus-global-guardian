@@ -1,5 +1,5 @@
 /**
- * AI Disaster Analysis Assistant streaming client.
+ * AI 灾害分析助手的流式客户端。
  *
  * 将聊天消息和灾害上下文发送至 `/api/ai/chat`，并消费文本 SSE 分块。
  * 仅在特定的服务端配置错误时返回演示回复。
@@ -165,7 +165,7 @@ export async function streamChatMessage(
         const parsed: unknown = JSON.parse(text);
         if (isRecord(parsed) && typeof parsed.code === "string") code = parsed.code;
       } catch {
-        // Non-JSON error bodies must not be exposed to the caller.
+        // 不得将非 JSON 错误响应体暴露给调用方。
       }
 
       if (options.signal?.aborted) return { kind: "cancelled" };
@@ -192,7 +192,7 @@ export async function streamChatMessage(
   }
 }
 
-// ─── Demo 演示模式（特定服务端配置错误时的降级响应）──────────────────────────
+// ─── 演示模式（特定服务端配置错误时的降级响应）──────────────────────────────
 
 const DEMO_RESPONSES: Array<{
   keywords: string[];

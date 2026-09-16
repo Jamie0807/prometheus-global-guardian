@@ -1,3 +1,6 @@
+/**
+ * 提供灾害数据到 GeoJSON 要素的转换工具。
+ */
 import type { Hazard } from "../../../types";
 import { HAZARD_COLORS, defaultColor } from "../../../config/hazardColors";
 

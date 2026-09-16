@@ -1,3 +1,6 @@
+/**
+ * 定义地图数据源与图层标识符常量。
+ */
 export const MAP_SOURCE_IDS = {
   lod: "hazards-lod",
   heatmap: "hazards-heat",

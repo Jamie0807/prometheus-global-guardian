@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的统一数据模型契约与解析逻辑。
+ */
 import {
   AnalyticsContractError,
   parseFiniteNumber,

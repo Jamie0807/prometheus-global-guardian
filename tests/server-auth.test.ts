@@ -1,3 +1,4 @@
+/** 验证 BFF 认证、灾害代理、缓存回退和请求安全边界。 */
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";

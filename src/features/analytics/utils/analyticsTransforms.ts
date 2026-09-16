@@ -1,3 +1,6 @@
+/**
+ * 提供分析数据聚合与转换工具。
+ */
 import { getHazardIntensity } from "../../../utils/hazardMetrics";
 import type { AnalyticsHazard } from "../types";
 

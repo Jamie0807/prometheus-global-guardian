@@ -1,3 +1,4 @@
+/** 验证地图状态上下文对灾害数据、刷新和通知的管理。 */
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

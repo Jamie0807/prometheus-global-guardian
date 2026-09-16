@@ -1,3 +1,6 @@
+/**
+ * 定义错误边界的展示模型与转换工具。
+ */
 export interface ErrorBoundaryDisplay {
   message: string;
   details: string | null;

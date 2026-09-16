@@ -1,3 +1,6 @@
+/**
+ * 提供灾害标记弹窗 HTML 内容生成工具。
+ */
 import type { Hazard } from "../../../types";
 
 function appendTextRow(container: HTMLElement, label: string, value: string): void {

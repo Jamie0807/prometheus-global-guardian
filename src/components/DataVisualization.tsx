@@ -1,3 +1,6 @@
+/**
+ * 提供通用数据可视化与指标展示组件。
+ */
 import React from "react";
 import { getXAxisLabelIndexes } from "../utils/chartLabels";
 

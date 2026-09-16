@@ -1,3 +1,6 @@
+/**
+ * 提供图表自定义提示框组件。
+ */
 import React from "react";
 import type { TooltipPayloadEntry } from "recharts";
 

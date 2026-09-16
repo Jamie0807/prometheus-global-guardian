@@ -1,5 +1,5 @@
 /**
- * Python Analytics Service API Client
+ * Python 分析服务 API 客户端
  * 与 FastAPI 后端通信的客户端
  *
  * 客户端能力：
@@ -524,7 +524,7 @@ function toCoordinates(value: unknown, path: string): HazardData["coordinates"] 
     throw new AnalyticsContractError(path);
   }
 
-  // GeoJSON Position may contain a third altitude or depth value; Analytics uses longitude/latitude.
+  // GeoJSON Position 可能包含第三个海拔或深度值；分析服务只使用经度和纬度。
   const [longitude, latitude] = value;
   if (
     typeof longitude !== "number" ||

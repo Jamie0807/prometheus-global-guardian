@@ -1,3 +1,4 @@
+/** 验证 BFF 请求边界的路由白名单、限流和超时保护。 */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PassThrough } from "node:stream";

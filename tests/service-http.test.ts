@@ -1,3 +1,4 @@
+/** 验证 HTTP 服务客户端的 JSON、文本和流式请求处理。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { requestJson, requestStream, requestText } from "../src/services/http/httpClient";

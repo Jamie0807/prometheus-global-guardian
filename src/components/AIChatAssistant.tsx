@@ -23,7 +23,7 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
   const renderMarkdown = (text: string) => {
     const lines = text.split("\n");
     return lines.map((line, i) => {
-      // 标题 **text**
+      // 标题 **文本**
       const boldLine = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
       if (line.startsWith("### "))

@@ -1,3 +1,5 @@
+"""定义综合分析、统计、预测、ETL 与风险评估路由。"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request

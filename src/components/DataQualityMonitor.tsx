@@ -1,3 +1,6 @@
+/**
+ * 提供数据质量监控展示组件。
+ */
 import React, { useCallback, useEffect, useState } from "react";
 import { assessDataQuality, getQualityThresholds } from "../services/analytics/analyticsService";
 import {

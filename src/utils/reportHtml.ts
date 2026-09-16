@@ -1,3 +1,6 @@
+/**
+ * 提供报告 HTML 内容生成工具。
+ */
 import type { SaveReportPayload } from "../types";
 
 export type HtmlReportPayload = SaveReportPayload & { timestamp: string };

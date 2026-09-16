@@ -1,3 +1,6 @@
+/**
+ * 提供地图状态上下文与访问 Hook。
+ */
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { PropsWithChildren } from "react";
 
@@ -49,7 +52,7 @@ export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Ele
   return <MapStateContext.Provider value={value}>{children}</MapStateContext.Provider>;
 }
 
-// The hook and provider intentionally share the map-state module as one public API.
+// Hook 与 Provider 有意共用地图状态模块，作为同一个公开 API。
 // eslint-disable-next-line react-refresh/only-export-components
 export function useMapState(): MapStateValue {
   const value = useContext(MapStateContext);

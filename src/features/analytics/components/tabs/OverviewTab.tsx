@@ -1,3 +1,6 @@
+/**
+ * 提供分析概览标签页内容组件。
+ */
 import { toOverviewStatistics } from "../../utils/analyticsViewModels";
 import { formatAnalyticsNumber } from "../../../../services/analytics/analyticsPresentation";
 import { LineChart } from "../../../../components/DataVisualization";

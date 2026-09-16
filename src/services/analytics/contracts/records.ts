@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的原始记录契约与解析逻辑。
+ */
 import { AnalyticsContractError, parseRecord } from "./common";
 
 export type AnalyticsJsonValue = string | number | boolean | null;

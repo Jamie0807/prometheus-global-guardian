@@ -1,3 +1,5 @@
+"""配置 FastAPI 应用所需的服务状态。"""
+
 from fastapi import FastAPI
 
 from app.services.analytics_service import AnalyticsService

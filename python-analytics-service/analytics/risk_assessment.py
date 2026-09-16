@@ -216,7 +216,7 @@ class RiskAssessor:
         }
     
     def _generate_recommendation_details(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
-        """Generate recommendations with stable rule metadata for the UI."""
+        """生成包含稳定规则元数据、供 UI 使用的建议。"""
         recommendations: List[Dict[str, Any]] = []
         overall_risk = self._calculate_overall_risk(df)
         if overall_risk['score'] >= 80:

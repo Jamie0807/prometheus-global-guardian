@@ -1,3 +1,6 @@
+/**
+ * 定义分析功能使用的视图状态与数据类型。
+ */
 import type { Hazard as AppHazard } from "../../types";
 import type { AnalyticsSuccess } from "../../services/analytics/contracts/common";
 import type { PredictionsData } from "../../services/analytics/contracts/predictions";

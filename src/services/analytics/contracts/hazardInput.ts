@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的灾害输入契约。
+ */
 import type { HazardData } from "../analyticsTypes";
 import { AnalyticsContractError, parseFiniteNumber, parseRecord } from "./common";
 

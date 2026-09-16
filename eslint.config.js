@@ -1,3 +1,6 @@
+/**
+ * 定义项目的 ESLint 规则与忽略范围。
+ */
 import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";

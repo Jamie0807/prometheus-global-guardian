@@ -1,3 +1,6 @@
+/**
+ * 提供分析数据加载、刷新与自动分析 Hook。
+ */
 import { useEffect, useState } from "react";
 import {
   analyze4DTrends,

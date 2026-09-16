@@ -1,3 +1,6 @@
+/**
+ * 提供灾害强度与严重度计算工具。
+ */
 interface HazardIntensityInput {
   magnitude?: unknown;
   geometry?: {

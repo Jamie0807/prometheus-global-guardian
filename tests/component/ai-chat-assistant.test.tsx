@@ -1,3 +1,4 @@
+/** 验证 AI 聊天助手的流式交互、状态展示和错误处理。 */
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

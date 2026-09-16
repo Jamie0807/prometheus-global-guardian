@@ -1,3 +1,5 @@
+"""定义数据分析 API 的响应模式。"""
+
 from typing import Any
 
 from pydantic import BaseModel

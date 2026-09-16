@@ -1,3 +1,6 @@
+/**
+ * 提供分析页面头部组件。
+ */
 import type { ServiceStatus } from "../types";
 
 interface AnalyticsHeaderProps {

@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的 ETL 数据契约与解析逻辑。
+ */
 import { AnalyticsContractError, parseFiniteNumber, parseRecord } from "./common";
 import { parseQualityReport, type QualityReportData } from "./quality";
 import { parseAnalyticsJsonTreeRecords, type AnalyticsJsonTreeRecord } from "./records";

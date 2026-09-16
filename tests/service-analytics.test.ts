@@ -1,3 +1,4 @@
+/** 验证客户端分析服务的请求组装、响应处理和错误传播。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {

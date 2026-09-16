@@ -1,3 +1,6 @@
+/**
+ * 提供服务与灾害状态面板组件。
+ */
 import React from "react";
 import DISPLAYED_TYPES from "../config/displayedTypes";
 import { useMapState } from "../features/map/state/MapStateContext";

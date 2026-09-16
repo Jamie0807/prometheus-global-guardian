@@ -1,3 +1,5 @@
+"""验证 FastAPI 应用工厂及兼容入口。"""
+
 import sys
 import unittest
 from pathlib import Path

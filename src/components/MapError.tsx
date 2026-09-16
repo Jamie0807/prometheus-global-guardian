@@ -1,3 +1,6 @@
+/**
+ * 提供地图错误提示组件。
+ */
 import React from "react";
 
 interface MapErrorProps {

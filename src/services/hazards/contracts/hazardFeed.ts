@@ -1,3 +1,6 @@
+/**
+ * 定义灾害数据源响应契约与解析逻辑。
+ */
 import type {
   Hazard,
   HazardFeedResponse,

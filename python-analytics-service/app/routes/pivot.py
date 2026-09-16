@@ -1,3 +1,5 @@
+"""定义四维数据透视表分析路由。"""
+
 import logging
 from typing import Annotated, Callable
 

@@ -1,3 +1,5 @@
+"""验证分析结果的语义、边界和序列化行为。"""
+
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone

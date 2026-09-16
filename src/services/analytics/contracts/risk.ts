@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的风险评估契约与解析逻辑。
+ */
 import {
   AnalyticsContractError,
   parseFiniteNumber,

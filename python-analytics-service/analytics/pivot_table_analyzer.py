@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-4维数据透视表分析引擎
-Four-Dimensional Pivot Table Analyzer
+四维数据透视表分析引擎。
 
 实现时间、地理、类型和严重性维度的透视表、切片、趋势和风险计算。
 """
@@ -23,8 +22,8 @@ class FourDimensionalPivotTable:
     维度说明：
     - 时间维度：year/quarter/month/week/day/hour/date_only/year_month
     - 地理维度：region/continent/lat_bin/lng_bin/geo_grid
-    - 类型维度：hazard type (EARTHQUAKE, VOLCANO, etc.)
-    - 严重性维度：severity level (WARNING/WATCH/ADVISORY)
+    - 类型维度：灾害类型（EARTHQUAKE、VOLCANO 等）
+    - 严重性维度：严重性级别（WARNING/WATCH/ADVISORY）
     
     核心功能：
     - 多维度透视表构建
@@ -37,7 +36,7 @@ class FourDimensionalPivotTable:
     def __init__(self, df: pd.DataFrame):
         """初始化，预处理数据
         
-        Args:
+        参数：
             df: 原始数据DataFrame，需包含基础字段
         """
         self.df = df.copy()
@@ -134,7 +133,7 @@ class FourDimensionalPivotTable:
             return 'Other'
     
     def _classify_continent(self, row) -> str:
-        """按预设经纬度范围分类，未匹配记录归为 Antarctica。"""
+        """按预设经纬度范围分类，未匹配记录归为南极洲。"""
         lat, lng = row.get('lat', 0), row.get('lng', 0)
         
         if -10 <= lat <= 80 and 25 <= lng <= 180:
@@ -161,7 +160,7 @@ class FourDimensionalPivotTable:
                         values_col: str = 'id') -> pd.DataFrame:
         """构建4维数据透视表
         
-        Args:
+        参数：
             time_dim: 时间维度 (year/quarter/month/week/day/hour/date_only/year_month)
             geo_dim: 地理维度 (region/continent/lat_bin/lng_bin/geo_grid)
             type_dim: 类型维度 (type_category)
@@ -169,7 +168,7 @@ class FourDimensionalPivotTable:
             aggfunc: 聚合函数 (count/sum/mean/max/min)
             values_col: 聚合的值列
         
-        Returns:
+        返回：
             4维透视表 (MultiIndex DataFrame)
         """
         try:
@@ -231,16 +230,16 @@ class FourDimensionalPivotTable:
                                  severities: Optional[List[str]] = None) -> pd.DataFrame:
         """多维度联合查询
         
-        Args:
+        参数：
             time_range: 时间范围 (start_date, end_date)
             regions: 地理区域列表
             types: 灾害类型列表
             severities: 严重性级别列表
         
-        Returns:
+        返回：
             过滤后的DataFrame
         
-        Example:
+        示例：
             查询"过去7天，亚太地区，地震类型，WARNING级别"的数据
             result = analyzer.multi_dimensional_query(
                 time_range=(datetime.now() - timedelta(days=7), datetime.now()),
@@ -279,10 +278,10 @@ class FourDimensionalPivotTable:
     def trend_analysis_4d(self, time_window: int = 7) -> pd.DataFrame:
         """4维趋势分析：时间×地理×类型×严重性的趋势变化
         
-        Args:
+        参数：
             time_window: 时间窗口（天数）
         
-        Returns:
+        返回：
             趋势分析结果DataFrame
         """
         results = {}
@@ -342,10 +341,10 @@ class FourDimensionalPivotTable:
     def risk_score_4d(self, time_window: int = 7) -> pd.DataFrame:
         """按时间窗口、地理网格、类型和严重性计算风险分数。
         
-        Args:
+        参数：
             time_window: 时间窗口（天数）
         
-        Returns:
+        返回：
             风险评分结果DataFrame，按risk_score降序排列
         """
         # 获取最近N天数据
@@ -397,7 +396,7 @@ class FourDimensionalPivotTable:
     def get_summary_statistics(self) -> Dict[str, Any]:
         """获取4维数据的汇总统计
         
-        Returns:
+        返回：
             包含各维度统计信息的字典
         """
         summary = {
@@ -426,10 +425,10 @@ class FourDimensionalPivotTable:
     def export_pivot_to_dict(self, pivot_table: pd.DataFrame) -> Dict[str, Any]:
         """将透视表转换为可JSON序列化的字典
         
-        Args:
+        参数：
             pivot_table: Pandas透视表
         
-        Returns:
+        返回：
             字典格式的透视表数据
         """
         try:
@@ -464,10 +463,10 @@ class FourDimensionalPivotTable:
 def create_pivot_analyzer(data: Union[pd.DataFrame, List[Dict]]) -> FourDimensionalPivotTable:
     """创建4维透视表分析器的便捷函数
     
-    Args:
+    参数：
         data: DataFrame或字典列表
     
-    Returns:
+    返回：
         FourDimensionalPivotTable实例
     """
     if isinstance(data, list):

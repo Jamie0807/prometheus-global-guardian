@@ -1,3 +1,4 @@
+/** 验证数据质量监控组件的指标展示、阈值处理和错误状态。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

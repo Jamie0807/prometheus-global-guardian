@@ -1,3 +1,5 @@
+"""验证数据分析 API 的请求契约和参数边界。"""
+
 import sys
 import unittest
 from pathlib import Path

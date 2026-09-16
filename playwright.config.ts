@@ -1,3 +1,6 @@
+/**
+ * 定义端到端 Playwright 测试配置。
+ */
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({

@@ -1,3 +1,6 @@
+/**
+ * 定义应用日志级别与日志记录器创建逻辑。
+ */
 export const LOG_LEVELS = ["debug", "info", "warn", "error", "silent"] as const;
 
 export type LogLevel = (typeof LOG_LEVELS)[number];

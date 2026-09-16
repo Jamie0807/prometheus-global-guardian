@@ -1,10 +1,11 @@
-const DEFAULT_ARK_API_URL = 'https://ark.cn-beijing.volces.com/api/plan/v3';
+/** 解析 AI 提供商配置，并构造不同协议的请求与灾害上下文提示。 */
+const DEFAULT_ARK_API_URL = "https://ark.cn-beijing.volces.com/api/plan/v3";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
-export type ProviderName = 'workflow' | 'volcengine';
-export type AIProviderMode = 'router' | 'workflow' | 'ark';
-type ProviderProtocol = 'workflow' | 'responses' | 'chat_completions';
-type ProviderConfigReason = '' | 'missing_workflow_url' | 'missing_key' | 'missing_model';
+export type ProviderName = "workflow" | "volcengine";
+export type AIProviderMode = "router" | "workflow" | "ark";
+type ProviderProtocol = "workflow" | "responses" | "chat_completions";
+type ProviderConfigReason = "" | "missing_workflow_url" | "missing_key" | "missing_model";
 
 export interface HazardSummary {
   title?: string;
@@ -21,7 +22,7 @@ export interface DisasterContext {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -51,7 +52,7 @@ interface ChatCompletionPayload {
   stream: true;
   temperature: number;
   max_tokens: number;
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
 }
 
 interface ResponsesPayload {
@@ -74,112 +75,108 @@ interface WorkflowPayload {
 }
 
 export type AIProviderRequest =
-  | { apiUrl: string; protocol: 'workflow'; headers?: Record<string, string>; payload: WorkflowPayload & { stream: true } }
-  | { apiUrl: string; protocol: 'responses'; headers?: Record<string, string>; payload: ResponsesPayload }
-  | { apiUrl: string; protocol: 'chat_completions'; headers?: Record<string, string>; payload: ChatCompletionPayload };
+  | {
+      apiUrl: string;
+      protocol: "workflow";
+      headers?: Record<string, string>;
+      payload: WorkflowPayload & { stream: true };
+    }
+  | {
+      apiUrl: string;
+      protocol: "responses";
+      headers?: Record<string, string>;
+      payload: ResponsesPayload;
+    }
+  | {
+      apiUrl: string;
+      protocol: "chat_completions";
+      headers?: Record<string, string>;
+      payload: ChatCompletionPayload;
+    };
 
 const firstValue = (...values: unknown[]): string =>
   (() => {
-    const value = values.find(candidate =>
-      typeof candidate === 'string' && candidate.trim().length > 0,
+    const value = values.find(
+      (candidate) => typeof candidate === "string" && candidate.trim().length > 0,
     );
-    return typeof value === 'string' ? value.trim() : '';
+    return typeof value === "string" ? value.trim() : "";
   })();
 
 export function resolveAIProviderMode(env: ServerEnvironment = process.env): AIProviderMode {
   const configuredProvider = firstValue(env.AI_PROVIDER, env.VOLCENGINE_AI_PROVIDER).toLowerCase();
 
-  if (configuredProvider === 'workflow') return 'workflow';
-  if (configuredProvider === 'ark' || configuredProvider === 'volcengine') return 'ark';
-  return 'router';
+  if (configuredProvider === "workflow") return "workflow";
+  if (configuredProvider === "ark" || configuredProvider === "volcengine") return "ark";
+  return "router";
 }
 
 export function resolveServerAIProviderConfig(
   env: ServerEnvironment = process.env,
   requestedProvider?: ProviderName,
 ): ServerAIProviderConfig {
-  const providerName: ProviderName = requestedProvider ?? (
-    resolveAIProviderMode(env) === 'workflow' ? 'workflow' : 'volcengine'
-  );
+  const providerName: ProviderName =
+    requestedProvider ?? (resolveAIProviderMode(env) === "workflow" ? "workflow" : "volcengine");
 
-  if (providerName === 'workflow') {
-    const apiUrl = firstValue(
-      env.VOLCENGINE_WORKFLOW_API_URL,
-      env.AI_WORKFLOW_API_URL,
-    );
+  if (providerName === "workflow") {
+    const apiUrl = firstValue(env.VOLCENGINE_WORKFLOW_API_URL, env.AI_WORKFLOW_API_URL);
 
     if (!apiUrl) {
       return {
         configured: false,
-        reason: 'missing_workflow_url',
-        providerName: 'workflow',
-        apiKey: '',
-        apiUrl: '',
-        model: '',
+        reason: "missing_workflow_url",
+        providerName: "workflow",
+        apiKey: "",
+        apiUrl: "",
+        model: "",
         requestTimeoutMs: resolveAIRequestTimeoutMs(env),
       };
     }
 
     return {
       configured: true,
-      reason: '',
-      providerName: 'workflow',
-      apiKey: firstValue(
-        env.VOLCENGINE_WORKFLOW_API_KEY,
-        env.AI_WORKFLOW_API_KEY,
-      ),
+      reason: "",
+      providerName: "workflow",
+      apiKey: firstValue(env.VOLCENGINE_WORKFLOW_API_KEY, env.AI_WORKFLOW_API_KEY),
       apiUrl,
-      model: '',
+      model: "",
       requestTimeoutMs: resolveAIRequestTimeoutMs(env),
     };
   }
 
-  const apiKey = firstValue(
-    env.VOLCENGINE_ARK_API_KEY,
-    env.ARK_API_KEY,
-  );
+  const apiKey = firstValue(env.VOLCENGINE_ARK_API_KEY, env.ARK_API_KEY);
 
   if (!apiKey) {
     return {
       configured: false,
-      reason: 'missing_key',
-      providerName: 'volcengine',
-      apiKey: '',
-      apiUrl: '',
-      model: '',
+      reason: "missing_key",
+      providerName: "volcengine",
+      apiKey: "",
+      apiUrl: "",
+      model: "",
       requestTimeoutMs: resolveAIRequestTimeoutMs(env),
     };
   }
 
-  const model = firstValue(
-    env.VOLCENGINE_ARK_MODEL,
-    env.ARK_MODEL,
-  );
+  const model = firstValue(env.VOLCENGINE_ARK_MODEL, env.ARK_MODEL);
 
   if (!model) {
     return {
       configured: false,
-      reason: 'missing_model',
-      providerName: 'volcengine',
+      reason: "missing_model",
+      providerName: "volcengine",
       apiKey,
-      apiUrl: firstValue(
-        env.VOLCENGINE_ARK_API_URL,
-        env.ARK_API_URL,
-      ) || DEFAULT_ARK_API_URL,
-      model: '',
+      apiUrl: firstValue(env.VOLCENGINE_ARK_API_URL, env.ARK_API_URL) || DEFAULT_ARK_API_URL,
+      model: "",
       requestTimeoutMs: resolveAIRequestTimeoutMs(env),
     };
   }
 
   return {
     configured: true,
-    reason: '',
-    providerName: 'volcengine',
+    reason: "",
+    providerName: "volcengine",
     apiKey,
-    apiUrl: firstValue(
-      env.VOLCENGINE_ARK_API_URL,
-      env.ARK_API_URL,
-    ) || DEFAULT_ARK_API_URL,
+    apiUrl: firstValue(env.VOLCENGINE_ARK_API_URL, env.ARK_API_URL) || DEFAULT_ARK_API_URL,
     model,
     requestTimeoutMs: resolveAIRequestTimeoutMs(env),
   };
@@ -187,44 +184,41 @@ export function resolveServerAIProviderConfig(
 
 export function normalizeAIProviderApiUrl(apiUrl = DEFAULT_ARK_API_URL): {
   apiUrl: string;
-  protocol: Exclude<ProviderProtocol, 'workflow'>;
+  protocol: Exclude<ProviderProtocol, "workflow">;
 } {
   const trimmedUrl = firstValue(apiUrl) || DEFAULT_ARK_API_URL;
-  const normalizedUrl = trimmedUrl.replace(/\/+$/, '');
+  const normalizedUrl = trimmedUrl.replace(/\/+$/, "");
   const lowerUrl = normalizedUrl.toLowerCase();
 
-  if (lowerUrl.endsWith('/responses')) {
+  if (lowerUrl.endsWith("/responses")) {
     return {
       apiUrl: normalizedUrl,
-      protocol: 'responses',
+      protocol: "responses",
     };
   }
 
-  if (lowerUrl.endsWith('/chat/completions')) {
+  if (lowerUrl.endsWith("/chat/completions")) {
     return {
       apiUrl: normalizedUrl,
-      protocol: 'chat_completions',
+      protocol: "chat_completions",
     };
   }
 
-  if (lowerUrl.includes('/api/plan/v3')) {
+  if (lowerUrl.includes("/api/plan/v3")) {
     return {
       apiUrl: `${normalizedUrl}/responses`,
-      protocol: 'responses',
+      protocol: "responses",
     };
   }
 
   return {
     apiUrl: normalizedUrl,
-    protocol: 'chat_completions',
+    protocol: "chat_completions",
   };
 }
 
 export function resolveAIRequestTimeoutMs(env: ServerEnvironment = process.env): number {
-  const rawValue = firstValue(
-    env.VOLCENGINE_ARK_TIMEOUT_MS,
-    env.ARK_TIMEOUT_MS,
-  );
+  const rawValue = firstValue(env.VOLCENGINE_ARK_TIMEOUT_MS, env.ARK_TIMEOUT_MS);
   const parsed = Number(rawValue);
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -252,26 +246,26 @@ export function buildDisasterSystemPrompt(ctx?: DisasterContext | null): string 
       .sort(([, a], [, b]) => Number(b) - Number(a))
       .slice(0, 6)
       .map(([type, count]) => `${type}(${count})`)
-      .join('、');
+      .join("、");
 
     const recentStr = Array.isArray(ctx.recent)
       ? ctx.recent
           .slice(0, 4)
           .map((hazard) => {
-            const severity = hazard.severity ? ` ${hazard.severity}` : '';
-            const magnitude = hazard.magnitude ? ` M${hazard.magnitude}` : '';
+            const severity = hazard.severity ? ` ${hazard.severity}` : "";
+            const magnitude = hazard.magnitude ? ` M${hazard.magnitude}` : "";
             return `「${hazard.title}」${hazard.type}${severity}${magnitude}`;
           })
-          .join('；')
-      : '';
+          .join("；")
+      : "";
 
     prompt += `
 
 ---
-📡 **平台实时数据上下文（${new Date().toLocaleString('zh-CN')}）**
+📡 **平台实时数据上下文（${new Date().toLocaleString("zh-CN")}）**
 - 活跃监控事件总数：**${ctx.total} 条**
 - 灾害类型分布：${topTypes}
-- 近期代表事件：${recentStr || '暂无'}
+- 近期代表事件：${recentStr || "暂无"}
 
 请在分析时优先结合以上实时数据，提供具有针对性的研判。`;
   }
@@ -283,11 +277,11 @@ const normalizeMessages = (messages: unknown): ChatMessage[] => {
   if (!Array.isArray(messages)) return [];
 
   return messages.filter((message): message is ChatMessage => {
-    if (!message || typeof message !== 'object') return false;
+    if (!message || typeof message !== "object") return false;
     const candidate = message as Record<string, unknown>;
     return (
-      (candidate.role === 'user' || candidate.role === 'assistant') &&
-      typeof candidate.content === 'string'
+      (candidate.role === "user" || candidate.role === "assistant") &&
+      typeof candidate.content === "string"
     );
   });
 };
@@ -304,12 +298,12 @@ export function buildChatCompletionPayload({
   const safeMessages = normalizeMessages(messages);
 
   return {
-    model: model ?? '',
+    model: model ?? "",
     stream: true,
     temperature: 0.7,
     max_tokens: 1500,
     messages: [
-      { role: 'system', content: buildDisasterSystemPrompt(disasterContext) },
+      { role: "system", content: buildDisasterSystemPrompt(disasterContext) },
       ...safeMessages,
     ],
   };
@@ -327,7 +321,7 @@ export function buildResponsesPayload({
   const safeMessages = normalizeMessages(messages);
 
   return {
-    model: model ?? '',
+    model: model ?? "",
     stream: true,
     temperature: 0.7,
     max_output_tokens: 1500,
@@ -348,19 +342,20 @@ export function buildWorkflowPayload({
   language?: unknown;
 }): WorkflowPayload {
   const safeMessages = normalizeMessages(messages);
-  const latestInput = [...safeMessages].reverse().find(message => message.role === 'user') ?? safeMessages.at(-1);
+  const latestInput =
+    [...safeMessages].reverse().find((message) => message.role === "user") ?? safeMessages.at(-1);
 
   return {
     inputs: {
       user_input: latestInput
-        ? `${latestInput.role === 'assistant' ? '助手' : '用户'}：${latestInput.content}`
-        : '',
+        ? `${latestInput.role === "assistant" ? "助手" : "用户"}：${latestInput.content}`
+        : "",
       hazard_context:
-        disasterContext && typeof disasterContext === 'object'
+        disasterContext && typeof disasterContext === "object"
           ? disasterContext
           : { total: 0, byType: {}, recent: [] },
-      location: typeof location === 'string' ? location.trim() : '',
-      language: typeof language === 'string' && language.trim() ? language.trim() : 'zh',
+      location: typeof location === "string" ? location.trim() : "",
+      language: typeof language === "string" && language.trim() ? language.trim() : "zh",
     },
   };
 }
@@ -378,7 +373,7 @@ export function buildAIProviderRequest({
   location?: unknown;
   language?: unknown;
 }): AIProviderRequest {
-  if (config.providerName === 'workflow') {
+  if (config.providerName === "workflow") {
     const workflowPayload = buildWorkflowPayload({
       messages,
       disasterContext,
@@ -387,8 +382,8 @@ export function buildAIProviderRequest({
     });
 
     return {
-      apiUrl: config.apiUrl.replace(/\/+$/, ''),
-      protocol: 'workflow',
+      apiUrl: config.apiUrl.replace(/\/+$/, ""),
+      protocol: "workflow",
       payload: {
         ...workflowPayload,
         stream: true,
@@ -398,17 +393,17 @@ export function buildAIProviderRequest({
 
   const target = normalizeAIProviderApiUrl(config.apiUrl);
 
-  if (target.protocol === 'responses') {
+  if (target.protocol === "responses") {
     return {
       ...target,
-      protocol: 'responses',
+      protocol: "responses",
       payload: buildResponsesPayload({ messages, disasterContext, model: config.model }),
     };
   }
 
   return {
     ...target,
-    protocol: 'chat_completions',
+    protocol: "chat_completions",
     payload: buildChatCompletionPayload({ messages, disasterContext, model: config.model }),
   };
 }

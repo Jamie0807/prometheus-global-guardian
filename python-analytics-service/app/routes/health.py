@@ -1,3 +1,5 @@
+"""定义服务信息、健康检查和管理路由。"""
+
 from datetime import datetime
 from typing import Annotated
 

@@ -1,3 +1,6 @@
+/**
+ * 提供应用错误边界组件。
+ */
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { createClientLogger } from "../utils/logger";

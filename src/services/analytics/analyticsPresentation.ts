@@ -1,3 +1,6 @@
+/**
+ * 提供分析展示层的状态与文案转换工具。
+ */
 export type PredictionStatus = "ready" | "insufficient_data" | "model_error" | "no_result";
 export type AnalyticsLocale = "zh-CN" | "en-US";
 

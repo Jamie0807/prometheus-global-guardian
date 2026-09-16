@@ -1,1 +1,1 @@
-"""HTTP routers for the analytics service."""
+"""数据分析服务的 HTTP 路由包。"""

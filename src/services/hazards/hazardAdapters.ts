@@ -1,3 +1,6 @@
+/**
+ * 提供灾害数据适配与规范化工具。
+ */
 import type { Hazard } from "../../types";
 import {
   asRecord,

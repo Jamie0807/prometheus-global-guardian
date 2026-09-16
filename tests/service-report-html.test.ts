@@ -1,3 +1,4 @@
+/** 验证灾害报告 HTML 的内容呈现、打印结构和转义处理。 */
 import { describe, expect, it } from "vitest";
 
 import { buildReportHtml } from "../src/utils/reportHtml";

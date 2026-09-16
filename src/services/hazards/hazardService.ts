@@ -1,3 +1,6 @@
+/**
+ * 提供灾害数据获取与服务调用逻辑。
+ */
 import type { ActiveHazard, Hazard, HazardFeedResponse, HazardType } from "../../types";
 import { requestJson } from "../http/httpClient";
 import {

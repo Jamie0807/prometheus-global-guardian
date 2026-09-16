@@ -1,3 +1,6 @@
+/**
+ * 提供分析质量标签页内容组件。
+ */
 import DataQualityMonitor from "../../../../components/DataQualityMonitor";
 import type { AnalyticsHazard } from "../../types";
 

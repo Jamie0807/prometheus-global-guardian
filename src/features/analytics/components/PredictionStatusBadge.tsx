@@ -1,3 +1,6 @@
+/**
+ * 提供预测状态徽章组件。
+ */
 import { getPredictionDisplay } from "../../../services/analytics/analyticsPresentation";
 import type { PredictionModelResult } from "../../../services/analytics/contracts/predictions";
 

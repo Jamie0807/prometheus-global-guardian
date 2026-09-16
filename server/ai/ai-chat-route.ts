@@ -1,3 +1,4 @@
+/** 注册 AI 聊天接口，并协调提供商选择、流式转发和错误响应。 */
 import type { Application, Request, RequestHandler, Response } from "express";
 import fetch from "node-fetch";
 import { isValidAIRequest } from "../security/ai-request.js";

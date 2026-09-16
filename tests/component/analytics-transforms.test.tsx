@@ -1,3 +1,4 @@
+/** 验证分析数据的哈希、分类汇总和强度序列转换。 */
 import { describe, expect, it } from "vitest";
 import {
   buildAnalyticsDataHash,

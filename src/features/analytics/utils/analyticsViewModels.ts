@@ -1,7 +1,10 @@
+/**
+ * 提供分析服务数据到视图模型的转换工具。
+ */
 import type { StatisticsData } from "../../../services/analytics/contracts/statistics";
 import type { OverviewStatisticsView } from "../types";
 
-// The statistics endpoint provides descriptive data, not the combined-analysis response.
+// 统计端点提供描述性数据，而非综合分析响应。
 export function toOverviewStatistics(data: StatisticsData): OverviewStatisticsView {
   const descriptive = data.descriptiveStatistics;
   const mostCommon =

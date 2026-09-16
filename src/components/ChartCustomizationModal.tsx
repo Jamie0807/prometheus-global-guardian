@@ -1,3 +1,6 @@
+/**
+ * 提供图表样式自定义弹窗组件。
+ */
 import React, { useState, useEffect } from "react";
 
 interface ChartCustomizationModalProps {
@@ -160,7 +163,7 @@ const ChartCustomizationModal: React.FC<ChartCustomizationModalProps> = ({
         </div>
 
         <div className="customization-content">
-          {/* Color Scheme Section */}
+          {/* 配色方案区域 */}
           <div className="customization-section">
             <h4>
               <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,7 +199,7 @@ const ChartCustomizationModal: React.FC<ChartCustomizationModalProps> = ({
             </div>
           </div>
 
-          {/* Custom Colors Section */}
+          {/* 自定义颜色区域 */}
           {settings.colorScheme === "custom" && (
             <div className="customization-section">
               <h4>自定义配色</h4>
@@ -219,7 +222,7 @@ const ChartCustomizationModal: React.FC<ChartCustomizationModalProps> = ({
             </div>
           )}
 
-          {/* Chart Style Section */}
+          {/* 图表样式区域 */}
           <div className="customization-section">
             <h4>
               <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,7 +267,7 @@ const ChartCustomizationModal: React.FC<ChartCustomizationModalProps> = ({
             </div>
           </div>
 
-          {/* Display Options Section */}
+          {/* 显示选项区域 */}
           <div className="customization-section">
             <h4>
               <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +302,7 @@ const ChartCustomizationModal: React.FC<ChartCustomizationModalProps> = ({
             </div>
           </div>
 
-          {/* Font Size Section */}
+          {/* 字体大小区域 */}
           <div className="customization-section">
             <h4>
               <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">

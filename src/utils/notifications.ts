@@ -1,5 +1,5 @@
 /**
- * 通知系统
+ * 提供应用内通知管理、订阅和浏览器通知权限请求。
  */
 
 export type NotificationType = "info" | "success" | "warning" | "error";

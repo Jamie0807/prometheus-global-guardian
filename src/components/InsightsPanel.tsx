@@ -1,3 +1,6 @@
+/**
+ * 提供分析洞察展示面板组件。
+ */
 import React, { useCallback, useState, useEffect } from "react";
 import { getRiskAssessment } from "../services/analytics/analyticsService";
 import type { RiskAssessmentData } from "../services/analytics/contracts/risk";

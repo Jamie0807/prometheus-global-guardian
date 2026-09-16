@@ -1,3 +1,6 @@
+/**
+ * 定义界面中展示的灾害类型集合。
+ */
 const DISPLAYED_TYPES = [
   { type_id: "DROUGHT", type_name: "干旱" },
   { type_id: "EARTHQUAKE", type_name: "地震" },

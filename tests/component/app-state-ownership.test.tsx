@@ -1,3 +1,4 @@
+/** 验证应用状态的所有权、初始化流程和跨组件传递。 */
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

@@ -1,4 +1,4 @@
-"""Centralized, safe logging configuration for the analytics service."""
+"""数据分析服务的集中式安全日志配置。"""
 
 import logging
 import os
@@ -32,7 +32,7 @@ _SAFE_EVENT_NAME = re.compile(r"^[a-z][a-z0-9_.-]*$")
 
 
 def resolve_log_level(value: object, fallback: int) -> LogLevel:
-    """Resolve a supported log level, falling back when the value is invalid."""
+    """解析受支持的日志级别，值无效时使用回退级别。"""
     if not isinstance(value, str):
         return fallback
 
@@ -40,7 +40,7 @@ def resolve_log_level(value: object, fallback: int) -> LogLevel:
 
 
 class SensitiveDataFilter(logging.Filter):
-    """Prevent exception details and sensitive context from reaching log output."""
+    """防止异常详情和敏感上下文进入日志输出。"""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.exc_info = None
@@ -63,7 +63,7 @@ def _default_log_level() -> int:
 
 
 def configure_logging() -> LogLevel:
-    """Configure root logging from LOG_LEVEL and APP_ENV without basicConfig."""
+    """根据 LOG_LEVEL 和 APP_ENV 配置根日志，且不调用 basicConfig。"""
     level = resolve_log_level(os.getenv("LOG_LEVEL"), _default_log_level())
     root_logger = logging.getLogger()
 

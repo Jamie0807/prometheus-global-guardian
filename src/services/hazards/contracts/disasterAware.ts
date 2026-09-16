@@ -1,3 +1,6 @@
+/**
+ * 定义 DisasterAware 数据源契约与解析逻辑。
+ */
 import type { ActiveHazard, HazardType } from "../../../types";
 import { HazardContractError, parseFiniteNumber, parseRecord } from "./common";
 

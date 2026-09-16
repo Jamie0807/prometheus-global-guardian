@@ -1,3 +1,6 @@
+/**
+ * 提供图表数据钻取弹窗组件。
+ */
 import React from "react";
 import ReactDOM from "react-dom";
 import type { Hazard } from "../types";

@@ -1,3 +1,5 @@
+"""验证数据分析 API 路由的响应和错误处理。"""
+
 import os
 import sys
 import unittest

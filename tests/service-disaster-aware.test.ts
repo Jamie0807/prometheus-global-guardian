@@ -1,3 +1,4 @@
+/** 验证 DisasterAWARE 客户端的授权、请求和故障处理。 */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ActiveHazard } from "../src/types";

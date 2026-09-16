@@ -1,3 +1,6 @@
+/**
+ * 提供报告保存与导出弹窗组件。
+ */
 import React, { useState } from "react";
 import type { SaveReportPayload } from "../types";
 import { useMapState } from "../features/map/state/MapStateContext";

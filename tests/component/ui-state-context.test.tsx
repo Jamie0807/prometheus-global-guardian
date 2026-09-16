@@ -1,3 +1,4 @@
+/** 验证 UI 状态上下文和设置界面的共享状态交互。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

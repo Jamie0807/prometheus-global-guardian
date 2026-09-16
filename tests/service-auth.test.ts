@@ -1,3 +1,4 @@
+/** 验证客户端授权服务对 BFF 认证结果和访问令牌的管理。 */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requestJsonMock = vi.hoisted(() => vi.fn());

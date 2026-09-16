@@ -1,3 +1,6 @@
+/**
+ * 定义灾害数据源的通用契约与校验逻辑。
+ */
 import { ServiceError } from "../../http/serviceError";
 
 export class HazardContractError extends ServiceError {

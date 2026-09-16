@@ -1,3 +1,4 @@
+/** 提供 Express BFF 应用、灾害数据代理、认证和健康检查路由。 */
 import express, { type Application, type NextFunction, type Request, type Response } from "express";
 import fetch, { type Response as FetchResponse } from "node-fetch";
 import path from "path";
@@ -203,7 +204,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
           },
         };
       } catch {
-        // A second attempt and a cached response are handled below without exposing upstream details.
+        // 下方会在不暴露上游细节的情况下处理第二次尝试和缓存响应。
       }
     }
 

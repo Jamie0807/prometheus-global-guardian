@@ -1,3 +1,4 @@
+/** 验证分析结果的展示语义、数值格式和本地化文案。 */
 import { describe, expect, it } from "vitest";
 
 import {

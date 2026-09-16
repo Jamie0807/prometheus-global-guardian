@@ -1,3 +1,6 @@
+/**
+ * 提供分析页面的控制面板组件。
+ */
 import { type ReactNode } from "react";
 import { AlertBox, LoadingSpinner } from "../../../components/DataVisualization";
 import type {

@@ -1,3 +1,4 @@
+/** 验证地图视图的图层、控件、交互和生命周期处理。 */
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

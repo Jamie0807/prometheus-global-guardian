@@ -1,3 +1,6 @@
+/**
+ * 提供应用界面状态上下文与访问 Hook。
+ */
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { PropsWithChildren } from "react";
 
@@ -52,7 +55,7 @@ export function UIStateProvider({ children }: PropsWithChildren): React.JSX.Elem
   return <UIStateContext.Provider value={value}>{children}</UIStateContext.Provider>;
 }
 
-// The hook and provider intentionally share the UI-state module as one public API.
+// Hook 与 Provider 有意共用 UI 状态模块，作为同一个公开 API。
 // eslint-disable-next-line react-refresh/only-export-components
 export function useUIState(): UIStateValue {
   const value = useContext(UIStateContext);

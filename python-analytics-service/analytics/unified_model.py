@@ -238,7 +238,7 @@ class UnifiedHazardModel:
                 population = item.get('population', {})
                 pop_exposed = float(population.get('value', 0))
                 
-                # GDACS alert level映射到置信度
+                # 将 GDACS 警报级别映射到置信度
                 alert_levels = {'Red': 0.95, 'Orange': 0.85, 'Green': 0.70}
                 alert_level = item.get('alertlevel', 'Green')
                 confidence = alert_levels.get(alert_level, 0.75)

@@ -1,5 +1,5 @@
 /**
- * Hazard Data Worker
+ * 灾害数据 Worker
  * 在 Worker 中过滤无效坐标并按 id 去重。
  */
 

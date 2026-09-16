@@ -1,3 +1,6 @@
+/**
+ * 提供分析功能的主页面组件。
+ */
 import { useMemo, useState } from "react";
 import AnalyticsControlPanel from "./components/AnalyticsControlPanel";
 import AnalyticsHeader from "./components/AnalyticsHeader";

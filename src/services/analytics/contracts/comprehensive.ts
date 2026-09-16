@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的综合分析契约与解析逻辑。
+ */
 import type { PredictionsData } from "./predictions";
 import type { QualityReportData } from "./quality";
 import type { RiskAssessmentData } from "./risk";

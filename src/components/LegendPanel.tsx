@@ -1,3 +1,6 @@
+/**
+ * 提供地图图例面板组件。
+ */
 import React from "react";
 import { HAZARD_COLORS } from "../config/hazardColors";
 import DISPLAYED_TYPES from "../config/displayedTypes";

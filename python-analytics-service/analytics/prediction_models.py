@@ -51,7 +51,7 @@ class PredictionEngine:
         data_points: int,
         minimum_data_points: int,
     ) -> Dict[str, Any]:
-        """Return the stable metadata shared by every prediction result."""
+        """返回每个预测结果共用的稳定元数据。"""
         return {
             "type": hazard_type,
             "status": status,

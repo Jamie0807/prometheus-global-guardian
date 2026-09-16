@@ -1,3 +1,4 @@
+/** 验证分析服务通用响应契约的解析和类型约束。 */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
   AnalyticsResponse,

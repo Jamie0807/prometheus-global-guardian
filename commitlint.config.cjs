@@ -1,4 +1,7 @@
-/** @type {import('cz-git').UserConfig} */
+/**
+ * 定义 Commitlint 与 cz-git 的提交信息规范。
+ * @type {import('cz-git').UserConfig}
+ */
 module.exports = {
   extends: ["@commitlint/config-conventional"],
   prompt: {

@@ -1,3 +1,5 @@
+"""提供分析请求的统一内部错误响应。"""
+
 import logging
 from typing import NoReturn
 

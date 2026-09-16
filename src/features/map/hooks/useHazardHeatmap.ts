@@ -1,3 +1,6 @@
+/**
+ * 提供地图灾害热力图图层的管理 Hook。
+ */
 import { useCallback, useEffect, useState } from "react";
 import type { MutableRefObject } from "react";
 import type { GeoJSONSource, Map } from "mapbox-gl";
@@ -15,8 +18,8 @@ export function useHazardHeatmap(
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapRevision === 0 || map.getSource(MAP_SOURCE_IDS.heatmap)) return;
-    // Keep one GeoJSON source and heatmap layer per map style; later updates only
-    // replace feature data, which avoids rebuilding the WebGL layer on refresh.
+    // 每个地图样式保留一个 GeoJSON 数据源和热力图图层；后续更新仅替换要素数据，
+    // 避免刷新时重建 WebGL 图层。
     map.addSource(MAP_SOURCE_IDS.heatmap, {
       type: "geojson",
       data: createHeatmapFeatureCollection([]),
@@ -53,7 +56,7 @@ export function useHazardHeatmap(
   }, [mapRef, mapRevision]);
   useEffect(() => {
     const source = mapRef.current?.getSource(MAP_SOURCE_IDS.heatmap) as GeoJSONSource | undefined;
-    // setData updates the heatmap input without changing paint or layout settings.
+    // setData 会更新热力图输入，而不改变 paint 或 layout 设置。
     source?.setData(createHeatmapFeatureCollection(hazards));
   }, [hazards, mapRef, mapRevision]);
   useEffect(() => {

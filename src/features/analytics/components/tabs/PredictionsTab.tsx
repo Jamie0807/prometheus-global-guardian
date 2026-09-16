@@ -1,3 +1,6 @@
+/**
+ * 提供预测分析标签页内容组件。
+ */
 import {
   formatAnalyticsNumber,
   formatAnalyticsPercent,

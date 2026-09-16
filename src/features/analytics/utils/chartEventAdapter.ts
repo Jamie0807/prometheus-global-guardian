@@ -1,3 +1,6 @@
+/**
+ * 定义图表事件数据并提供适配工具。
+ */
 export interface ChartEventData {
   name: string;
 }

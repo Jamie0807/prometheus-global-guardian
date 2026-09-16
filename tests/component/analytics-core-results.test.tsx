@@ -1,3 +1,4 @@
+/** 验证分析核心结果组件对统计、预测和风险数据的呈现。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";

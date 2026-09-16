@@ -1,3 +1,6 @@
+/**
+ * 提供 HTTP 请求客户端及流式请求工具。
+ */
 import { ServiceError, type ServiceErrorCode } from "./serviceError";
 
 export interface HttpRequestOptions {

@@ -1,3 +1,4 @@
+/** 验证共享日志记录器的配置回退和级别过滤。 */
 import { describe, expect, it, vi } from "vitest";
 import { createLogger, resolveLogLevel } from "../shared/logging.js";
 

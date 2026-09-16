@@ -1,3 +1,6 @@
+/**
+ * 提供交互式灾害地图视图组件。
+ */
 import { useMapState } from "./state/MapStateContext";
 import { useDeck3DTiles } from "./hooks/useDeck3DTiles";
 import { useHazardHeatmap } from "./hooks/useHazardHeatmap";

@@ -1,3 +1,6 @@
+/**
+ * 提供分析摘要指标网格组件。
+ */
 import { MetricCard, ProgressBar } from "../../../components/DataVisualization";
 import type { ServiceStatus } from "../types";
 

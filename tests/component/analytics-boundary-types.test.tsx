@@ -1,3 +1,4 @@
+/** 验证分析页面在数据边界类型和契约异常下的呈现行为。 */
 import React, { type ReactNode } from "react";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";

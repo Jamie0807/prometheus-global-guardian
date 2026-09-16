@@ -1,3 +1,6 @@
+/**
+ * 提供分析页面的标签页切换组件。
+ */
 import type {
   StatisticsResponse,
   PredictionsResponse,

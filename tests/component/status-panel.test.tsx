@@ -1,3 +1,4 @@
+/** 验证状态面板的灾害概览、筛选和刷新交互。 */
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

@@ -1,3 +1,6 @@
+/**
+ * 定义灾害类型对应的地图颜色配置。
+ */
 export const HAZARD_COLORS: Record<string, string> = {
   DROUGHT: "#D2691E",
   EARTHQUAKE: "#8B4513",
@@ -12,7 +15,7 @@ export const HAZARD_COLORS: Record<string, string> = {
   TSUNAMI: "#1E90FF",
   VOLCANO: "#FF4500",
   WILDFIRE: "#FF6347",
-  WINTERSTORM: "#87CEFA"
+  WINTERSTORM: "#87CEFA",
 };
 
-export const defaultColor = "#888888"; // Default color
+export const defaultColor = "#888888"; // 默认颜色

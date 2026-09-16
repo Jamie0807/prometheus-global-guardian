@@ -1,3 +1,4 @@
+/** 验证地图灾害 GeoJSON 转换和缩放级别可见性计算。 */
 import { describe, expect, it } from "vitest";
 
 import type { Hazard } from "../src/types";

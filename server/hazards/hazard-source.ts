@@ -1,5 +1,4 @@
-// Multi-source hazard aggregation for the backend /api/hazards endpoint.
-// Sources: USGS earthquakes, NASA EONET events, and GDACS disaster alerts.
+/** 聚合 USGS、NASA EONET 和 GDACS 的灾害数据，供后端 /api/hazards 接口使用。 */
 
 import fetch, { type Response as FetchResponse } from "node-fetch";
 

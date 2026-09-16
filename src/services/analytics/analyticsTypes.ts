@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的数据类型及兼容类型。
+ */
 import type { AnalyticsSuccess } from "./contracts/common";
 
 export type { AnalyticsSuccess } from "./contracts/common";
@@ -52,7 +55,7 @@ export interface AnalysisRequest {
 
 export type AnalyticsResponse<T = unknown> = AnalyticsSuccess<T>;
 
-/** Legacy shape retained while older endpoint adapters migrate to contracts. */
+/** 在旧端点适配器迁移至数据契约期间保留的旧版数据结构。 */
 export interface LegacyAnalyticsResponse<T = unknown> {
   success?: boolean;
   data?: T;

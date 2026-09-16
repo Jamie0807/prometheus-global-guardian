@@ -1,3 +1,6 @@
+/**
+ * 定义地图图层细节级别阈值与计算工具。
+ */
 import { MAP_LOD_THRESHOLDS } from "./mapLayerIds";
 
 export interface MapLodVisibility {

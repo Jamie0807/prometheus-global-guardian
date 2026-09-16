@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for local startup and ``uvicorn main:app``."""
+"""为本地启动和 ``uvicorn main:app`` 提供兼容入口。"""
 
 from app.main import create_app
 

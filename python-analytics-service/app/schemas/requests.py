@@ -1,3 +1,5 @@
+"""定义并校验数据分析 API 的请求模式。"""
+
 import math
 from datetime import datetime
 from typing import Annotated, Any, Literal

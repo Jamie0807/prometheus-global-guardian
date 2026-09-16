@@ -1,3 +1,6 @@
+/**
+ * 提供身份认证及令牌管理服务。
+ */
 import { requestJson, requestStream } from "../http/httpClient";
 import { ServiceError } from "../http/serviceError";
 

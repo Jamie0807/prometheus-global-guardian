@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务数据契约的通用解析与校验工具。
+ */
 export class AnalyticsContractError extends Error {
   readonly code = "ANALYTICS_RESPONSE_INVALID" as const;
   readonly path: string;

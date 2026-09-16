@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的统计数据契约与解析逻辑。
+ */
 import {
   parseFiniteNumber,
   parseNumberMap,
@@ -71,7 +74,7 @@ export interface StatisticsData {
   };
   performanceMetrics: StatisticsJsonObject;
 
-  // Compatibility aliases for callers of the pre-Python-shape parser.
+  // 为使用旧版 Python 数据结构解析器的调用方保留兼容别名。
   basicStats?: DescriptiveStatistics["basicStats"];
   centralTendency?: DescriptiveStatistics["centralTendency"];
   variabilityMeasures?: DescriptiveStatistics["variabilityMeasures"];

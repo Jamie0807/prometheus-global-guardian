@@ -1,3 +1,5 @@
+"""验证分析服务日志配置的行为。"""
+
 import io
 import importlib
 import logging

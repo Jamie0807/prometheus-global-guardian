@@ -1,3 +1,6 @@
+/**
+ * 定义分析服务的预测数据契约与解析逻辑。
+ */
 import {
   AnalyticsContractError,
   parseFiniteNumber,

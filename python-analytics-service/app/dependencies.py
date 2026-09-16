@@ -1,3 +1,5 @@
+"""提供 FastAPI 路由所需的服务依赖。"""
+
 from fastapi import Request
 
 from app.services.analytics_service import AnalyticsService

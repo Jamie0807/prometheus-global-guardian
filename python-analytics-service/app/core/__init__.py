@@ -1,1 +1,1 @@
-"""Application state, middleware and HTTP boundary helpers."""
+"""应用状态、中间件和 HTTP 边界辅助功能包。"""
