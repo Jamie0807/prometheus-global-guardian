@@ -74,4 +74,30 @@ describe("cross-language analytics hazard contract", () => {
       ]),
     ).toMatchObject([{ coordinates: [-156.47, 56.191] }]);
   });
+
+  it("replaces a blank source timestamp with a valid request timestamp", () => {
+    const [formatted] = formatHazards([
+      {
+        id: "gdacs-without-timestamp",
+        timestamp: "",
+        geometry: { type: "Point", coordinates: [12.5, 41.9] },
+      },
+    ]);
+
+    expect(formatted.timestamp).not.toBe("");
+    expect(parseAnalyticsHazardData(formatted)).toEqual(formatted);
+  });
+
+  it("truncates an external title to the Python request limit", () => {
+    const [formatted] = formatHazards([
+      {
+        id: "gdacs-with-long-title",
+        title: "灾".repeat(257),
+        geometry: { type: "Point", coordinates: [12.5, 41.9] },
+      },
+    ]);
+
+    expect(formatted.title).toHaveLength(256);
+    expect(parseAnalyticsHazardData(formatted)).toEqual(formatted);
+  });
 });

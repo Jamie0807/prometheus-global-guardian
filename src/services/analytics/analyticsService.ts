@@ -492,16 +492,18 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
     const candidate = {
       id: String(hazard.id ?? properties?.id ?? `hazard-${idx}-${Date.now()}`),
       type: String(hazard.type ?? properties?.type ?? "未分类"),
-      title: String(
-        hazard.title ??
-          properties?.title ??
-          hazard.description ??
-          properties?.description ??
-          "Unknown Event",
+      title: toBoundedText(
+        hazard.title ?? properties?.title ?? hazard.description ?? properties?.description,
+        "Unknown Event",
+        256,
       ),
       coordinates: toCoordinates(hazard.geometry?.coordinates, `hazards.${idx}.coordinates`) ??
         toCoordinates(properties?.coordinates, `hazards.${idx}.properties.coordinates`) ?? [0, 0],
-      timestamp: String(hazard.timestamp ?? properties?.timestamp ?? new Date().toISOString()),
+      timestamp: toBoundedText(
+        hazard.timestamp ?? properties?.timestamp,
+        new Date().toISOString(),
+        64,
+      ),
       magnitude: toNullableNumber(
         hazard.magnitude ?? properties?.magnitude,
         `hazards.${idx}.magnitude`,
@@ -535,6 +537,11 @@ function toCoordinates(value: unknown, path: string): HazardData["coordinates"] 
     throw new AnalyticsContractError(path);
   }
   return [longitude, latitude];
+}
+
+function toBoundedText(value: unknown, fallback: string, maximum: number): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  return (text.trim() === "" ? fallback : text).slice(0, maximum);
 }
 
 function toNullableNumber(value: unknown, path: string): number | null {
