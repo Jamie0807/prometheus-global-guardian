@@ -122,7 +122,9 @@ vi.mock("../../src/services/hazards/hazardService", () => ({
 }));
 
 import MapView from "../../src/features/map/MapView";
+import Header from "../../src/components/Header";
 import { MapStateProvider, useMapState } from "../../src/features/map/state/MapStateContext";
+import { UIStateProvider } from "../../src/state/UIStateContext";
 
 function pendingHazardFeed() {
   let resolve: (value: unknown) => void = () => undefined;
@@ -154,6 +156,16 @@ function renderMapView() {
       <MapView />
       <MapStateControls />
     </MapStateProvider>,
+  );
+}
+
+function renderHeader() {
+  return render(
+    <UIStateProvider>
+      <MapStateProvider>
+        <Header />
+      </MapStateProvider>
+    </UIStateProvider>,
   );
 }
 
@@ -194,14 +206,23 @@ describe("MapView", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the map container and toggles heatmap mode", async () => {
+  it("places the heatmap toggle after settings in the header", () => {
+    renderHeader();
+
+    const settingsButton = screen.getByRole("button", { name: "打开设置弹窗" });
+    const heatmapButton = screen.getByTitle("显示热力图");
+    expect(
+      settingsButton.compareDocumentPosition(heatmapButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.click(heatmapButton);
+    expect(screen.getByTitle("显示标记")).toHaveTextContent("标记");
+  });
+
+  it("renders the map container", async () => {
     renderMapView();
 
-    const button = await screen.findByTitle("显示热力图");
-    expect(button).toHaveTextContent("热力图");
-    fireEvent.click(button);
-
-    expect(screen.getByTitle("显示标记")).toHaveTextContent("标记");
+    await waitFor(() => expect(mapMocks.addSource).toHaveBeenCalled());
   });
 
   it("passes a DOM popup node to Mapbox for external hazard text", async () => {

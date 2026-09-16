@@ -1,7 +1,7 @@
 /**
  * 提供地图灾害热力图图层的管理 Hook。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { MutableRefObject } from "react";
 import type { GeoJSONSource, Map } from "mapbox-gl";
 
@@ -13,8 +13,8 @@ export function useHazardHeatmap(
   mapRef: MutableRefObject<Map | null>,
   hazards: readonly Hazard[],
   mapRevision: number,
+  showHeatmap: boolean,
 ) {
-  const [showHeatmap, setShowHeatmap] = useState(false);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapRevision === 0 || map.getSource(MAP_SOURCE_IDS.heatmap)) return;
@@ -64,5 +64,4 @@ export function useHazardHeatmap(
     if (map?.getLayer(MAP_LAYER_IDS.heatmap))
       map.setLayoutProperty(MAP_LAYER_IDS.heatmap, "visibility", showHeatmap ? "visible" : "none");
   }, [mapRef, mapRevision, showHeatmap]);
-  return { showHeatmap, toggleHeatmap: useCallback(() => setShowHeatmap((value) => !value), []) };
 }

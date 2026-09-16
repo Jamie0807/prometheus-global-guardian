@@ -4,9 +4,11 @@
 import React from "react";
 import NotificationCenter from "./NotificationCenter";
 import { useUIState } from "../state/UIStateContext";
+import { useMapState } from "../features/map/state/MapStateContext";
 
 const Header: React.FC = () => {
-  const { openModal, openView } = useUIState();
+  const { activeView, openModal, openView } = useUIState();
+  const { showHeatmap, toggleHeatmap } = useMapState();
   return (
     <header className="header">
       <div className="header-content">
@@ -82,6 +84,17 @@ const Header: React.FC = () => {
             </svg>
             <span>设置</span>
           </button>
+
+          {activeView === "map" && (
+            <button
+              type="button"
+              className={`btn btn-secondary btn-heatmap ${showHeatmap ? "active" : ""}`}
+              title={showHeatmap ? "显示标记" : "显示热力图"}
+              onClick={toggleHeatmap}
+            >
+              <span>{showHeatmap ? "标记" : "热力图"}</span>
+            </button>
+          )}
 
           <NotificationCenter />
         </div>

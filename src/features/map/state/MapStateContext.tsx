@@ -1,7 +1,15 @@
 /**
  * 提供地图状态上下文与访问 Hook。
  */
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { PropsWithChildren } from "react";
 
 import { useHazardData } from "../hooks/useHazardData";
@@ -12,9 +20,11 @@ export type MapStateValue = {
   hazards: Hazard[];
   filter: string;
   mapStyle: string;
+  showHeatmap: boolean;
   sourceMeta: HazardFeedResponse["meta"] | null;
   setFilter(filter: string): void;
   setMapStyle(mapStyle: string): void;
+  toggleHeatmap(): void;
   refresh(): Promise<void>;
 };
 
@@ -23,6 +33,8 @@ const MapStateContext = createContext<MapStateValue | undefined>(undefined);
 export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Element {
   const [filter, setFilter] = useState("ALL");
   const [mapStyle, setMapStyle] = useState("dark-v11");
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const toggleHeatmap = useCallback(() => setShowHeatmap((value) => !value), []);
   const { disasters, refresh, sourceMeta } = useHazardData(filter);
   const previousHazardCountRef = useRef(0);
 
@@ -41,12 +53,14 @@ export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Ele
       hazards: disasters,
       filter,
       mapStyle,
+      showHeatmap,
       sourceMeta,
       setFilter,
       setMapStyle,
+      toggleHeatmap,
       refresh,
     }),
-    [disasters, filter, mapStyle, refresh, sourceMeta],
+    [disasters, filter, mapStyle, refresh, showHeatmap, sourceMeta, toggleHeatmap],
   );
 
   return <MapStateContext.Provider value={value}>{children}</MapStateContext.Provider>;
