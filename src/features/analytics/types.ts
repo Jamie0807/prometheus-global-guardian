@@ -17,6 +17,7 @@ export type AnalyticsHazard = AppHazard & {
     type?: string;
     magnitude?: number | string;
     severity?: string;
+    timestamp?: string;
     episodealertlevel?: number | string;
     alertlevel?: number | string;
     mag?: number | string;

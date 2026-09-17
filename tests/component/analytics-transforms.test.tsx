@@ -4,6 +4,8 @@ import {
   buildAnalyticsDataHash,
   buildHazardsByType,
   buildIntensitySeries,
+  buildSeverityDistribution,
+  buildTimelineData,
 } from "../../src/features/analytics/utils/analyticsTransforms";
 import type { AnalyticsHazard } from "../../src/features/analytics/types";
 
@@ -56,6 +58,47 @@ describe("analyticsTransforms", () => {
       { x: "#1", y: 4.2 },
       { x: "#3", y: 5.6 },
     ]);
+  });
+
+  it("builds timeline and severity data from top-level hazard fields", () => {
+    const hazards = [
+      createHazard({
+        timestamp: "2026-09-17T09:00:00.000Z",
+        severity: "WATCH",
+      }),
+      createHazard({
+        id: "hazard-2",
+        timestamp: "2026-09-18T09:00:00.000Z",
+        severity: "WARNING",
+      }),
+    ];
+
+    expect(buildTimelineData(hazards)).toEqual([
+      { date: new Date("2026-09-17T09:00:00.000Z").toLocaleDateString("zh-CN"), count: 1 },
+      { date: new Date("2026-09-18T09:00:00.000Z").toLocaleDateString("zh-CN"), count: 1 },
+    ]);
+    expect(buildSeverityDistribution(hazards)).toEqual([
+      { name: "WATCH", value: 1 },
+      { name: "WARNING", value: 1 },
+    ]);
+  });
+
+  it("falls back to legacy nested timeline and severity fields", () => {
+    const hazards = [
+      createHazard({
+        timestamp: undefined,
+        severity: undefined,
+        properties: {
+          timestamp: "2026-09-17T09:00:00.000Z",
+          severity: "ADVISORY",
+        },
+      }),
+    ];
+
+    expect(buildTimelineData(hazards)).toEqual([
+      { date: new Date("2026-09-17T09:00:00.000Z").toLocaleDateString("zh-CN"), count: 1 },
+    ]);
+    expect(buildSeverityDistribution(hazards)).toEqual([{ name: "ADVISORY", value: 1 }]);
   });
 
   it("builds the existing count-first-id-last-id data hash", () => {

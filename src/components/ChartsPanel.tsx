@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { getStatistics } from "../services/analytics/analyticsService";
 import type { StatisticsData } from "../services/analytics/contracts/statistics";
 import { formatAnalyticsNumber } from "../services/analytics/analyticsPresentation";
-import type { Hazard } from "../types";
+import type { AnalyticsHazard } from "../features/analytics/types";
 import {
   PieChart,
   Pie,
@@ -25,17 +25,17 @@ import {
 } from "recharts";
 import ChartDrilldownModal from "./ChartDrilldownModal";
 import { createClientLogger } from "../utils/logger";
+import {
+  buildSeverityDistribution,
+  buildTimelineData,
+  formatHazardDate,
+  getHazardSeverity,
+} from "../features/analytics/utils/analyticsTransforms";
 import { readChartEvent } from "../features/analytics/utils/chartEventAdapter";
 
 const logger = createClientLogger("charts-panel");
 
-type ChartHazard = Hazard & {
-  properties?: {
-    type?: string;
-    severity?: string;
-    timestamp?: string;
-  };
-};
+type ChartHazard = AnalyticsHazard;
 
 const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
   const [pythonStats, setPythonStats] = useState<StatisticsData | null>(null);
@@ -70,29 +70,10 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
   }));
 
   // 时间线数据（按日期统计）
-  const timelineData = React.useMemo(() => {
-    const dateCount: Record<string, number> = {};
-    hazards.forEach((h) => {
-      const date = h.properties?.timestamp
-        ? new Date(h.properties.timestamp).toLocaleDateString("zh-CN")
-        : "未知日期";
-      dateCount[date] = (dateCount[date] || 0) + 1;
-    });
-    return Object.entries(dateCount)
-      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-      .slice(-30) // 保留排序后的最后 30 个日期桶
-      .map(([date, count]) => ({ date, count }));
-  }, [hazards]);
+  const timelineData = React.useMemo(() => buildTimelineData(hazards), [hazards]);
 
   // 严重性分布数据
-  const severityData = React.useMemo(() => {
-    const severityCount: Record<string, number> = {};
-    hazards.forEach((h) => {
-      const severity = h.properties?.severity || "未知";
-      severityCount[severity] = (severityCount[severity] || 0) + 1;
-    });
-    return Object.entries(severityCount).map(([name, value]) => ({ name, value }));
-  }, [hazards]);
+  const severityData = React.useMemo(() => buildSeverityDistribution(hazards), [hazards]);
 
   const COLORS = ["#4CAF50", "#FF9800", "#2196F3", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B"];
 
@@ -122,17 +103,14 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
         break;
       case "severity":
         filtered = hazards.filter((h) => {
-          const severity = h.properties?.severity || "未知";
+          const severity = getHazardSeverity(h) || "未知";
           return severity === value;
         });
         title = `严重性级别：${value} (${filtered.length}条)`;
         break;
       case "date":
         filtered = hazards.filter((h) => {
-          const date = h.properties?.timestamp
-            ? new Date(h.properties.timestamp).toLocaleDateString("zh-CN")
-            : "未知日期";
-          return date === value;
+          return formatHazardDate(h) === value;
         });
         title = `日期：${value} (${filtered.length}条)`;
         break;

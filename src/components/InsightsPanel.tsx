@@ -8,20 +8,16 @@ import {
   formatAnalyticsNumber,
   getRiskLevelLabel,
 } from "../services/analytics/analyticsPresentation";
-import type { Hazard } from "../types";
+import type { AnalyticsHazard } from "../features/analytics/types";
+import {
+  getHazardSeverity,
+  getHazardTimestamp,
+} from "../features/analytics/utils/analyticsTransforms";
 import { createClientLogger } from "../utils/logger";
 
 const logger = createClientLogger("insights-panel");
 
-type InsightsHazard = Hazard & {
-  properties?: {
-    type?: string;
-    severity?: string;
-    timestamp?: string;
-  };
-};
-
-const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => {
+const InsightsPanel: React.FC<{ hazards: AnalyticsHazard[] }> = ({ hazards }) => {
   const [riskData, setRiskData] = useState<RiskAssessmentData | null>(null);
   const [loading, setLoading] = useState(false);
   const recentHazards = hazards.slice(0, 3);
@@ -74,10 +70,10 @@ const InsightsPanel: React.FC<{ hazards: InsightsHazard[] }> = ({ hazards }) => 
             }}
           >
             <div style={{ color: "#fff", fontWeight: "bold" }}>
-              {h.properties?.type || "未知类型"}
+              {h.type || h.properties?.type || "未知类型"}
             </div>
             <div style={{ color: "#888", fontSize: "14px", marginTop: "4px" }}>
-              {h.properties?.severity || "暂无"} | {h.properties?.timestamp || "时间未知"}
+              {getHazardSeverity(h) || "暂无"} | {getHazardTimestamp(h) || "时间未知"}
             </div>
           </div>
         ))

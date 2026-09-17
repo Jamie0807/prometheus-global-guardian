@@ -65,6 +65,22 @@ describe("validated analytics result consumers", () => {
     expect(screen.getByText("暂无 | 时间未知")).toBeInTheDocument();
   });
 
+  it("renders top-level severity and timestamp in latest hazards", () => {
+    render(
+      <InsightsPanel
+        hazards={[
+          {
+            ...hazards[0],
+            severity: "WATCH",
+            timestamp: "2026-09-17T09:00:00.000Z",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("WATCH | 2026-09-17T09:00:00.000Z")).toBeInTheDocument();
+  });
+
   it.each([0, null])(
     "renders actual statistics fields with mean %s and legitimate zero values",
     (mean) => {
