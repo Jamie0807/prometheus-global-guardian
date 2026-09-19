@@ -60,3 +60,9 @@
 - [x] Task 4：Analytics 输入和 Python 跨语言契约；TS 41/41、Python 55/55、服务测试 234/234，修复后任务级复核 Approved；canonical 显式 null 在两端统一拒绝，字段省略保持兼容。
 - [x] Task 5：质量检查和 AI 灾害上下文；BFF 88/88、服务 235/235、组件 84/84、Python 56/56，修复后任务级复核 Approved；旧 source fallback 和 prompt 敏感样本清洗已验证。
 - [x] Task 6：文档、格式清单和完整验收；仅修改允许的文档/配置文件，BFF 88/88、Service 235/235、组件 84/84、E2E 1/1、Python 56/56，类型检查、Lint、格式、构建和 diff 检查通过；最终整体复核 Approved。
+
+## 2026-09-19 数据源健康检查与新鲜度
+
+- [x] Task 1：5 分钟进程内健康注册表；注册表测试 10/10、服务端类型检查、定向 ESLint 和 diff 检查通过，任务级复核 Approved；未来时间戳、无效日期和固定窗口参数作为非阻塞 Minor 记录。
+- [x] Task 2：BFF 来源加载与 `meta.sources[]` 健康快照；修复公共源 HTTP 200 错误形状后 BFF 92/92、健康注册表 10/10、类型检查、Lint、格式和 diff 检查通过，修复后复核 Approved；Node 24 engine warning 为环境提示。
+- [x] Task 3：事实文档同步与完整验收；BFF 92/92、Service 235/235、组件 84/84、E2E 1/1、Python 56/56，Node 全基线、类型、Lint、格式、构建及 diff 检查通过。实现子智能体因平台 usage limit 中断，文档任务由主会话接手完成；任务 1/2 已独立复核，最终整轮独立复核受同一额度限制，主会话完成差异与门禁验收。

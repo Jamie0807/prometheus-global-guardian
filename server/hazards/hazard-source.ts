@@ -8,6 +8,7 @@ import {
   type HazardSourceId,
 } from "../../shared/hazards/hazard-event.js";
 import { resolveHazardLayerId } from "../../shared/hazards/hazard-layer-registry.js";
+import type { HazardSourceHealth } from "./source-health.js";
 
 const USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
 const NASA_URL = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300";
@@ -22,6 +23,7 @@ export interface ServerHazard extends HazardEvent {
 }
 
 export type { HazardSourceId } from "../../shared/hazards/hazard-event.js";
+export type { HazardSourceHealth, HazardSourceHealthErrorCode } from "./source-health.js";
 
 export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback" | "stale";
 
@@ -31,6 +33,7 @@ export interface HazardSourceStatus {
   count: number;
   fetchedAt?: string;
   message?: string;
+  health?: HazardSourceHealth;
 }
 
 export interface CachedHazardSource {
@@ -89,18 +92,6 @@ interface GDACSFeature {
   };
 }
 
-interface USGSResponse {
-  features?: USGSFeature[];
-}
-
-interface NASAResponse {
-  events?: NASAEvent[];
-}
-
-interface GDACSResponse {
-  features?: GDACSFeature[];
-}
-
 export function mapNASACategoryToType(category: string): string {
   if (category.includes("Wildfires")) return "WILDFIRE";
   if (category.includes("Volcanoes")) return "VOLCANO";
@@ -139,6 +130,18 @@ function toIsoTimestamp(value: number | undefined): string | undefined {
   return value === undefined ? undefined : new Date(value).toISOString();
 }
 
+function readRequiredResponseArray<T>(payload: unknown, property: string, source: string): T[] {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !Array.isArray((payload as Record<string, unknown>)[property])
+  ) {
+    throw new SyntaxError(`${source} response must include a ${property} array.`);
+  }
+
+  return (payload as Record<string, unknown>)[property] as T[];
+}
+
 export async function fetchUSGSEarthquakes(
   sourceFetch: HazardSourceFetch = fetch,
 ): Promise<ServerHazard[]> {
@@ -147,8 +150,12 @@ export async function fetchUSGSEarthquakes(
     throw new Error("USGS response was unavailable");
   }
 
-  const data = (await response.json()) as USGSResponse;
-  return (data.features ?? [])
+  const features = readRequiredResponseArray<USGSFeature>(
+    await response.json(),
+    "features",
+    "USGS",
+  );
+  return features
     .map((feature): ServerHazard | null => {
       const sourceEventId = readStableSourceEventId(feature.id);
       if (!sourceEventId) return null;
@@ -192,8 +199,12 @@ export async function fetchNASAEONET(
     throw new Error("NASA EONET response was unavailable");
   }
 
-  const data = (await response.json()) as NASAResponse;
-  return (data.events ?? [])
+  const events = readRequiredResponseArray<NASAEvent>(
+    await response.json(),
+    "events",
+    "NASA EONET",
+  );
+  return events
     .map((event): ServerHazard | null => {
       const sourceEventId = readStableSourceEventId(event.id);
       if (!sourceEventId) return null;
@@ -232,10 +243,14 @@ export async function fetchGDACS(sourceFetch: HazardSourceFetch = fetch): Promis
     throw new Error("GDACS response was unavailable");
   }
 
-  const geojson = (await response.json()) as GDACSResponse;
+  const features = readRequiredResponseArray<GDACSFeature>(
+    await response.json(),
+    "features",
+    "GDACS",
+  );
   const results: ServerHazard[] = [];
 
-  for (const feature of geojson.features ?? []) {
+  for (const feature of features) {
     const geometry = feature.geometry;
     const properties = feature.properties;
     if (!geometry?.coordinates || !properties) continue;

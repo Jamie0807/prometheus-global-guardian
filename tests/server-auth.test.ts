@@ -176,6 +176,7 @@ test("GET /api/hazards prefers DisasterAWARE and does not request fallback sourc
       fallbackCalls += 1;
       return { hazards: [], sources: [] };
     },
+    () => new Date("2026-09-09T00:00:00.000Z"),
   );
   t.after(testApp.close);
 
@@ -188,7 +189,13 @@ test("GET /api/hazards prefers DisasterAWARE and does not request fallback sourc
       fallbackUsed: boolean;
       generatedAt: string;
       stale: boolean;
-      sources: Array<{ id: string; status: string; count: number; fetchedAt?: string }>;
+      sources: Array<{
+        id: string;
+        status: string;
+        count: number;
+        fetchedAt?: string;
+        health?: Record<string, unknown>;
+      }>;
     };
   };
   assert.deepEqual(body.hazards, [
@@ -220,10 +227,55 @@ test("GET /api/hazards prefers DisasterAWARE and does not request fallback sourc
         status: "success",
         count: 1,
         fetchedAt: body.meta.sources[0]?.fetchedAt,
+        health: {
+          windowMs: 300000,
+          attempts: 1,
+          successes: 1,
+          failures: 0,
+          successRate: 1,
+          averageLatencyMs: 0,
+          lastLatencyMs: 0,
+          lastAttemptAt: body.meta.sources[0]?.health?.lastAttemptAt,
+          lastSuccessAt: body.meta.sources[0]?.health?.lastSuccessAt,
+          consecutiveFailures: 0,
+        },
       },
-      { id: "usgs", status: "fallback", count: 0 },
-      { id: "nasa-eonet", status: "fallback", count: 0 },
-      { id: "gdacs", status: "fallback", count: 0 },
+      {
+        id: "usgs",
+        status: "fallback",
+        count: 0,
+        health: {
+          windowMs: 300000,
+          attempts: 0,
+          successes: 0,
+          failures: 0,
+          consecutiveFailures: 0,
+        },
+      },
+      {
+        id: "nasa-eonet",
+        status: "fallback",
+        count: 0,
+        health: {
+          windowMs: 300000,
+          attempts: 0,
+          successes: 0,
+          failures: 0,
+          consecutiveFailures: 0,
+        },
+      },
+      {
+        id: "gdacs",
+        status: "fallback",
+        count: 0,
+        health: {
+          windowMs: 300000,
+          attempts: 0,
+          successes: 0,
+          failures: 0,
+          consecutiveFailures: 0,
+        },
+      },
     ],
   });
   assert.match(body.meta.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
@@ -290,8 +342,24 @@ test("GET /api/hazards serves an unexpired DisasterAWARE cache after both live a
 
   const first = await fetch(`${testApp.baseUrl}/api/hazards`);
   assert.equal(first.status, 200);
-  const firstBody = (await first.json()) as { meta: { sources: Array<{ fetchedAt?: string }> } };
+  const firstBody = (await first.json()) as {
+    meta: {
+      sources: Array<{ fetchedAt?: string; health?: { attempts: number; successes: number } }>;
+    };
+  };
   assert.equal(firstBody.meta.sources[0]?.fetchedAt, "2026-09-09T00:00:00.000Z");
+  assert.deepEqual(firstBody.meta.sources[0]?.health, {
+    windowMs: 300000,
+    attempts: 1,
+    successes: 1,
+    failures: 0,
+    successRate: 1,
+    averageLatencyMs: 0,
+    lastLatencyMs: 0,
+    lastAttemptAt: "2026-09-09T00:00:00.000Z",
+    lastSuccessAt: "2026-09-09T00:00:00.000Z",
+    consecutiveFailures: 0,
+  });
 
   shouldFail = true;
   currentTime = new Date("2026-09-09T00:04:59.999Z");
@@ -302,7 +370,16 @@ test("GET /api/hazards serves an unexpired DisasterAWARE cache after both live a
     meta: {
       stale: boolean;
       fallbackUsed: boolean;
-      sources: Array<{ status: string; fetchedAt?: string }>;
+      sources: Array<{
+        status: string;
+        fetchedAt?: string;
+        health?: {
+          attempts: number;
+          successes: number;
+          failures: number;
+          lastErrorCode?: string;
+        };
+      }>;
     };
   };
   assert.deepEqual(
@@ -311,11 +388,20 @@ test("GET /api/hazards serves an unexpired DisasterAWARE cache after both live a
   );
   assert.equal(secondBody.meta.stale, true);
   assert.equal(secondBody.meta.fallbackUsed, true);
-  assert.deepEqual(secondBody.meta.sources[0], {
-    id: "disasteraware",
-    status: "stale",
-    count: 1,
-    fetchedAt: "2026-09-09T00:00:00.000Z",
+  assert.equal(secondBody.meta.sources[0]?.status, "stale");
+  assert.equal(secondBody.meta.sources[0]?.fetchedAt, "2026-09-09T00:00:00.000Z");
+  assert.deepEqual(secondBody.meta.sources[0]?.health, {
+    windowMs: 300000,
+    attempts: 3,
+    successes: 1,
+    failures: 2,
+    successRate: 1 / 3,
+    averageLatencyMs: 0,
+    lastLatencyMs: 0,
+    lastAttemptAt: "2026-09-09T00:04:59.999Z",
+    lastSuccessAt: "2026-09-09T00:00:00.000Z",
+    consecutiveFailures: 2,
+    lastErrorCode: "HTTP_ERROR",
   });
   assert.equal(activeCalls, 3);
   assert.equal(fallbackCalls, 1);
@@ -350,11 +436,39 @@ test("GET /api/hazards does not serve a DisasterAWARE cache older than five minu
   const response = await fetch(`${testApp.baseUrl}/api/hazards`);
   const body = (await response.json()) as {
     hazards: Array<{ id: string }>;
-    meta: { stale: boolean; sources: Array<{ status: string }> };
+    meta: {
+      stale: boolean;
+      sources: Array<{
+        status: string;
+        health?: {
+          attempts: number;
+          successes: number;
+          failures: number;
+          successRate?: number;
+          averageLatencyMs?: number;
+          lastLatencyMs?: number;
+          lastAttemptAt?: string;
+          consecutiveFailures: number;
+          lastErrorCode?: string;
+        };
+      }>;
+    };
   };
   assert.deepEqual(body.hazards, []);
   assert.equal(body.meta.stale, false);
   assert.equal(body.meta.sources[0]?.status, "unavailable");
+  assert.deepEqual(body.meta.sources[0]?.health, {
+    windowMs: 300000,
+    attempts: 2,
+    successes: 0,
+    failures: 2,
+    successRate: 0,
+    averageLatencyMs: 0,
+    lastLatencyMs: 0,
+    lastAttemptAt: "2026-09-09T00:05:00.001Z",
+    consecutiveFailures: 2,
+    lastErrorCode: "HTTP_ERROR",
+  });
 });
 
 test("GET /api/hazards retries a timed-out DisasterAWARE request once", async (t) => {
@@ -376,6 +490,8 @@ test("GET /api/hazards retries a timed-out DisasterAWARE request once", async (t
       );
     },
     { HAZARD_SOURCE_TIMEOUT_MS: "1" },
+    undefined,
+    () => new Date("2026-09-09T00:00:00.000Z"),
   );
   t.after(testApp.close);
 
@@ -390,8 +506,125 @@ test("GET /api/hazards retries a timed-out DisasterAWARE request once", async (t
   );
   assert.equal(body.meta.stale, false);
   assert.equal(body.meta.sources[0]?.status, "success");
+  assert.deepEqual((body.meta.sources[0] as { health?: unknown }).health, {
+    windowMs: 300000,
+    attempts: 2,
+    successes: 1,
+    failures: 1,
+    successRate: 0.5,
+    averageLatencyMs: 0,
+    lastLatencyMs: 0,
+    lastAttemptAt: (body.meta.sources[0] as { health?: { lastAttemptAt?: string } }).health
+      ?.lastAttemptAt,
+    lastSuccessAt: (body.meta.sources[0] as { health?: { lastSuccessAt?: string } }).health
+      ?.lastSuccessAt,
+    consecutiveFailures: 0,
+    lastErrorCode: "TIMEOUT",
+  });
   assert.equal(activeCalls, 2);
 });
+
+test("GET /api/hazards records invalid DisasterAWARE JSON as a stable failed attempt", async (t) => {
+  const rawPayload = "unexpected-upstream-payload";
+  const testApp = await startTestApp(
+    async (url) => {
+      if (url.endsWith("/authorize")) return new Response(JSON.stringify({ accessToken: "token" }));
+      return new Response(rawPayload, { headers: { "content-type": "application/json" } });
+    },
+    {},
+    async () => ({ hazards: [], sources: [] }),
+    () => new Date("2026-09-09T00:00:00.000Z"),
+  );
+  t.after(testApp.close);
+
+  const response = await fetch(`${testApp.baseUrl}/api/hazards`);
+  const body = (await response.json()) as {
+    meta: {
+      sources: Array<{
+        status: string;
+        health?: {
+          attempts: number;
+          successes: number;
+          failures: number;
+          lastErrorCode?: string;
+        };
+      }>;
+    };
+  };
+
+  assert.equal(body.meta.sources[0]?.status, "unavailable");
+  assert.deepEqual(body.meta.sources[0]?.health, {
+    windowMs: 300000,
+    attempts: 2,
+    successes: 0,
+    failures: 2,
+    successRate: 0,
+    averageLatencyMs: 0,
+    lastLatencyMs: 0,
+    lastAttemptAt: "2026-09-09T00:00:00.000Z",
+    consecutiveFailures: 2,
+    lastErrorCode: "INVALID_RESPONSE",
+  });
+  assert.equal(JSON.stringify(body).includes(rawPayload), false);
+});
+
+for (const source of [
+  ["USGS", "usgs"],
+  ["NASA", "nasa-eonet"],
+  ["GDACS", "gdacs"],
+] as const) {
+  test(`GET /api/hazards records an invalid ${source[0]} response shape as unavailable`, async (t) => {
+    let sourceCalls = 0;
+    const testApp = await startTestApp(
+      async (url) => {
+        if (url.endsWith("/authorize")) {
+          return new Response(JSON.stringify({ accessToken: "token" }));
+        }
+        if (url.includes("api.disasteraware.com")) {
+          return new Response("[]", { headers: { "content-type": "application/json" } });
+        }
+        sourceCalls += 1;
+        return new Response("{}", { headers: { "content-type": "application/json" } });
+      },
+      {},
+      fetchAllHazards,
+      () => new Date("2026-09-09T00:00:00.000Z"),
+    );
+    t.after(testApp.close);
+
+    const response = await fetch(`${testApp.baseUrl}/api/hazards?source=${source[0]}`);
+    const body = (await response.json()) as {
+      meta: {
+        sources: Array<{
+          id: string;
+          status: string;
+          health?: {
+            attempts: number;
+            successes: number;
+            failures: number;
+            lastErrorCode?: string;
+          };
+        }>;
+      };
+    };
+    const sourceStatus = body.meta.sources.find((status) => status.id === source[1]);
+
+    assert.equal(sourceCalls, 2);
+    assert.equal(sourceStatus?.status, "unavailable");
+    assert.deepEqual(sourceStatus?.health, {
+      windowMs: 300000,
+      attempts: 2,
+      successes: 0,
+      failures: 2,
+      successRate: 0,
+      averageLatencyMs: 0,
+      lastLatencyMs: 0,
+      lastAttemptAt: "2026-09-09T00:00:00.000Z",
+      consecutiveFailures: 2,
+      lastErrorCode: "INVALID_RESPONSE",
+    });
+  });
+}
 
 test("GET /api/hazards removes duplicate source and id pairs from aggregated hazards", async (t) => {
   const testApp = await startTestApp(
@@ -479,6 +712,7 @@ for (const primaryResponse of ["empty", "unavailable"] as const) {
           ],
         };
       },
+      () => new Date("2026-09-09T00:00:00.000Z"),
     );
     t.after(testApp.close);
 
@@ -488,7 +722,23 @@ for (const primaryResponse of ["empty", "unavailable"] as const) {
       hazards: Array<{ id: string }>;
       meta: {
         fallbackUsed: boolean;
-        sources: Array<{ id: string; status: string; count: number }>;
+        sources: Array<{
+          id: string;
+          status: string;
+          count: number;
+          health?: {
+            attempts: number;
+            successes: number;
+            failures: number;
+            successRate?: number;
+            averageLatencyMs?: number;
+            lastLatencyMs?: number;
+            lastAttemptAt?: string;
+            lastSuccessAt?: string;
+            consecutiveFailures: number;
+            lastErrorCode?: string;
+          };
+        }>;
       };
     };
     assert.deepEqual(
@@ -502,6 +752,34 @@ for (const primaryResponse of ["empty", "unavailable"] as const) {
       { id: "nasa-eonet", status: "unavailable", count: 0 },
       { id: "gdacs", status: "success", count: 1 },
     ]);
+    assert.deepEqual(
+      body.meta.sources[0]?.health,
+      primaryResponse === "empty"
+        ? {
+            windowMs: 300000,
+            attempts: 1,
+            successes: 1,
+            failures: 0,
+            successRate: 1,
+            averageLatencyMs: 0,
+            lastLatencyMs: 0,
+            lastAttemptAt: body.meta.sources[0]?.health?.lastAttemptAt,
+            lastSuccessAt: body.meta.sources[0]?.health?.lastSuccessAt,
+            consecutiveFailures: 0,
+          }
+        : {
+            windowMs: 300000,
+            attempts: 2,
+            successes: 0,
+            failures: 2,
+            successRate: 0,
+            averageLatencyMs: 0,
+            lastLatencyMs: 0,
+            lastAttemptAt: body.meta.sources[0]?.health?.lastAttemptAt,
+            consecutiveFailures: 2,
+            lastErrorCode: "HTTP_ERROR",
+          },
+    );
     assert.equal(fallbackCalls, 1);
     assert.equal(JSON.stringify(body).includes(secret), false);
   });

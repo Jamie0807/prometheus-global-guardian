@@ -23,6 +23,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 在 Mapbox 地图和分析界面中消费同一灾害状态；
 - 通过 FastAPI 提供统计、预测、风险、ETL、质量、统一模型和透视分析；
 - 通过 Express BFF 完成 DisasterAware 服务端授权、受限代理、多源灾害聚合和 AI 流式代理；
+- 通过 BFF 的 `meta.sources[]` 为 DisasterAware、USGS、NASA EONET 和 GDACS 输出固定五分钟窗口的进程内来源健康快照；
 - 通过前端 Service 运行时解析、Python Pydantic 模型和共享 JSON 样本维护 Analytics 输入边界；
 - 通过 `shared/hazards/` 与 `contracts/hazard-event.json` 维护统一事件/图层注册表，向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
 - 通过 lint、格式检查、TypeScript 类型检查、多层自动化测试和构建命令执行质量检查。
@@ -32,7 +33,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 面向公网部署的身份系统、角色授权、网关、共享限流和集中告警；
 - AI 会话服务端持久化、跨刷新恢复、用户级隔离、成本配额和熔断；
 - Analytics 4D `data` 内部字段的完整跨语言共享契约、复杂几何与历史回放；
-- 数据源健康检查、数据库/PostGIS 技术设计、历史快照和审计存储；
+- 数据库/PostGIS 技术设计、历史快照和审计存储；
 - 完整视觉回归、真实第三方服务集成测试和自动发布。
 
 ## 3. 术语
@@ -164,6 +165,8 @@ BFF 执行以下请求边界：
 - 授权、AI、hazard 接口分别使用单进程内存固定窗口限流；
 - 日志上下文只保留字符串、数字、布尔值，并按敏感字段名过滤值。
 
+`/api/hazards` 在既有 `meta.sources[]` 的来源状态旁可返回健康快照。快照固定聚合当前 BFF 进程最近五分钟的真实 `load()` 尝试，包含尝试/成功/失败数、成功率、平均和最近延迟、最近尝试与成功时间、连续失败数及稳定错误码。一次 `load()` 最多记录一次，现有一次重试最多形成两条记录；DisasterAware 认证不单独计数。空数组是成功，缓存命中、`stale` 和 fallback 占位状态只读取快照而不新增尝试。错误码仅为 `TIMEOUT`、`HTTP_ERROR`、`INVALID_RESPONSE` 或 `UPSTREAM_ERROR`，不暴露上游异常细节。该统计不持久化，BFF 重启后窗口为空。
+
 当前 BFF 没有浏览器用户身份认证、会话鉴权、角色授权或 CSRF 机制，也没有注册 CORS 中间件。`/api/authorize` 只代表 BFF 获取上游服务 token，不代表浏览器用户通过身份认证。
 
 AI Provider 请求具有独立边界：请求有超时、响应开始前的 Provider 降级和流中断处理，但当前不复用公共灾害源的统一重定向禁止与 8 MiB 响应体上限。新增 AI Provider 时需要单独评估这两项边界。
@@ -259,7 +262,7 @@ sequenceDiagram
   Worker-->>UI: 清洗后的 hazards
 ```
 
-`meta` 记录首选源、是否使用 fallback、各来源状态和 stale 状态。Worker 只返回清洗后的 hazards；`useHazardData` 在主线程分别写入 Worker 结果和原始 `response.meta`。客户端用取消、请求去重和序号防护避免筛选或刷新变化时写入迟到响应。
+`meta` 记录首选源、是否使用 fallback、各来源状态和 stale 状态。每个来源还可携带最近五分钟的进程内健康快照：真实 `load()` 成功（包括空数组）或失败才计数，缓存、`stale` 和 fallback 占位不改变来源统计。Worker 只返回清洗后的 hazards；`useHazardData` 在主线程分别写入 Worker 结果和原始 `response.meta`。客户端用取消、请求去重和序号防护避免筛选或刷新变化时写入迟到响应。
 
 BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边界生成 canonical `eventId`、`sourceEventId`、`sourceId`、`layerId`、观测/更新时间和置信度字段；浏览器 parser、Worker 和地图转换保留同一事件标识。未知来源或图层安全回退为 `unknown`，旧 `id`、`source` 和 `timestamp` 字段仍在迁移期兼容解析。
 
@@ -418,7 +421,7 @@ Compose 中：
 ### 14.3 数据与产品
 
 - Analytics 请求侧 HazardData、顶层响应信封和灾害事件/图层注册表已有共享输入/输出样本；4D `data` 内部字段的完整跨语言模型仍未统一；
-- 数据源健康检查尚未形成成功率、延迟、最后更新时间、陈旧状态和降级原因的统一指标契约；
+- 数据源健康快照只保存在当前 BFF 进程的固定五分钟窗口，重启即清空；尚无跨实例聚合、历史趋势、持久化指标或告警。数据库/PostGIS、历史快照、复杂几何和审计存储仍需先完成技术设计并确认需求；
 - 当前没有 PostgreSQL/PostGIS 历史数据层，复杂几何、历史快照、回放和审计仍需先完成技术设计并确认需求；
 - 多来源 severity 与 magnitude 不天然可比较，统一强度排序需要先定义业务换算规则；
 - 预测置信度、风险阈值、估算 magnitude 和质量规则仍需要真实业务样本校准；

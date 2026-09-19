@@ -11,6 +11,11 @@ import {
   type HazardSourceStatus,
   type ServerHazard,
 } from "./server/hazards/hazard-source.js";
+import {
+  createHazardSourceHealthRegistry,
+  type HazardSourceHealth,
+  type HazardSourceHealthErrorCode,
+} from "./server/hazards/source-health.js";
 import { loadLocalEnv } from "./server/env.js";
 import { createServerLogger } from "./server/logging.js";
 import { createHazardEventId } from "./shared/hazards/hazard-event.js";
@@ -118,10 +123,28 @@ const fallbackSourceIds = ["usgs", "nasa-eonet", "gdacs"] as const;
 function completeFallbackSourceStatuses(
   sources: readonly HazardSourceStatus[],
   defaultStatus: HazardSourceStatus["status"],
+  healthForSource: (source: HazardSourceId) => HazardSourceHealth,
 ): HazardSourceStatus[] {
-  return fallbackSourceIds.map(
-    (id) => sources.find((source) => source.id === id) ?? { id, status: defaultStatus, count: 0 },
-  );
+  return fallbackSourceIds.map((id) => ({
+    ...(sources.find((source) => source.id === id) ?? { id, status: defaultStatus, count: 0 }),
+    health: healthForSource(id),
+  }));
+}
+
+function toHazardSourceHealthErrorCode(error: unknown): HazardSourceHealthErrorCode {
+  if (error instanceof RequestBoundaryError && error.code === "UPSTREAM_TIMEOUT") {
+    return "TIMEOUT";
+  }
+
+  if (error instanceof SyntaxError) {
+    return "INVALID_RESPONSE";
+  }
+
+  if (error instanceof Error && /(?:response|request) was unavailable$/i.test(error.message)) {
+    return "HTTP_ERROR";
+  }
+
+  return "UPSTREAM_ERROR";
 }
 
 function readToken(payload: unknown): string {
@@ -144,6 +167,15 @@ async function readJsonResponse(response: FetchResponse): Promise<unknown> {
   } catch {
     return undefined;
   }
+}
+
+async function readHazardArrayResponse(response: FetchResponse): Promise<unknown[]> {
+  const payload = JSON.parse(await response.text()) as unknown;
+  if (!Array.isArray(payload)) {
+    throw new SyntaxError("DisasterAware active hazards response must be an array.");
+  }
+
+  return payload;
 }
 
 function apiPath(request: Request): string {
@@ -202,15 +234,23 @@ export function createApp(options: CreateAppOptions = {}): Application {
   let authorizationRequest: Promise<string> | undefined;
   // 每个灾害源单独缓存最近一次成功结果，供短暂上游故障时回退。
   const sourceCache = new Map<HazardSourceId, CachedHazardSource>();
+  const sourceHealth = createHazardSourceHealthRegistry();
 
   const loadSource = async (
     source: HazardSourceId,
     load: () => Promise<ServerHazard[]>,
   ): Promise<HazardSourceLoadResult> => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      const startedAt = now();
       try {
         const hazards = await load();
-        const fetchedAt = now().toISOString();
+        const completedAt = now();
+        sourceHealth.recordSuccess(
+          source,
+          completedAt.getTime() - startedAt.getTime(),
+          completedAt,
+        );
+        const fetchedAt = completedAt.toISOString();
         sourceCache.set(source, { hazards, fetchedAt });
         return {
           hazards,
@@ -219,9 +259,17 @@ export function createApp(options: CreateAppOptions = {}): Application {
             status: hazards.length > 0 ? "success" : "empty",
             count: hazards.length,
             fetchedAt,
+            health: sourceHealth.snapshot(source, completedAt),
           },
         };
-      } catch {
+      } catch (error: unknown) {
+        const completedAt = now();
+        sourceHealth.recordFailure(
+          source,
+          completedAt.getTime() - startedAt.getTime(),
+          toHazardSourceHealthErrorCode(error),
+          completedAt,
+        );
         // 下方会在不暴露上游细节的情况下处理第二次尝试和缓存响应。
       }
     }
@@ -241,11 +289,20 @@ export function createApp(options: CreateAppOptions = {}): Application {
           status: "stale",
           count: cached.hazards.length,
           fetchedAt: cached.fetchedAt,
+          health: sourceHealth.snapshot(source, now()),
         },
       };
     }
 
-    return { hazards: [], status: { id: source, status: "unavailable", count: 0 } };
+    return {
+      hazards: [],
+      status: {
+        id: source,
+        status: "unavailable",
+        count: 0,
+        health: sourceHealth.snapshot(source, now()),
+      },
+    };
   };
 
   app.disable("x-powered-by");
@@ -318,7 +375,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
       throw new Error("DisasterAware active hazards request was unavailable");
     }
 
-    return adaptDisasterAwareHazards(await readJsonResponse(response));
+    return adaptDisasterAwareHazards(await readHazardArrayResponse(response));
   };
 
   app.use(createRawBodyMiddleware());
@@ -384,7 +441,9 @@ export function createApp(options: CreateAppOptions = {}): Application {
           primaryStatus.status === "stale"
             ? [...primary.hazards, ...fallback.hazards]
             : fallback.hazards;
-        fallbackSources = completeFallbackSourceStatuses(fallback.sources, "fallback");
+        fallbackSources = completeFallbackSourceStatuses(fallback.sources, "fallback", (source) =>
+          sourceHealth.snapshot(source, now()),
+        );
       } catch {
         fallbackSources = completeFallbackSourceStatuses(
           [
@@ -393,6 +452,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
             { id: "gdacs", status: "unavailable", count: 0 },
           ],
           "unavailable",
+          (source) => sourceHealth.snapshot(source, now()),
         );
       }
     } else {
@@ -403,6 +463,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
           { id: "gdacs", status: "fallback", count: 0 },
         ],
         "fallback",
+        (source) => sourceHealth.snapshot(source, now()),
       );
     }
 
