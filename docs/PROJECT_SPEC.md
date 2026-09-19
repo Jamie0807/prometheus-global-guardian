@@ -269,9 +269,9 @@ sequenceDiagram
 
 浏览器向 `POST /api/ai/chat` 发送消息与灾害上下文，BFF 校验形状和大小后选择 Provider。路由模式根据知识库、灾害领域和实时上下文信号选择优先 Provider；强制模式固定使用 workflow 或 Ark。首选 Provider 在响应开始前失败时，BFF 才尝试另一个 Provider。
 
-前端会话只存在 React state 中：同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；request id 防止迟到 chunk 写入新请求。历史超过 50 条消息或序列化请求超过 64 KiB 时，从最早的一对 user/assistant 消息开始裁剪。单条用户输入上限为 8,000 字符。
+前端会话只存在 React state 中：同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；Hook 的本地请求序号防止迟到 chunk 写入新请求，Service 为每次 SSE 逻辑请求生成随机请求 ID 并在自动重连中复用。手动重试会先清除失败的半截助手回复，不重复追加用户消息。历史超过 50 条消息或序列化请求超过 64 KiB 时，从最早的一对 user/assistant 消息开始裁剪。单条用户输入上限为 8,000 字符。
 
-客户端 SSE parser 支持 CRLF、注释心跳、多行 `data` 和任意 UTF-8 字节分割，以 `[DONE]` 作为完成标记。没有 `[DONE]` 的 EOF 是失败。Provider 配置缺失的特定 503 错误触发浏览器本地 Demo 流；其他上游正文不会直接展示给用户。
+客户端 SSE parser 支持 CRLF、注释心跳、多行 `data` 和任意 UTF-8 字节分割，以 `[DONE]` 作为完成标记。网络异常、读取异常或没有 `[DONE]` 的 EOF 会在有限次数内使用相同请求 ID 和 `Last-Event-ID` 自动恢复，并按事件 ID 去重；显式 provider 错误和 HTTP 错误不自动重试。BFF 在单实例短时有界内存会话中缓存已转换事件，恢复窗口结束后返回稳定过期错误。Provider 配置缺失的特定 503 错误触发浏览器本地 Demo 流；其他上游正文不会直接展示给用户。
 
 ## 9. 跨语言契约与测试责任
 
@@ -284,12 +284,12 @@ sequenceDiagram
 
 ## 10. 配置与秘密边界
 
-| 范围           | 变量或配置                                                                                                                                           | 边界                                                                                                 |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| 浏览器构建     | `VITE_MAPBOX_TOKEN`、`VITE_PYTHON_API_URL`、`VITE_3D_TILES_URL`、`VITE_CESIUM_ION_TOKEN`、`VITE_LOG_LEVEL`                                           | 会进入客户端产物，只能放公开配置。                                                                   |
-| Express 运行时 | DisasterAware 凭据、`AI_PROVIDER`、`AI_WORKFLOW_*`、`ARK_*`、`VOLCENGINE_AI_PROVIDER` 兼容别名、`PORT` 与日志级别                                    | 只在服务端读取；不得改用 `VITE_` 前缀。`PORT` 缺失时为 8080；Compose 只显式传递部分服务端变量。      |
-| BFF 上游与限流 | `DISASTERAWARE_REQUEST_TIMEOUT_MS`、`HAZARD_SOURCE_TIMEOUT_MS`、`BFF_AUTHORIZE_RATE_LIMIT_MAX`、`BFF_AI_RATE_LIMIT_MAX`、`BFF_HAZARD_RATE_LIMIT_MAX` | 缺失时依次使用 10,000 ms、8,000 ms、10、30、120；代码会限制其最大值。当前 Compose 未显式传递这些值。 |
-| FastAPI 运行时 | `ANALYTICS_ADMIN_TOKEN`、`ANALYTICS_CORS_ORIGINS`、`APP_ENV`、`LOG_LEVEL`                                                                            | 管理令牌只在服务端使用；CORS 来源由部署配置确定。                                                    |
+| 范围           | 变量或配置                                                                                                                                           | 边界                                                                                                                              |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 浏览器构建     | `VITE_MAPBOX_TOKEN`、`VITE_PYTHON_API_URL`、`VITE_3D_TILES_URL`、`VITE_CESIUM_ION_TOKEN`、`VITE_LOG_LEVEL`                                           | 会进入客户端产物，只能放公开配置。                                                                                                |
+| Express 运行时 | DisasterAware 凭据、`AI_PROVIDER`、`AI_WORKFLOW_*`、`ARK_*`、`VOLCENGINE_AI_PROVIDER` 兼容别名、`BFF_AI_STREAM_RESUME_*`、`PORT` 与日志级别          | 只在服务端读取；不得改用 `VITE_` 前缀。`PORT` 缺失时为 8080；SSE 恢复配置只控制单实例短时会话的 TTL、事件数、字节数和会话数上限。 |
+| BFF 上游与限流 | `DISASTERAWARE_REQUEST_TIMEOUT_MS`、`HAZARD_SOURCE_TIMEOUT_MS`、`BFF_AUTHORIZE_RATE_LIMIT_MAX`、`BFF_AI_RATE_LIMIT_MAX`、`BFF_HAZARD_RATE_LIMIT_MAX` | 缺失时依次使用 10,000 ms、8,000 ms、10、30、120；代码会限制其最大值。当前 Compose 未显式传递这些值。                              |
+| FastAPI 运行时 | `ANALYTICS_ADMIN_TOKEN`、`ANALYTICS_CORS_ORIGINS`、`APP_ENV`、`LOG_LEVEL`                                                                            | 管理令牌只在服务端使用；CORS 来源由部署配置确定。                                                                                 |
 
 日志不得记录凭据、token、Cookie、完整 header、请求/响应 body、原始异常消息或堆栈。`ServiceError` 可保留 `responseBody` 和 `cause` 供调用层判断；新增调用方不得直接渲染或记录这些字段。现有 Analytics 4xx 展示路径是第 7.6 节记录的待收口例外。
 
@@ -407,9 +407,9 @@ Compose 中：
 
 ### 14.2 AI 与会话
 
-- 会话只保存在组件生命周期内，没有服务端会话 ID、跨刷新恢复、用户级隔离或审计存储；
+- 会话只保存在组件生命周期和 BFF 进程内，没有跨刷新持久化、用户级隔离、跨实例共享或审计存储；BFF 会在短时有界窗口内缓存 SSE 事件供 `Last-Event-ID` 恢复；
 - Provider 降级只发生在单次请求响应开始前，没有健康探测、熔断、持久化失败计数或用户/模型配额；
-- 已建立的上游 SSE 若中途失败，BFF 结束响应，客户端以缺失 `[DONE]` 的不完整流处理。
+- 已建立的上游 SSE 若中途失败，BFF 发布安全 `event: error` 并结束会话；客户端不会把明确 provider 错误自动重试，传输异常则按有限次数自动恢复。
 
 ### 14.3 数据与产品
 

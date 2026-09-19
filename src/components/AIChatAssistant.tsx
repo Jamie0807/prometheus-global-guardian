@@ -148,6 +148,7 @@ const AIChatAssistant: React.FC = () => {
     messages,
     input,
     errorText,
+    reconnectingText,
     isStreaming,
     canRetry,
     setInput,
@@ -268,6 +269,7 @@ const AIChatAssistant: React.FC = () => {
           ))}
 
           {/* 错误提示 */}
+          {reconnectingText && <div className="ai-error">🔄 {reconnectingText}</div>}
           {errorText && (
             <div className="ai-error">
               <span>⚠️ {errorText}</span>

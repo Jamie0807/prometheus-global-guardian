@@ -305,7 +305,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
 
   app.use(createRawBodyMiddleware());
 
-  registerAIChatRoute(app, [aiRateLimit]);
+  registerAIChatRoute(app, [aiRateLimit], { env: serverEnv, fetchImpl: upstreamFetch });
 
   app.use("/api", (req: Request, res: Response, next: NextFunction) => {
     // 本地 API 各自限定一种 HTTP 方法；未列出的路径继续交给后续路由判断。

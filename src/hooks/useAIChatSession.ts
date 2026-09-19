@@ -17,6 +17,7 @@ interface RetrySnapshot {
   history: ChatMessage[];
   userMessage: ChatMessage;
   context: DisasterContext | undefined;
+  failedAssistantId?: string;
 }
 
 interface ActiveRequest {
@@ -30,6 +31,7 @@ export interface AIChatSession {
   messages: readonly ChatMessage[];
   input: string;
   errorText: string;
+  reconnectingText: string;
   isStreaming: boolean;
   canRetry: boolean;
   setInput: (value: string) => void;
@@ -83,6 +85,7 @@ export function useAIChatSession(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [errorText, setErrorText] = useState("");
+  const [reconnectingText, setReconnectingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [retrySnapshot, setRetrySnapshot] = useState<RetrySnapshot>();
   const activeRequestRef = useRef<ActiveRequest | undefined>(undefined);
@@ -90,6 +93,7 @@ export function useAIChatSession(
 
   const stop = useCallback(() => {
     const active = activeRequestRef.current;
+    setReconnectingText("");
     if (!active) return;
 
     // 先使当前请求失效，再 abort；迟到的分块会被 requestId 守卫忽略。
@@ -130,14 +134,30 @@ export function useAIChatSession(
       // 将活动请求写入 ref，使停止、关闭和卸载都能取消同一条流。
       activeRequestRef.current = activeRequest;
       setErrorText("");
+      setReconnectingText("");
       setRetrySnapshot(undefined);
-      setMessages((current) => (appendUserMessage ? [...current, snapshot.userMessage] : current));
+      setMessages((current) => {
+        const withoutFailedReply = snapshot.failedAssistantId
+          ? current.filter((message) => message.id !== snapshot.failedAssistantId)
+          : current;
+        return appendUserMessage
+          ? [...withoutFailedReply, snapshot.userMessage]
+          : withoutFailedReply;
+      });
       setIsStreaming(true);
 
       // 防止取消后的异步读取或旧请求分块覆盖当前会话状态。
       const isCurrentRequest = (): boolean => activeRequestRef.current?.requestId === requestId;
       const outcome = await streamChatMessage(snapshot.history, snapshot.context, {
         signal: controller.signal,
+        onReconnect: (attempt) => {
+          if (isCurrentRequest()) {
+            setReconnectingText(`连接中断，正在自动恢复（第 ${attempt}/3 次）……`);
+          }
+        },
+        onReconnected: () => {
+          if (isCurrentRequest()) setReconnectingText("");
+        },
         onChunk: (chunk) => {
           if (!isCurrentRequest()) return;
           if (!chunk.trim()) return;
@@ -160,6 +180,7 @@ export function useAIChatSession(
       if (!isCurrentRequest()) return;
 
       if (outcome.kind === "completed") {
+        setReconnectingText("");
         if (activeRequest.assistantCreated) {
           setMessages((current) =>
             current.map((message) =>
@@ -170,6 +191,7 @@ export function useAIChatSession(
           );
         }
       } else if (outcome.kind === "cancelled") {
+        setReconnectingText("");
         if (activeRequest.assistantCreated) {
           setMessages((current) =>
             current.map((message) =>
@@ -180,6 +202,7 @@ export function useAIChatSession(
           );
         }
       } else {
+        setReconnectingText("");
         if (activeRequest.assistantCreated) {
           setMessages((current) =>
             current.map((message) =>
@@ -189,7 +212,7 @@ export function useAIChatSession(
         }
         // 失败时保存本次请求快照，供 retry 原样重发。
         setErrorText(outcome.message);
-        setRetrySnapshot(snapshot);
+        setRetrySnapshot({ ...snapshot, failedAssistantId: assistantId });
       }
 
       if (isCurrentRequest()) {
@@ -238,6 +261,7 @@ export function useAIChatSession(
     setMessages([]);
     setInput("");
     setErrorText("");
+    setReconnectingText("");
     setRetrySnapshot(undefined);
   }, [stop]);
 
@@ -258,6 +282,7 @@ export function useAIChatSession(
     messages,
     input,
     errorText,
+    reconnectingText,
     isStreaming,
     canRetry: Boolean(retrySnapshot) && !isStreaming,
     setInput,

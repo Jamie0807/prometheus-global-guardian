@@ -176,6 +176,11 @@ DISASTERAWARE_REQUEST_TIMEOUT_MS=10000
 BFF_AUTHORIZE_RATE_LIMIT_MAX=10
 BFF_AI_RATE_LIMIT_MAX=30
 BFF_HAZARD_RATE_LIMIT_MAX=120
+# AI SSE 断连恢复的单实例短时内存会话上限
+BFF_AI_STREAM_RESUME_TTL_MS=30000
+BFF_AI_STREAM_RESUME_MAX_EVENTS=256
+BFF_AI_STREAM_RESUME_MAX_BYTES=524288
+BFF_AI_STREAM_RESUME_MAX_SESSIONS=100
 LOG_LEVEL=info
 
 AI_PROVIDER=router
@@ -240,7 +245,7 @@ pnpm run test:component
 pnpm run test:python
 ```
 
-The current automated suites contain 179 frontend Service tests, 75 React component tests, and 40 Python unittest cases. They cover request and contract boundaries, hazard transformation, analytics presentation, AI streaming, report generation, map/UI state ownership, FastAPI routes, and analysis-result semantics. Component tests use Vitest, React Testing Library, and jsdom; Python tests do not require a running analytics service or real external data.
+The current automated suites contain 191 frontend Service tests, 81 React component tests, and 44 Python unittest cases. They cover request and contract boundaries, hazard transformation, analytics presentation, AI streaming and resumable sessions, report generation, map/UI state ownership, FastAPI routes, and analysis-result semantics. Component tests use Vitest, React Testing Library, and jsdom; Python tests do not require a running analytics service or real external data.
 
 Useful commands:
 
@@ -546,6 +551,11 @@ DISASTERAWARE_REQUEST_TIMEOUT_MS=10000
 BFF_AUTHORIZE_RATE_LIMIT_MAX=10
 BFF_AI_RATE_LIMIT_MAX=30
 BFF_HAZARD_RATE_LIMIT_MAX=120
+# AI SSE 断连恢复的单实例短时内存会话上限
+BFF_AI_STREAM_RESUME_TTL_MS=30000
+BFF_AI_STREAM_RESUME_MAX_EVENTS=256
+BFF_AI_STREAM_RESUME_MAX_BYTES=524288
+BFF_AI_STREAM_RESUME_MAX_SESSIONS=100
 LOG_LEVEL=info
 
 AI_PROVIDER=router
@@ -610,7 +620,7 @@ pnpm run test:component
 pnpm run test:python
 ```
 
-当前自动化套件包含 179 项前端 Service 测试、75 项 React 组件测试和 40 项 Python unittest。覆盖请求与契约边界、灾害转换、分析展示、AI 流式处理、报告生成、地图/UI 状态归属、FastAPI 路由和分析结果语义。组件测试使用 Vitest、React Testing Library 和 jsdom；Python 测试不要求启动分析服务，也不访问真实外部数据。
+当前自动化套件包含 191 项前端 Service 测试、81 项 React 组件测试和 44 项 Python unittest。覆盖请求与契约边界、灾害转换、分析展示、AI 流式处理与可恢复会话、报告生成、地图/UI 状态归属、FastAPI 路由和分析结果语义。组件测试使用 Vitest、React Testing Library 和 jsdom；Python 测试不要求启动分析服务，也不访问真实外部数据。
 
 常用命令：
 

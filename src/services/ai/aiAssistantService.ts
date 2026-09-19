@@ -43,10 +43,22 @@ export type AIStreamOutcome =
 export interface StreamChatOptions {
   signal?: AbortSignal;
   onChunk: (chunk: string) => void;
+  requestId?: string;
+  onReconnect?: (attempt: number, delayMs: number) => void;
+  onReconnected?: () => void;
 }
 
 const STREAM_ERROR = "AI 响应异常，请重试。";
 const INCOMPLETE_STREAM_ERROR = "AI 响应流意外中断，请重试。";
+const MAX_AUTO_RECONNECTS = 3;
+const INITIAL_RECONNECT_DELAY_MS = 200;
+
+type InternalStreamOutcome =
+  | { kind: "completed" }
+  | { kind: "cancelled" }
+  | { kind: "failed"; message: string; retryable: boolean };
+
+class NonRetryableStreamError extends Error {}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -55,7 +67,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 async function readChatCompletionEvents(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   options: StreamChatOptions,
-): Promise<AIStreamOutcome> {
+  seenEventIds: Set<string>,
+  lastEventId: { value?: string },
+): Promise<InternalStreamOutcome> {
   const decoder = new TextDecoder();
   let buffer = "";
   let completed = false;
@@ -74,6 +88,7 @@ async function readChatCompletionEvents(
     // 一个 SSE 事件可包含多行 data，需按协议合并后再解析 JSON。
     const data: string[] = [];
     let eventType = "";
+    let eventId: string | undefined;
     for (const line of event.split(/\r?\n/)) {
       if (line.startsWith(":")) continue;
       const colon = line.indexOf(":");
@@ -81,13 +96,27 @@ async function readChatCompletionEvents(
       const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
       if (field === "data") data.push(value);
       if (field === "event") eventType = value;
+      if (field === "id") eventId = value;
     }
-    if (eventType === "error") throw new Error(STREAM_ERROR);
+    if (eventType === "error") throw new NonRetryableStreamError(STREAM_ERROR);
     if (data.length === 0) return false;
     const payload = data.join("\n");
     if (payload.trim() === "[DONE]") return true;
-    const parsed: unknown = JSON.parse(payload);
-    if (!isRecord(parsed) || "error" in parsed) throw new Error(STREAM_ERROR);
+    const duplicate = eventId !== undefined && seenEventIds.has(eventId);
+    if (eventId !== undefined) {
+      if (!duplicate) {
+        seenEventIds.add(eventId);
+        lastEventId.value = eventId;
+      }
+    }
+    if (duplicate) return false;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      throw new NonRetryableStreamError(STREAM_ERROR);
+    }
+    if (!isRecord(parsed) || "error" in parsed) throw new NonRetryableStreamError(STREAM_ERROR);
     const choice: unknown = Array.isArray(parsed.choices) ? parsed.choices[0] : undefined;
     const delta = isRecord(choice) ? choice.delta : undefined;
     if (isRecord(delta) && typeof delta.content === "string" && delta.content) {
@@ -119,13 +148,15 @@ async function readChatCompletionEvents(
         if (options.signal?.aborted) return { kind: "cancelled" };
         return completed
           ? { kind: "completed" }
-          : { kind: "failed", message: INCOMPLETE_STREAM_ERROR };
+          : { kind: "failed", message: INCOMPLETE_STREAM_ERROR, retryable: true };
       }
     }
-  } catch {
-    return options.signal?.aborted
-      ? { kind: "cancelled" }
-      : { kind: "failed", message: STREAM_ERROR };
+  } catch (error: unknown) {
+    if (options.signal?.aborted) return { kind: "cancelled" };
+    if (error instanceof NonRetryableStreamError) {
+      return { kind: "failed", message: error.message, retryable: false };
+    }
+    return { kind: "failed", message: STREAM_ERROR, retryable: true };
   } finally {
     options.signal?.removeEventListener("abort", onAbort);
     try {
@@ -136,6 +167,35 @@ async function readChatCompletionEvents(
   }
 }
 
+function createRequestId(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    const randomPart = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `ai-${randomPart}`;
+  }
+  return `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function waitForReconnect(delayMs: number, signal?: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      resolve(false);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 // ─── 主流式请求函数 ──────────────────────────────────────────────────────────
 
 export async function streamChatMessage(
@@ -144,51 +204,84 @@ export async function streamChatMessage(
   options: StreamChatOptions,
 ): Promise<AIStreamOutcome> {
   if (options.signal?.aborted) return { kind: "cancelled" };
-  try {
-    const resp = await fetch(AI_CHAT_ENDPOINT, {
-      method: "POST",
-      signal: options.signal,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messages,
-        disasterContext: context ?? null,
-      }),
-    });
+  const requestId = options.requestId ?? createRequestId();
+  const seenEventIds = new Set<string>();
+  const lastEventId: { value?: string } = {};
+  let reconnectAttempt = 0;
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      let code = "";
+  while (true) {
+    let outcome: InternalStreamOutcome;
+    try {
+      const resp = await fetch(AI_CHAT_ENDPOINT, {
+        method: "POST",
+        signal: options.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "X-AI-Request-Id": requestId,
+          ...(lastEventId.value
+            ? { "Last-Event-ID": lastEventId.value }
+            : reconnectAttempt > 0
+              ? { "Last-Event-ID": "0" }
+              : {}),
+        },
+        body: JSON.stringify({
+          messages,
+          disasterContext: context ?? null,
+        }),
+      });
 
-      try {
-        const parsed: unknown = JSON.parse(text);
-        if (isRecord(parsed) && typeof parsed.code === "string") code = parsed.code;
-      } catch {
-        // 不得将非 JSON 错误响应体暴露给调用方。
+      if (!resp.ok) {
+        const text = await resp.text();
+        let code = "";
+
+        try {
+          const parsed: unknown = JSON.parse(text);
+          if (isRecord(parsed) && typeof parsed.code === "string") code = parsed.code;
+        } catch {
+          // 不得将非 JSON 错误响应体暴露给调用方。
+        }
+
+        if (options.signal?.aborted) return { kind: "cancelled" };
+        if (resp.status === 503 && DEMO_FALLBACK_CODES.has(code)) {
+          // 仅服务端明确标记为缺少 AI 配置时才使用本地演示回复。
+          return await runDemoMode(messages, context, options);
+        }
+
+        outcome = {
+          kind: "failed",
+          message: `AI 请求失败 (${resp.status})，请稍后重试。`,
+          retryable: false,
+        };
+      } else {
+        if (reconnectAttempt > 0) options.onReconnected?.();
+        const reader = resp.body?.getReader();
+        outcome = reader
+          ? await readChatCompletionEvents(reader, options, seenEventIds, lastEventId)
+          : {
+              kind: "failed",
+              message: "无法读取 AI 响应流，请重试。",
+              retryable: true,
+            };
       }
-
-      if (options.signal?.aborted) return { kind: "cancelled" };
-      if (resp.status === 503 && DEMO_FALLBACK_CODES.has(code)) {
-        // 仅服务端明确标记为缺少 AI 配置时才使用本地演示回复。
-        return await runDemoMode(messages, context, options);
-      }
-
-      return { kind: "failed", message: `AI 请求失败 (${resp.status})，请稍后重试。` };
-    }
-
-    const reader = resp.body?.getReader();
-    if (!reader) {
-      return options.signal?.aborted
+    } catch {
+      outcome = options.signal?.aborted
         ? { kind: "cancelled" }
-        : { kind: "failed", message: "无法读取 AI 响应流，请重试。" };
+        : { kind: "failed", message: "网络请求失败，请检查网络连接。", retryable: true };
     }
 
-    return await readChatCompletionEvents(reader, options);
-  } catch {
-    return options.signal?.aborted
-      ? { kind: "cancelled" }
-      : { kind: "failed", message: "网络请求失败，请检查网络连接。" };
+    if (
+      outcome.kind !== "failed" ||
+      !outcome.retryable ||
+      reconnectAttempt >= MAX_AUTO_RECONNECTS
+    ) {
+      if (outcome.kind === "failed") return { kind: "failed", message: outcome.message };
+      return outcome;
+    }
+
+    reconnectAttempt += 1;
+    const delayMs = INITIAL_RECONNECT_DELAY_MS * 2 ** (reconnectAttempt - 1);
+    options.onReconnect?.(reconnectAttempt, delayMs);
+    if (!(await waitForReconnect(delayMs, options.signal))) return { kind: "cancelled" };
   }
 }
 

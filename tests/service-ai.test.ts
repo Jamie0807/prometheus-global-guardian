@@ -61,6 +61,16 @@ describe("AI 助手 Service", () => {
         body: JSON.stringify({ messages, disasterContext: null }),
       }),
     );
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/ai/chat",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-AI-Request-Id": expect.stringMatching(
+            /^(?:[0-9a-f]{8}-[0-9a-f-]{27}|ai-[0-9a-f]{32}|ai-\d+-[a-z0-9]+)$/i,
+          ),
+        }),
+      }),
+    );
     expect(chunks).toEqual(["风险", "分析"]);
     expect(response.body?.locked).toBe(false);
   });
@@ -174,6 +184,72 @@ describe("AI 助手 Service", () => {
     const outcome = await streamChatMessage(messages, undefined, { onChunk: vi.fn() });
     expect(outcome).toEqual({ kind: "failed", message: expect.any(String) });
     expect(JSON.stringify(outcome)).not.toContain("provider-secret");
+  });
+
+  it("断流后复用请求 ID 和最后事件序号自动恢复，且不重复增量", async () => {
+    vi.useFakeTimers();
+    let pushed = false;
+    const firstResponse = new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pushed) {
+            controller.error(new Error("temporary disconnect"));
+            return;
+          }
+          pushed = true;
+          controller.enqueue(
+            new TextEncoder().encode('id: 1\ndata: {"choices":[{"delta":{"content":"风险"}}]}\n\n'),
+          );
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+    const secondResponse = sseResponse(
+      'id: 1\ndata: {"choices":[{"delta":{"content":"风险"}}]}\n\n' +
+        'id: 2\ndata: {"choices":[{"delta":{"content":"分析"}}]}\n\n' +
+        "id: 3\ndata: [DONE]\n\n",
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(firstResponse)
+      .mockResolvedValueOnce(secondResponse);
+    vi.stubGlobal("fetch", fetchMock);
+    const chunks: string[] = [];
+    const onReconnect = vi.fn();
+    const pending = streamChatMessage(messages, undefined, {
+      requestId: "resume-request",
+      onChunk: (chunk) => chunks.push(chunk),
+      onReconnect,
+    });
+
+    await vi.runAllTimersAsync();
+    await expect(pending).resolves.toEqual({ kind: "completed" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
+      "X-AI-Request-Id": "resume-request",
+    });
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
+      "X-AI-Request-Id": "resume-request",
+      "Last-Event-ID": "1",
+    });
+    expect(chunks).toEqual(["风险", "分析"]);
+    expect(onReconnect).toHaveBeenCalledWith(1, 200);
+  });
+
+  it("首个事件尚未到达时，自动恢复从事件序号零续传", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("connection closed before first event"))
+      .mockResolvedValueOnce(sseResponse("data: [DONE]\n\n"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = streamChatMessage(messages, undefined, { onChunk: vi.fn() });
+    await vi.runAllTimersAsync();
+
+    await expect(pending).resolves.toEqual({ kind: "completed" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({ "Last-Event-ID": "0" });
   });
 
   it("预取消时不发送请求", async () => {

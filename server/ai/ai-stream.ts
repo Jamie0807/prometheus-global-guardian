@@ -1,8 +1,25 @@
 /** 在工作流、Responses 和聊天补全 SSE 格式之间转换 AI 流式响应。 */
 import { Transform } from "stream";
+import { StringDecoder } from "node:string_decoder";
 
 interface WorkflowStreamState {
   previousWorkflowResult?: string;
+}
+
+const MAX_SSE_FRAME_BYTES = 64 * 1024;
+
+function splitBoundedSSEFrames(
+  buffer: string,
+): { frames: string[]; remainder: string } | undefined {
+  const frames = buffer.split(/\r?\n\r?\n/);
+  const remainder = frames.pop() ?? "";
+  if (
+    frames.some((frame) => Buffer.byteLength(frame, "utf8") > MAX_SSE_FRAME_BYTES) ||
+    Buffer.byteLength(remainder, "utf8") > MAX_SSE_FRAME_BYTES
+  ) {
+    return undefined;
+  }
+  return { frames, remainder };
 }
 
 const toChatCompletionDelta = (delta: string): string =>
@@ -148,21 +165,31 @@ export function convertWorkflowSSEToChatCompletionsSSE(
 export function createWorkflowToChatCompletionsStream(): Transform {
   let buffer = "";
   const state = {};
+  const decoder = new StringDecoder("utf8");
 
   return new Transform({
     transform(chunk, _encoding, callback) {
       // 上游 TCP 分块可能截断 SSE 事件；只转换以空行结束的完整事件。
-      buffer += chunk.toString("utf8");
-      const parts = buffer.split(/\r?\n\r?\n/);
-      buffer = parts.pop() ?? "";
+      buffer += typeof chunk === "string" ? decoder.end() + chunk : decoder.write(chunk);
+      const split = splitBoundedSSEFrames(buffer);
+      if (!split) {
+        callback(new Error("SSE frame exceeds the allowed size."));
+        return;
+      }
+      buffer = split.remainder;
 
-      for (const part of parts) {
+      for (const part of split.frames) {
         this.push(convertWorkflowSSEToChatCompletionsSSE(`${part}\n\n`, state));
       }
 
       callback();
     },
     flush(callback) {
+      buffer += decoder.end();
+      if (Buffer.byteLength(buffer, "utf8") > MAX_SSE_FRAME_BYTES) {
+        callback(new Error("SSE frame exceeds the allowed size."));
+        return;
+      }
       if (buffer.trim()) {
         this.push(convertWorkflowSSEToChatCompletionsSSE(buffer, state));
       }
@@ -173,21 +200,31 @@ export function createWorkflowToChatCompletionsStream(): Transform {
 
 export function createResponsesToChatCompletionsStream(): Transform {
   let buffer = "";
+  const decoder = new StringDecoder("utf8");
 
   return new Transform({
     transform(chunk, _encoding, callback) {
       // 保留未完成的 SSE 帧，直到收到下一块数据或 flush。
-      buffer += chunk.toString("utf8");
-      const parts = buffer.split(/\r?\n\r?\n/);
-      buffer = parts.pop() ?? "";
+      buffer += typeof chunk === "string" ? decoder.end() + chunk : decoder.write(chunk);
+      const split = splitBoundedSSEFrames(buffer);
+      if (!split) {
+        callback(new Error("SSE frame exceeds the allowed size."));
+        return;
+      }
+      buffer = split.remainder;
 
-      for (const part of parts) {
+      for (const part of split.frames) {
         this.push(convertResponsesSSEToChatCompletionsSSE(`${part}\n\n`));
       }
 
       callback();
     },
     flush(callback) {
+      buffer += decoder.end();
+      if (Buffer.byteLength(buffer, "utf8") > MAX_SSE_FRAME_BYTES) {
+        callback(new Error("SSE frame exceeds the allowed size."));
+        return;
+      }
       if (buffer.trim()) {
         this.push(convertResponsesSSEToChatCompletionsSSE(buffer));
       }
