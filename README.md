@@ -245,7 +245,7 @@ pnpm run test:component
 pnpm run test:python
 ```
 
-The current automated suites contain 191 frontend Service tests, 81 React component tests, and 44 Python unittest cases. They cover request and contract boundaries, hazard transformation, analytics presentation, AI streaming and resumable sessions, report generation, map/UI state ownership, FastAPI routes, and analysis-result semantics. Component tests use Vitest, React Testing Library, and jsdom; Python tests do not require a running analytics service or real external data.
+The current automated suites contain 194 frontend Service tests, 81 React component tests, and 49 Python unittest cases. They cover request and contract boundaries, hazard transformation, analytics presentation, versioned analytics response envelopes, AI streaming and resumable sessions, report generation, map/UI state ownership, FastAPI routes, and analysis-result semantics. Component tests use Vitest, React Testing Library, and jsdom; Python tests do not require a running analytics service or real external data.
 
 Useful commands:
 
@@ -323,6 +323,8 @@ It listens on `http://localhost:8080` by default. `pnpm run start:static` serves
 | Basic analysis            | `POST /api/v1/analyze`, `/statistics`, `/predictions`, `/risk-assessment`, `/etl/process`                                                                             |
 | Quality and unified model | `POST /api/v1/quality/assess`, `GET /api/v1/quality/thresholds`, `GET /api/v1/quality/history`, `POST /api/v1/unified-model/transform`, `/api/v1/unified-model/merge` |
 | Pivot workflows           | `POST /api/v1/pivot/create`, `/query`, `/trend-analysis`, `/risk-score`, `/summary`                                                                                   |
+
+All `/api/v1` business endpoints return a versioned response envelope. Successful responses include `schemaVersion`, `requestId`, `generatedAt`, `modelVersion`, `inputSnapshotId`, `warnings`, `processingTime`, and the compatibility alias `timestamp`; validation and internal failures use the stable `ANALYTICS_VALIDATION_ERROR` or `ANALYTICS_INTERNAL_ERROR` error envelope. Shared examples live in `contracts/analytics-response-envelope.json` and `contracts/analytics-error-envelope.json`.
 
 ### Data Sources
 
@@ -620,7 +622,7 @@ pnpm run test:component
 pnpm run test:python
 ```
 
-当前自动化套件包含 191 项前端 Service 测试、81 项 React 组件测试和 44 项 Python unittest。覆盖请求与契约边界、灾害转换、分析展示、AI 流式处理与可恢复会话、报告生成、地图/UI 状态归属、FastAPI 路由和分析结果语义。组件测试使用 Vitest、React Testing Library 和 jsdom；Python 测试不要求启动分析服务，也不访问真实外部数据。
+当前自动化套件包含 194 项前端 Service 测试、81 项 React 组件测试和 49 项 Python unittest。覆盖请求与契约边界、灾害转换、分析展示、版本化 Analytics 响应信封、AI 流式处理与可恢复会话、报告生成、地图/UI 状态归属、FastAPI 路由和分析结果语义。组件测试使用 Vitest、React Testing Library 和 jsdom；Python 测试不要求启动分析服务，也不访问真实外部数据。
 
 常用命令：
 
@@ -698,6 +700,8 @@ pnpm start
 | 基础分析       | `POST /api/v1/analyze`、`/statistics`、`/predictions`、`/risk-assessment`、`/etl/process`                                                                             |
 | 质量与统一模型 | `POST /api/v1/quality/assess`、`GET /api/v1/quality/thresholds`、`GET /api/v1/quality/history`、`POST /api/v1/unified-model/transform`、`/api/v1/unified-model/merge` |
 | 透视分析       | `POST /api/v1/pivot/create`、`/query`、`/trend-analysis`、`/risk-score`、`/summary`                                                                                   |
+
+所有 `/api/v1` 业务接口都返回版本化响应信封。成功响应包含 `schemaVersion`、`requestId`、`generatedAt`、`modelVersion`、`inputSnapshotId`、`warnings`、`processingTime` 和兼容字段 `timestamp`；校验失败和内部失败分别使用稳定的 `ANALYTICS_VALIDATION_ERROR`、`ANALYTICS_INTERNAL_ERROR` 错误信封。共享样本位于 `contracts/analytics-response-envelope.json` 和 `contracts/analytics-error-envelope.json`。
 
 ### 数据源
 

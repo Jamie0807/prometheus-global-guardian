@@ -59,11 +59,54 @@ class ApiRouteTests(unittest.TestCase):
     def test_core_analysis_routes_return_success_envelopes_for_representative_hazard(self):
         for path in ["/api/v1/statistics", "/api/v1/predictions", "/api/v1/risk-assessment"]:
             with self.subTest(path=path):
-                response = self.client.post(path, json={"hazards": [HAZARD]})
+                response = self.client.post(
+                    path,
+                    json={"hazards": [HAZARD]},
+                    headers={"X-Request-Id": "route-request-id"},
+                )
                 self.assertEqual(response.status_code, 200)
                 body = response.json()
                 self.assertIs(body["success"], True)
                 self.assertIn("data", body)
+                self.assertEqual(body["schemaVersion"], "1.0")
+                self.assertEqual(body["requestId"], "route-request-id")
+                self.assertEqual(body["modelVersion"], "analytics-model-v1")
+                self.assertEqual(body["warnings"], [])
+                self.assertEqual(response.headers["X-Request-Id"], "route-request-id")
+
+    def test_internal_errors_use_a_stable_error_envelope(self):
+        with patch.object(
+            self.app.state.analytics_service,
+            "statistics",
+            new=AsyncMock(side_effect=RuntimeError("secret path")),
+        ):
+            response = self.client.post(
+                "/api/v1/statistics",
+                json={"hazards": [HAZARD]},
+                headers={"X-Request-Id": "error-request-id"},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["success"], False)
+        self.assertEqual(response.json()["schemaVersion"], "1.0")
+        self.assertEqual(response.json()["error"], {
+            "code": "ANALYTICS_INTERNAL_ERROR",
+            "message": "Analysis service failed to process the request.",
+            "requestId": "error-request-id",
+        })
+        self.assertNotIn("secret path", response.text)
+
+    def test_validation_errors_use_a_stable_error_envelope(self):
+        response = self.client.post(
+            "/api/v1/analyze",
+            json={"hazards": [HAZARD] * 1001},
+            headers={"X-Request-Id": "validation-request-id"},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["error"]["code"], "ANALYTICS_VALIDATION_ERROR")
+        self.assertEqual(response.json()["error"]["requestId"], "validation-request-id")
+        self.assertNotIn("hazards.1000", response.text)
 
     def test_risk_assessment_serializes_zero_score_for_missing_magnitude(self):
         response = self.client.post(
@@ -85,7 +128,8 @@ class ApiRouteTests(unittest.TestCase):
             ):
                 response = self.client.post(path, json={"hazards": [HAZARD]}, headers={"X-Request-Id": "valid-request-id"})
             self.assertEqual(response.status_code, 500)
-            self.assertEqual(response.json()["detail"]["code"], "ANALYSIS_INTERNAL_ERROR")
+            self.assertFalse(response.json()["success"])
+            self.assertEqual(response.json()["error"]["code"], "ANALYTICS_INTERNAL_ERROR")
             self.assertNotIn("secret path", response.text)
             self.assertEqual(response.headers["X-Request-Id"], "valid-request-id")
 
@@ -127,7 +171,9 @@ class ApiRouteTests(unittest.TestCase):
             with self.subTest(path=path), patch.object(self.app.state.pivot_service, method, return_value=expected) as service_method:
                 response = self.client.post(path, json=payload)
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json(), expected)
+            self.assertTrue(response.json()["success"])
+            self.assertEqual(response.json()["data"], expected["data"])
+            self.assertEqual(response.json()["schemaVersion"], "1.0")
             service_method.assert_called_once()
 
     def test_management_routes_keep_404_policy_and_work_on_application_state(self):

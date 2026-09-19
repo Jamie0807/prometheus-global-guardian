@@ -1,5 +1,6 @@
 /** 验证分析服务通用响应契约的解析和类型约束。 */
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { readFileSync } from "node:fs";
 import type {
   AnalyticsResponse,
   LegacyAnalyticsResponse,
@@ -18,6 +19,47 @@ import {
 } from "../src/services/analytics/contracts/common";
 
 describe("analytics response contracts", () => {
+  it("parses the shared versioned response envelope and preserves metadata", () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL("../contracts/analytics-response-envelope.json", import.meta.url),
+        "utf8",
+      ),
+    ) as unknown;
+
+    expect(parseAnalyticsSuccess(fixture, (value) => parseRecord(value, "data"))).toMatchObject({
+      schemaVersion: "1.0",
+      requestId: "fixture-request-id",
+      generatedAt: "2026-09-19T00:00:00Z",
+      modelVersion: "analytics-model-v1",
+      inputSnapshotId: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      warnings: [],
+    });
+  });
+
+  it("parses the shared error envelope without exposing service details", () => {
+    const fixture = JSON.parse(
+      readFileSync("contracts/analytics-error-envelope.json", "utf8"),
+    ) as unknown;
+
+    expect(() => parseAnalyticsSuccess(fixture, () => ({}))).toThrowError(
+      expect.objectContaining({
+        code: "ANALYTICS_REQUEST_FAILED",
+        serviceCode: "ANALYTICS_INTERNAL_ERROR",
+        requestId: "fixture-request-id",
+      }),
+    );
+  });
+
+  it("rejects a partial versioned metadata envelope", () => {
+    expect(() =>
+      parseAnalyticsSuccess(
+        { success: true, data: {}, schemaVersion: "1.0", requestId: "request-only" },
+        () => ({}),
+      ),
+    ).toThrowError(expect.objectContaining({ path: "response.generatedAt" }));
+  });
+
   it("rejects non-record values and accepts plain objects", () => {
     expect(parseRecord({ value: 1 }, "data")).toEqual({ value: 1 });
     for (const value of [null, [], "object", 1]) {
@@ -139,6 +181,12 @@ describe("analytics response contracts", () => {
     expectTypeOf<AnalyticsResponse<{ score: number }>>().toEqualTypeOf<{
       success: true;
       data: { score: number };
+      schemaVersion?: string;
+      requestId?: string;
+      generatedAt?: string;
+      modelVersion?: string;
+      inputSnapshotId?: string;
+      warnings?: string[];
       processingTime?: number;
       timestamp?: string;
     }>();

@@ -1,0 +1,14 @@
+{
+  "success": true,
+  "data": {
+    "score": 0
+  },
+  "processingTime": 0,
+  "timestamp": "2026-09-19T00:00:00Z",
+  "schemaVersion": "1.0",
+  "requestId": "fixture-request-id",
+  "generatedAt": "2026-09-19T00:00:00Z",
+  "modelVersion": "analytics-model-v1",
+  "inputSnapshotId": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "warnings": []
+}

@@ -97,22 +97,35 @@ async function fetchWithRetry(
       if (response.ok) {
         return response;
       }
+      if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+        await throwAnalyticsResponseError(response);
+      }
+      if (i === retries - 1) {
+        await throwAnalyticsResponseError(response);
+      }
+      const delay = Math.min(1000 * Math.pow(2, i), 10000);
+      logger.warn("request_retry_scheduled", { attempt: i + 1, delay, retries });
+      await new Promise((resolve) => setTimeout(resolve, delay));
     } catch (error) {
+      if (error instanceof AnalyticsBusinessError || error instanceof AnalyticsContractError) {
+        throw error;
+      }
       const status =
         error && typeof error === "object" && "status" in error
           ? (error.status as number | undefined)
           : undefined;
       if (status !== undefined && status >= 400 && status < 500 && status !== 429) {
-        const responseBody =
-          error && typeof error === "object" && "responseBody" in error
-            ? String(error.responseBody ?? "")
-            : "";
-        throw new Error(`请求失败: ${status}${responseBody ? ` ${responseBody}` : ""}`);
+        throw new AnalyticsBusinessError();
       }
 
-      lastError = error instanceof Error ? error : new Error("请求失败");
+      lastError =
+        status !== undefined
+          ? new AnalyticsBusinessError()
+          : error instanceof Error
+            ? error
+            : new Error("请求失败");
 
-      // 最后一次尝试失败，抛出错误
+      // 最后一次网络尝试失败，抛出错误
       if (i === retries - 1) {
         break;
       }
@@ -133,6 +146,22 @@ async function readAnalyticsJson(response: Response): Promise<unknown> {
   } catch {
     throw new AnalyticsContractError("response.body");
   }
+}
+
+async function throwAnalyticsResponseError(response: Response): Promise<never> {
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new AnalyticsBusinessError();
+  }
+
+  try {
+    parseAnalyticsSuccess(payload, () => undefined);
+  } catch (error: unknown) {
+    if (error instanceof AnalyticsBusinessError) throw error;
+  }
+  throw new AnalyticsBusinessError();
 }
 
 export type { AnalysisRequest, HazardData } from "./analyticsTypes";
@@ -184,8 +213,7 @@ export async function getStatistics(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`统计分析失败: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -223,8 +251,7 @@ export async function getPredictions(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`预测分析失败: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -252,8 +279,7 @@ export async function processETL(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`ETL API failed: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -283,8 +309,7 @@ export async function getRiskAssessment(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`风险评估失败: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -318,8 +343,7 @@ export async function getComprehensiveAnalysis(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Comprehensive analysis API failed: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -357,8 +381,7 @@ export async function assessDataQuality(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`质量评估失败: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -394,8 +417,7 @@ export async function transformToUnifiedModel(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`统一模型转换失败: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -428,8 +450,7 @@ export async function mergeMultiSourceData(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`多数据源合并失败: ${errorText}`);
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -449,7 +470,7 @@ export async function getQualityThresholds(): Promise<AnalyticsSuccess<QualityTh
   try {
     const response = await fetchWithTimeout(`${API_BASE_URL}/api/v1/quality/thresholds`, {}, 5000);
     if (!response.ok) {
-      throw new Error("Failed to fetch quality thresholds");
+      await throwAnalyticsResponseError(response);
     }
     const payload = await readAnalyticsJson(response);
     return parseAnalyticsSuccess(payload, parseQualityThresholds);
@@ -472,7 +493,7 @@ export async function getQualityHistory(
       5000,
     );
     if (!response.ok) {
-      throw new Error("Failed to fetch quality history");
+      await throwAnalyticsResponseError(response);
     }
     const payload = await readAnalyticsJson(response);
     return parseAnalyticsSuccess(payload, parseQualityHistory);
@@ -584,7 +605,7 @@ export async function create4DPivotTable(
     });
 
     if (!response.ok) {
-      throw new Error("Failed to create 4D pivot table");
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -624,7 +645,7 @@ export async function multiDimensionalQuery(
     });
 
     if (!response.ok) {
-      throw new Error("Multi-dimensional query failed");
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -656,7 +677,7 @@ export async function analyze4DTrends(
     });
 
     if (!response.ok) {
-      throw new Error("4D trend analysis failed");
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -688,7 +709,7 @@ export async function calculate4DRiskScores(
     });
 
     if (!response.ok) {
-      throw new Error("4D risk scoring failed");
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);
@@ -718,7 +739,7 @@ export async function get4DSummary(
     });
 
     if (!response.ok) {
-      throw new Error("Failed to get 4D summary");
+      await throwAnalyticsResponseError(response);
     }
 
     const payload = await readAnalyticsJson(response);

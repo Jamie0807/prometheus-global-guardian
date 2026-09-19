@@ -30,7 +30,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 
 - 面向公网部署的身份系统、角色授权、网关、共享限流和集中告警；
 - AI 会话服务端持久化、跨刷新恢复、用户级隔离、成本配额和熔断；
-- Analytics 响应和 4D 输出的完整跨语言共享契约；
+- Analytics 4D `data` 内部字段和事件/图层注册表的完整跨语言共享契约；
 - 完整视觉回归、真实第三方服务集成测试和自动发布。
 
 ## 3. 术语
@@ -186,11 +186,11 @@ flowchart TD
 - `app/services/` 负责编排、缓存、指标和模型到 DataFrame 的转换；
 - `analytics/` 负责 ETL、统计、预测、风险、质量、统一模型和透视算法。
 
-每个请求会设置并回传 `X-Request-Id`。`/api/v1/analyze` 的内部分析异常通过统一 helper 返回稳定的 500 code、message 和 requestId；日志过滤异常文本和敏感字段。质量、统一模型和透视路由当前仍有把 `str(exc)` 写入 `HTTPException.detail` 的路径，属于待收口的公开错误边界。
+每个请求会设置并回传 `X-Request-Id`。所有 `/api/v1` 业务接口通过统一 helper 返回版本化成功信封和稳定错误信封；成功响应包含 `schemaVersion`、`requestId`、`generatedAt`、`modelVersion`、`inputSnapshotId`、`warnings`，错误响应使用 `ANALYTICS_VALIDATION_ERROR` 或 `ANALYTICS_INTERNAL_ERROR`。日志过滤异常文本和敏感字段。
 
 `/health` 公开。`/metrics` 和 `/cache/clear` 依赖 `ANALYTICS_ADMIN_TOKEN` 与 `X-Analytics-Admin-Token`；配置缺失、header 缺失或值不匹配均返回 404。该令牌只保护这两个管理接口，不构成公开 Analytics 业务接口的用户身份系统。
 
-FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `ANALYTICS_CORS_ORIGINS` 覆盖；允许 GET、POST、OPTIONS，允许 `Content-Type` 和管理令牌 header，不允许 Cookie 凭据。
+FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `ANALYTICS_CORS_ORIGINS` 覆盖；允许 GET、POST、OPTIONS，允许 `Content-Type`、管理令牌和 `X-Request-Id` header，并暴露 `X-Request-Id`，不允许 Cookie 凭据。
 
 ### 7.5 分层与依赖规则
 
@@ -222,7 +222,7 @@ FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `
 ### 7.6 类型、错误和日志细则
 
 - TypeScript 新增边界输入使用 `unknown`，通过类型守卫、parser 或判别联合收窄；避免新增无必要的 `any`，类型导入使用 `import type`；
-- 新增或修改的对外错误应使用稳定 code、可安全展示的 message 和可选 request id。现有 `/api/v1/analyze` 已遵循该规则；质量和透视路由的 `HTTPException.detail` 以及 Analytics 4xx 的前端错误展示仍可能包含上游正文或异常文本，不能视为已完成的全面脱敏；
+- 新增或修改的对外错误应使用稳定 code、可安全展示的 message 和 request id。Analytics `/api/v1` 路由统一返回版本化错误信封；前端解析器只保留服务错误码和请求 ID，不传播上游响应正文；
 - 取消属于控制流：调用方主动取消不应被包装成可重试的业务失败，也不应产生面向用户的错误通知；
 - 日志事件记录可脱敏的状态、耗时、数量、provider、HTTP status 和 request id。不得记录密钥、token、Cookie、鉴权 header、完整请求/响应 body、原始异常文本或堆栈；
 - 新环境变量必须标明归属运行单元、是否公开、默认值、缺失行为和 Docker/CI 传递方式。任何秘密变量不得使用 `VITE_` 前缀；
@@ -263,7 +263,7 @@ sequenceDiagram
 
 前端先用 `formatHazards` 统一 Hazard 字段，再通过 `parseAnalyticsHazardData` 检查待发送数据。浏览器直接向 FastAPI `/api/v1/*` 发送请求；响应先读为 `unknown`，再由端点对应 parser 构造成类型化成功结果。
 
-共同输入字段为 `id`、`type`、`title`、`coordinates`、`timestamp`、`magnitude`、`severity`、`source` 和可选 `populationExposed`。坐标顺序为 `[longitude, latitude]`。Python Pydantic 是服务端最终请求门禁。
+共同输入字段为 `id`、`type`、`title`、`coordinates`、`timestamp`、`magnitude`、`severity`、`source` 和可选 `populationExposed`。坐标顺序为 `[longitude, latitude]`。Python Pydantic 是服务端最终请求门禁。成功响应和错误响应分别使用 `contracts/analytics-response-envelope.json`、`contracts/analytics-error-envelope.json` 作为双端共享样本；输入摘要只返回 SHA-256，不保存原始请求。
 
 ### 8.3 AI 流式会话
 
@@ -280,7 +280,7 @@ sequenceDiagram
 - TypeScript 侧由 `formatHazards`、运行时 parser 和 `tests/service-cross-language-hazard-contract.test.ts` 验证；
 - Python 侧由 Pydantic `HazardData`、请求模型和 `python-analytics-service/tests/test_cross_language_hazard_contract.py` 验证；
 - 修改共同输入字段、默认值、长度、坐标、数值或未知字段策略时，必须同步更新共享样本和双端测试；
-- Analytics 响应在前端由各端点 parser 分别维护；Python 当前仅 `/api/v1/analyze` 声明 Pydantic `AnalysisResponse`，其余响应主要由 service/route 返回的 `dict` 和测试维护。当前不应声称已有统一的跨语言响应契约。
+- Analytics 响应由 Python 统一 helper 生成版本化成功/错误信封，前端 parser 对元数据成组校验并保留迁移期旧响应兼容；双方共同读取 `contracts/analytics-response-envelope.json` 和 `contracts/analytics-error-envelope.json`。`data` 内部业务字段和 4D 事件/图层模型仍由各领域 parser 维护。
 
 ## 10. 配置与秘密边界
 
@@ -413,7 +413,7 @@ Compose 中：
 
 ### 14.3 数据与产品
 
-- Analytics 请求侧 HazardData 已有共享输入样本，响应模型和 4D 输出仍未统一为跨语言工件；
+- Analytics 请求侧 HazardData 与顶层响应信封已有共享输入/输出样本，4D `data` 内部字段和事件/图层注册表仍未统一；
 - 多来源 severity 与 magnitude 不天然可比较，统一强度排序需要先定义业务换算规则；
 - 预测置信度、风险阈值、估算 magnitude 和质量规则仍需要真实业务样本校准；
 - 当前报告下载格式与界面文案的闭环仍在优化清单中；

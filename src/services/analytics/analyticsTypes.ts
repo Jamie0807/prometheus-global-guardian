@@ -3,7 +3,11 @@
  */
 import type { AnalyticsSuccess } from "./contracts/common";
 
-export type { AnalyticsSuccess } from "./contracts/common";
+export type {
+  AnalyticsErrorEnvelope,
+  AnalyticsResponseMetadata,
+  AnalyticsSuccess,
+} from "./contracts/common";
 export type { StatisticsData } from "./contracts/statistics";
 export type {
   OverallPredictionAssessment,

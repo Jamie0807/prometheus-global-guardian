@@ -100,7 +100,7 @@ LOG_LEVEL=info
 pnpm run test:python
 ```
 
-当前 39 项 unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。
+当前 49 项 unittest 覆盖应用工厂、跨语言灾害请求/响应契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。
 
 `test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。GitHub Actions 使用 Python 3.13 安装依赖后运行 `pnpm run test:python`。
 

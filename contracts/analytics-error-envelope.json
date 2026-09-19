@@ -1,0 +1,13 @@
+{
+  "success": false,
+  "schemaVersion": "1.0",
+  "requestId": "fixture-request-id",
+  "generatedAt": "2026-09-19T00:00:00Z",
+  "modelVersion": "analytics-model-v1",
+  "warnings": [],
+  "error": {
+    "code": "ANALYTICS_INTERNAL_ERROR",
+    "message": "Analysis service failed to process the request.",
+    "requestId": "fixture-request-id"
+  }
+}

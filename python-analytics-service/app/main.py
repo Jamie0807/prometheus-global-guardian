@@ -2,7 +2,9 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 
+from app.core.errors import validation_error_response
 from app.core.middleware import attach_request_id
 from app.core.state import configure_application_state
 from app.routes.analytics import router as analytics_router
@@ -26,8 +28,10 @@ def create_app() -> FastAPI:
         allow_origins=get_cors_origins(),
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Analytics-Admin-Token"],
+        allow_headers=["Content-Type", "X-Analytics-Admin-Token", "X-Request-Id"],
+        expose_headers=["X-Request-Id"],
     )
+    application.add_exception_handler(RequestValidationError, validation_error_response)
     application.middleware("http")(attach_request_id)
     application.include_router(health_router)
     application.include_router(analytics_router)
