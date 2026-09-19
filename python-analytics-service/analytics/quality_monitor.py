@@ -68,8 +68,9 @@ class DataQualityMonitor:
             'recommendations': [...]
         }
         """
+        normalized_source = self._report_source(source)
         if df.empty:
-            return self._empty_quality_report(source)
+            return self._empty_quality_report(normalized_source)
         
         # 评估各个维度
         dimension_results = {
@@ -115,7 +116,7 @@ class DataQualityMonitor:
             all_recommendations.extend(dimension_data.get('recommendations', []))
         
         report = {
-            'source': source,
+            'source': normalized_source,
             'timestamp': datetime.now().isoformat(),
             'record_count': len(df),
             'overall_score': round(overall_score, 4),
@@ -249,10 +250,10 @@ class DataQualityMonitor:
                 type_inconsistencies = normalized_types.isin(unknown_types).sum()
                 inconsistency_count += type_inconsistencies
         
-        # 检查源一致性
-        if 'source' in df.columns:
+        # 检查源一致性：canonical sourceId 优先，旧 source 仅作逐条 fallback。
+        if 'source' in df.columns or 'sourceId' in df.columns:
             known_sources = {'USGS', 'NASA', 'GDACS', 'DISASTERAWARE'}
-            normalized_sources = df['source'].dropna().astype(str).str.upper()
+            normalized_sources = self._source_dimension(df)
             unknown_sources = set(normalized_sources.unique()) - known_sources
             if unknown_sources:
                 issues.append(f"Found unknown data sources: {', '.join(unknown_sources)}")
@@ -280,6 +281,40 @@ class DataQualityMonitor:
             'issues': issues,
             'recommendations': recommendations
         }
+
+    @staticmethod
+    def _normalize_source_value(value: Any) -> str:
+        """将 canonical/旧来源映射为有限集合，未知值统一为 UNKNOWN。"""
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return 'UNKNOWN'
+
+        normalized = str(value).strip().lower()
+        source_labels = {
+            'disasteraware': 'DISASTERAWARE',
+            'usgs': 'USGS',
+            'nasa-eonet': 'NASA',
+            'nasa': 'NASA',
+            'gdacs': 'GDACS',
+        }
+        return source_labels.get(normalized, 'UNKNOWN')
+
+    @classmethod
+    def _report_source(cls, value: Any) -> str:
+        normalized = cls._normalize_source_value(value)
+        return 'unknown' if normalized == 'UNKNOWN' else normalized
+
+    def _source_dimension(self, df: pd.DataFrame) -> pd.Series:
+        """按行优先使用 sourceId；缺失时兼容旧 source 字段。"""
+        legacy = df['source'] if 'source' in df.columns else pd.Series('unknown', index=df.index)
+        canonical = df['sourceId'] if 'sourceId' in df.columns else pd.Series(np.nan, index=df.index)
+
+        values = []
+        for canonical_value, legacy_value in zip(canonical, legacy):
+            if canonical_value is not None and not pd.isna(canonical_value) and str(canonical_value).strip():
+                values.append(self._normalize_source_value(canonical_value))
+            else:
+                values.append(self._normalize_source_value(legacy_value))
+        return pd.Series(values, index=df.index, dtype='object')
     
     def _check_timeliness(self, df: pd.DataFrame) -> Dict[str, Any]:
         """

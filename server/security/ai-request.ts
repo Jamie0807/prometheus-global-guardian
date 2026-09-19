@@ -14,6 +14,15 @@ function isOptionalString(value: unknown, maxLength = MAX_CONTEXT_FIELD_LENGTH):
   return value === undefined || (typeof value === "string" && value.length <= maxLength);
 }
 
+function isOptionalCanonicalString(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (typeof value === "string" &&
+      value.trim().length > 0 &&
+      value.length <= MAX_CONTEXT_FIELD_LENGTH)
+  );
+}
+
 function isValidMessage(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -33,7 +42,9 @@ function isValidRecentHazard(value: unknown): boolean {
     isOptionalString(value.title) &&
     isOptionalString(value.type) &&
     isOptionalString(value.source) &&
-    isOptionalString(value.severity)
+    isOptionalString(value.severity) &&
+    isOptionalCanonicalString(value.sourceId) &&
+    isOptionalCanonicalString(value.layerId)
   );
 }
 

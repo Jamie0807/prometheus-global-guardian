@@ -9,6 +9,11 @@ import {
 import { getMapLodVisibility } from "../src/features/map/utils/mapLod";
 
 const validHazard: Hazard = {
+  schemaVersion: "1",
+  eventId: "disasteraware:hazard-1",
+  sourceEventId: "hazard-1",
+  sourceId: "disasteraware",
+  layerId: "hydrological",
   id: "hazard-1",
   title: "Flood near coast",
   type: "FLOOD",
@@ -59,6 +64,9 @@ describe("hazard GeoJSON conversion", () => {
           type: "Feature",
           properties: {
             id: "hazard-1",
+            eventId: "disasteraware:hazard-1",
+            sourceId: "disasteraware",
+            layerId: "hydrological",
             title: "Flood near coast",
             type: "FLOOD",
             severity: "WARNING",
@@ -78,6 +86,37 @@ describe("hazard GeoJSON conversion", () => {
     };
 
     expect(createLodFeatureCollection([validHazard, invalidHazard]).features).toHaveLength(1);
+  });
+
+  it("deduplicates repeated event IDs before creating LOD features", () => {
+    const duplicate = {
+      ...validHazard,
+      id: "legacy-duplicate-id",
+      title: "Duplicate title",
+    };
+
+    const result = createLodFeatureCollection([validHazard, duplicate]);
+
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0]?.properties.eventId).toBe("disasteraware:hazard-1");
+  });
+
+  it("keeps a valid later record when an earlier duplicate has invalid coordinates", () => {
+    const invalidDuplicate = {
+      ...validHazard,
+      id: "invalid-duplicate",
+      geometry: { type: "Point" as const, coordinates: [Number.NaN, 30] },
+    };
+    const validLaterDuplicate = {
+      ...validHazard,
+      id: "valid-duplicate",
+      geometry: { type: "Point" as const, coordinates: [121, 31] },
+    };
+
+    const result = createLodFeatureCollection([invalidDuplicate, validLaterDuplicate]);
+
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0]?.geometry.coordinates).toEqual([121, 31]);
   });
 
   it("uses the existing heatmap magnitude fallback and preserves zero", () => {

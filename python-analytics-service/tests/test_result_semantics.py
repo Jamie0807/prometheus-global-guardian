@@ -170,6 +170,18 @@ class QualityResultSemanticsTests(unittest.TestCase):
             self.assertGreaterEqual(dimension["score"], 0)
             self.assertLessEqual(dimension["score"], 1)
 
+    def test_quality_prefers_canonical_source_id_and_normalizes_unknown_sources(self):
+        frame = make_hazard_frame(count=2)
+        frame["source"] = ["legacy-a", "legacy-b"]
+        frame["sourceId"] = ["usgs", "untrusted-source"]
+
+        report = DataQualityMonitor().assess_quality(frame, "legacy-request-source")
+
+        self.assertEqual(report["source"], "unknown")
+        issues = report["dimensions"]["consistency"]["issues"]
+        self.assertTrue(any("unknown data sources: UNKNOWN" in issue for issue in issues))
+        self.assertFalse(any("legacy-a" in issue or "legacy-b" in issue for issue in issues))
+
 
 if __name__ == "__main__":
     unittest.main()

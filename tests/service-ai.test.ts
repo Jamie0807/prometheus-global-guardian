@@ -39,6 +39,36 @@ afterEach(() => {
 });
 
 describe("AI 助手 Service", () => {
+  it("serializes only the bounded canonical disaster context fields", async () => {
+    mockResponse(sseResponse("data: [DONE]\n\n"));
+
+    const context = {
+      total: 1,
+      byType: { EARTHQUAKE: 1 },
+      recent: [
+        {
+          title: "M 5.1 earthquake",
+          type: "EARTHQUAKE",
+          sourceId: "usgs" as const,
+          layerId: "earthquake" as const,
+        },
+      ],
+    };
+
+    await expect(streamChatMessage(messages, context, { onChunk: vi.fn() })).resolves.toEqual({
+      kind: "completed",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/ai/chat",
+      expect.objectContaining({
+        body: JSON.stringify({ messages, disasterContext: context }),
+      }),
+    );
+    expect(JSON.stringify(context)).not.toContain("url");
+    expect(JSON.stringify(context)).not.toContain("coordinates");
+  });
+
   it("发送统一请求并解析 SSE 增量", async () => {
     const response = sseResponse(
       'data: {"choices":[{"delta":{"content":"风险"}}]}\n\n' +

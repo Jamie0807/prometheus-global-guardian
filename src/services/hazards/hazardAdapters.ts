@@ -2,6 +2,8 @@
  * 提供灾害数据适配与规范化工具。
  */
 import type { Hazard } from "../../types";
+import { createHazardEventId } from "../../../shared/hazards/hazard-event";
+import { resolveHazardLayerId } from "../../../shared/hazards/hazard-layer-registry";
 import {
   asRecord,
   asRecordArray,
@@ -24,6 +26,15 @@ const parseGeometry = (value: unknown, path: string): Hazard["geometry"] => {
 
 const parseOptionalFiniteNumber = (value: unknown, path: string): number | undefined =>
   value === undefined || value === null ? undefined : parseFiniteNumber(value, path);
+
+const readStableSourceEventId = (value: unknown): string | undefined => {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return undefined;
+};
+
+const toIsoTimestamp = (value: number | undefined): string | undefined =>
+  value === undefined ? undefined : new Date(value).toISOString();
 
 export const mapNASACategoryToType = (category: string): string => {
   if (category.includes("Wildfires")) return "WILDFIRE";
@@ -55,15 +66,25 @@ export function adaptUSGSResponse(input: unknown): Hazard[] {
   return asRecordArray(root.features).flatMap((feature, index) => {
     try {
       const path = `features.${index}`;
+      const sourceEventId = readStableSourceEventId(feature.id);
+      if (!sourceEventId) return [];
       const properties = asRecord(feature.properties) ?? {};
       const magnitude = parseOptionalFiniteNumber(properties.mag, `${path}.properties.mag`);
       const time = parseOptionalFiniteNumber(properties.time, `${path}.properties.time`);
       const place = asString(properties.place, "Unknown location");
+      const type = "EARTHQUAKE";
+      const eventId = createHazardEventId("usgs", sourceEventId);
+      const observedAt = toIsoTimestamp(time);
       return [
         {
-          id: parseString(feature.id, `${path}.id`),
+          schemaVersion: "1",
+          eventId,
+          sourceEventId,
+          sourceId: "usgs",
+          layerId: resolveHazardLayerId(type),
+          id: eventId,
           title: asString(properties.title, asString(properties.place, "Unknown Event")),
-          type: "EARTHQUAKE",
+          type,
           severity:
             magnitude !== undefined && magnitude >= 6
               ? "WARNING"
@@ -73,7 +94,7 @@ export function adaptUSGSResponse(input: unknown): Hazard[] {
           description: `Magnitude ${magnitude ?? "N/A"} earthquake - ${place}`,
           geometry: parseGeometry(feature.geometry, `${path}.geometry`),
           ...(magnitude === undefined ? {} : { magnitude }),
-          ...(time === undefined ? {} : { timestamp: new Date(time).toISOString() }),
+          ...(observedAt === undefined ? {} : { observedAt, timestamp: observedAt }),
           source: "USGS",
         } satisfies Hazard,
       ];
@@ -89,21 +110,31 @@ export function adaptNASAResponse(input: unknown): Hazard[] {
   return asRecordArray(root.events).flatMap((event, index) => {
     try {
       const path = `events.${index}`;
+      const sourceEventId = readStableSourceEventId(event.id);
+      if (!sourceEventId) return [];
       const title = asString(event.title, "Unknown Event");
       const categories = asRecordArray(event.categories);
       const category = asString(categories[0]?.title, "UNKNOWN");
       const geometries = asRecordArray(event.geometry);
       const latestGeometry = geometries.at(-1);
       const date = asString(latestGeometry?.date);
+      const type = mapNASACategoryToType(category);
+      const eventId = createHazardEventId("nasa-eonet", sourceEventId);
+      const observedAt = date ? new Date(date).toISOString() : undefined;
       return [
         {
-          id: parseString(event.id, `${path}.id`),
+          schemaVersion: "1",
+          eventId,
+          sourceEventId,
+          sourceId: "nasa-eonet",
+          layerId: resolveHazardLayerId(type),
+          id: eventId,
           title,
-          type: mapNASACategoryToType(category),
+          type,
           severity: "ADVISORY",
           description: `${category} - ${title}`,
           geometry: parseGeometry(latestGeometry, `${path}.geometry`),
-          ...(date ? { timestamp: new Date(date).toISOString() } : {}),
+          ...(observedAt === undefined ? {} : { observedAt, timestamp: observedAt }),
           source: "NASA EONET",
         } satisfies Hazard,
       ];
@@ -121,10 +152,8 @@ export function adaptGDACSResponse(input: unknown): Hazard[] {
       const path = `features.${index}`;
       const properties = asRecord(feature.properties) ?? {};
       const eventId = properties.eventid;
-      const normalizedEventId =
-        typeof eventId === "number"
-          ? String(parseFiniteNumber(eventId, `${path}.properties.eventid`))
-          : parseString(eventId, `${path}.properties.eventid`);
+      const sourceEventId = readStableSourceEventId(eventId);
+      if (!sourceEventId) return [];
       const title = asString(properties.name, asString(properties.eventname, "Unknown Event"));
       const description = asString(properties.description, asString(properties.htmldescription));
       const severityData = asRecord(properties.severitydata);
@@ -137,16 +166,27 @@ export function adaptGDACSResponse(input: unknown): Hazard[] {
             : "ADVISORY";
       const urlRecord = asRecord(properties.url);
       const url = urlRecord ? asString(urlRecord.report) : "";
+      const type = detectHazardTypeFromTitle(`${title} ${description} ${severityText}`);
+      const canonicalEventId = createHazardEventId("gdacs", sourceEventId);
+      const observedAt = asString(properties.eventdate);
+      const updatedAt = asString(properties.lastupdate, asString(properties.last_update));
 
       return [
         {
-          id: `gdacs-${normalizedEventId}`,
+          schemaVersion: "1",
+          eventId: canonicalEventId,
+          sourceEventId,
+          sourceId: "gdacs",
+          layerId: resolveHazardLayerId(type),
+          id: canonicalEventId,
           title,
-          type: detectHazardTypeFromTitle(`${title} ${description} ${severityText}`),
+          type,
           severity,
           description,
           geometry: parseGeometry(feature.geometry, `${path}.geometry`),
           source: "GDACS",
+          ...(observedAt ? { observedAt, timestamp: observedAt } : {}),
+          ...(updatedAt ? { updatedAt } : {}),
           ...(url ? { url } : {}),
         } satisfies Hazard,
       ];

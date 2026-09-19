@@ -35,10 +35,16 @@ describe("hazard adapters", () => {
     });
 
     expect(hazards[0]).toMatchObject({
-      id: "usgs-1",
+      schemaVersion: "1",
+      id: "usgs:usgs-1",
+      eventId: "usgs:usgs-1",
+      sourceEventId: "usgs-1",
+      sourceId: "usgs",
+      layerId: "earthquake",
       source: "USGS",
       type: "EARTHQUAKE",
       severity: "ADVISORY",
+      observedAt: new Date(0).toISOString(),
       timestamp: new Date(0).toISOString(),
     });
   });
@@ -64,7 +70,7 @@ describe("hazard adapters", () => {
     });
 
     expect(hazards).toHaveLength(1);
-    expect(hazards[0]?.id).toBe("usgs-valid");
+    expect(hazards[0]?.id).toBe("usgs:usgs-valid");
   });
 
   it("skips NASA events without geometry and uses the latest geometry", () => {
@@ -81,7 +87,18 @@ describe("hazard adapters", () => {
     });
 
     expect(hazards).toHaveLength(1);
-    expect(hazards[0]).toMatchObject({ id: "nasa-2", type: "FLOOD", source: "NASA EONET" });
+    expect(hazards[0]).toMatchObject({
+      schemaVersion: "1",
+      id: "nasa-eonet:nasa-2",
+      eventId: "nasa-eonet:nasa-2",
+      sourceEventId: "nasa-2",
+      sourceId: "nasa-eonet",
+      layerId: "hydrological",
+      type: "FLOOD",
+      source: "NASA EONET",
+      observedAt: new Date("2024-01-01").toISOString(),
+      timestamp: new Date("2024-01-01").toISOString(),
+    });
   });
 
   it("keeps only NASA records with an id, geometry, and finite coordinates", () => {
@@ -106,7 +123,7 @@ describe("hazard adapters", () => {
     });
 
     expect(hazards).toHaveLength(1);
-    expect(hazards[0]?.id).toBe("nasa-valid");
+    expect(hazards[0]?.id).toBe("nasa-eonet:nasa-valid");
   });
 
   it("skips GDACS records without geometry and maps severity", () => {
@@ -122,7 +139,12 @@ describe("hazard adapters", () => {
 
     expect(hazards).toHaveLength(1);
     expect(hazards[0]).toMatchObject({
-      id: "gdacs-2",
+      schemaVersion: "1",
+      id: "gdacs:2",
+      eventId: "gdacs:2",
+      sourceEventId: "2",
+      sourceId: "gdacs",
+      layerId: "hydrological",
       source: "GDACS",
       severity: "WATCH",
       geometry: { coordinates: [3, 4] },
@@ -149,6 +171,40 @@ describe("hazard adapters", () => {
     });
 
     expect(hazards).toHaveLength(1);
-    expect(hazards[0]?.id).toBe("gdacs-42");
+    expect(hazards[0]?.id).toBe("gdacs:42");
+  });
+
+  it("skips records without stable source IDs instead of generating positional IDs", () => {
+    expect(
+      adaptUSGSResponse({
+        features: [
+          {
+            properties: { title: "Missing USGS id", time: 0 },
+            geometry: { type: "Point", coordinates: [1, 2] },
+          },
+        ],
+      }),
+    ).toEqual([]);
+    expect(
+      adaptNASAResponse({
+        events: [
+          {
+            title: "Missing NASA id",
+            categories: [{ title: "Floods" }],
+            geometry: [{ type: "Point", coordinates: [1, 2], date: "2024-01-01" }],
+          },
+        ],
+      }),
+    ).toEqual([]);
+    expect(
+      adaptGDACSResponse({
+        features: [
+          {
+            properties: { name: "Missing GDACS id" },
+            geometry: { type: "Point", coordinates: [1, 2] },
+          },
+        ],
+      }),
+    ).toEqual([]);
   });
 });

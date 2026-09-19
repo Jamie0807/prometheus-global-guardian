@@ -1,4 +1,6 @@
 /** 解析 AI 提供商配置，并构造不同协议的请求与灾害上下文提示。 */
+import { HAZARD_LAYER_REGISTRY } from "../../shared/hazards/hazard-layer-registry.js";
+
 const DEFAULT_ARK_API_URL = "https://ark.cn-beijing.volces.com/api/plan/v3";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
@@ -12,6 +14,9 @@ export interface HazardSummary {
   type?: string;
   severity?: string;
   magnitude?: number;
+  timestamp?: string;
+  sourceId?: string;
+  layerId?: string;
 }
 
 export interface DisasterContext {
@@ -228,6 +233,105 @@ export function resolveAIRequestTimeoutMs(env: ServerEnvironment = process.env):
   return Math.min(parsed, 120_000);
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  disasteraware: "DisasterAWARE",
+  usgs: "USGS",
+  "nasa-eonet": "NASA EONET",
+  gdacs: "GDACS",
+};
+
+const SENSITIVE_PROMPT_PATTERNS = [
+  /\b(?:https?|ftp):\/\/\S+/i,
+  /\bwww\.\S+/i,
+  /\b(?:api[_-]?key|token|secret|password|passwd|authorization|credential)\s*[:=]\s*\S+/i,
+  /\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/i,
+  /\b(?:lat(?:itude)?|lon(?:gitude)?|lng)\s*[:=]\s*-?\d+(?:\.\d+)?/i,
+  /\b(?:coordinates?|coords?)\s*[:=]?\s*(?:\[|\()?\s*-?\d+(?:\.\d+)?\s*[,;\s]+\s*-?\d+(?:\.\d+)?/i,
+  /-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?/,
+];
+
+function safePromptText(value: unknown, fallback = "unknown", maxLength = 160): string {
+  if (typeof value !== "string") return fallback;
+  const normalized = [...value]
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint >= 0x20 && codePoint !== 0x7f;
+    })
+    .join("")
+    .trim()
+    .slice(0, maxLength);
+  if (SENSITIVE_PROMPT_PATTERNS.some((pattern) => pattern.test(normalized))) return fallback;
+  return normalized || fallback;
+}
+
+function safeSourceLabel(value: unknown): string {
+  if (typeof value !== "string") return "unknown";
+  return SOURCE_LABELS[value.trim().toLowerCase()] ?? "unknown";
+}
+
+function safeLayerLabel(value: unknown): string {
+  if (typeof value !== "string") return "unknown";
+  const normalized = value.trim().toLowerCase();
+  return (
+    HAZARD_LAYER_REGISTRY.find((definition) => definition.layerId === normalized)?.label ??
+    "unknown"
+  );
+}
+
+function safeCanonicalSourceId(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return SOURCE_LABELS[normalized] ? normalized : "unknown";
+}
+
+function safeCanonicalLayerId(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return HAZARD_LAYER_REGISTRY.some((definition) => definition.layerId === normalized)
+    ? normalized
+    : "unknown";
+}
+
+function sanitizeHazardSummary(value: HazardSummary): HazardSummary {
+  const summary: HazardSummary = {
+    title: safePromptText(value.title),
+    type: safePromptText(value.type),
+    severity: safePromptText(value.severity, "", 64),
+  };
+  const sourceId = safeCanonicalSourceId(value.sourceId);
+  const layerId = safeCanonicalLayerId(value.layerId);
+  if (sourceId) summary.sourceId = sourceId;
+  if (layerId) summary.layerId = layerId;
+  if (typeof value.timestamp === "string" && value.timestamp.trim()) {
+    summary.timestamp = safePromptText(value.timestamp, "", 64);
+  }
+  if (typeof value.magnitude === "number" && Number.isFinite(value.magnitude)) {
+    summary.magnitude = value.magnitude;
+  }
+  return summary;
+}
+
+function sanitizeDisasterContext(ctx?: DisasterContext | null): DisasterContext {
+  const total = Number(ctx?.total);
+  const byType = Object.fromEntries(
+    Object.entries(ctx?.byType ?? {})
+      .slice(0, 50)
+      .map(([type, count]) => [
+        safePromptText(type),
+        Number.isSafeInteger(Number(count)) && Number(count) >= 0 ? Number(count) : 0,
+      ]),
+  );
+  const recent = Array.isArray(ctx?.recent)
+    ? ctx.recent.slice(0, 50).map(sanitizeHazardSummary)
+    : [];
+
+  return {
+    total: Number.isSafeInteger(total) && total >= 0 ? total : 0,
+    byType,
+    recent,
+  };
+}
+
 export function buildDisasterSystemPrompt(ctx?: DisasterContext | null): string {
   let prompt = `你是 Prometheus Global Guardian 平台的 AI 灾害分析助手（Powered by LLM）。
 你的专业领域：全球灾害监控、风险评估、应急响应分析与减灾策略。
@@ -245,16 +349,24 @@ export function buildDisasterSystemPrompt(ctx?: DisasterContext | null): string 
     const topTypes = Object.entries(ctx.byType ?? {})
       .sort(([, a], [, b]) => Number(b) - Number(a))
       .slice(0, 6)
-      .map(([type, count]) => `${type}(${count})`)
+      .map(
+        ([type, count]) =>
+          `${safePromptText(type)}(${Number.isFinite(Number(count)) ? Number(count) : 0})`,
+      )
       .join("、");
 
     const recentStr = Array.isArray(ctx.recent)
       ? ctx.recent
           .slice(0, 4)
           .map((hazard) => {
-            const severity = hazard.severity ? ` ${hazard.severity}` : "";
-            const magnitude = hazard.magnitude ? ` M${hazard.magnitude}` : "";
-            return `「${hazard.title}」${hazard.type}${severity}${magnitude}`;
+            const title = safePromptText(hazard.title);
+            const type = safePromptText(hazard.type);
+            const severity = safePromptText(hazard.severity, "", 64);
+            const magnitude =
+              typeof hazard.magnitude === "number" && Number.isFinite(hazard.magnitude)
+                ? ` M${hazard.magnitude}`
+                : "";
+            return `「${title}」${type}${severity ? ` ${severity}` : ""}${magnitude}（来源：${safeSourceLabel(hazard.sourceId)}；图层：${safeLayerLabel(hazard.layerId)}）`;
           })
           .join("；")
       : "";
@@ -352,7 +464,7 @@ export function buildWorkflowPayload({
         : "",
       hazard_context:
         disasterContext && typeof disasterContext === "object"
-          ? disasterContext
+          ? sanitizeDisasterContext(disasterContext)
           : { total: 0, byType: {}, recent: [] },
       location: typeof location === "string" ? location.trim() : "",
       language: typeof language === "string" && language.trim() ? language.trim() : "zh",

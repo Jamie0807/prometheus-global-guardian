@@ -2,29 +2,27 @@
 
 import fetch, { type Response as FetchResponse } from "node-fetch";
 
+import {
+  createHazardEventId,
+  type HazardEvent,
+  type HazardSourceId,
+} from "../../shared/hazards/hazard-event.js";
+import { resolveHazardLayerId } from "../../shared/hazards/hazard-layer-registry.js";
+
 const USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
 const NASA_URL = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300";
 const GDACS_URL = "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH";
 
-interface Geometry {
-  type: string;
-  coordinates: unknown;
-}
+type Geometry = HazardEvent["geometry"];
 
-export interface ServerHazard {
+export interface ServerHazard extends HazardEvent {
   id: string;
-  title: string;
-  type: string;
-  severity?: string;
-  description: string;
-  geometry: Geometry;
-  magnitude?: number;
-  timestamp?: string;
   source: string;
-  url?: string;
+  timestamp?: string;
 }
 
-export type HazardSourceId = "disasteraware" | "usgs" | "nasa-eonet" | "gdacs";
+export type { HazardSourceId } from "../../shared/hazards/hazard-event.js";
+
 export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback" | "stale";
 
 export interface HazardSourceStatus {
@@ -53,7 +51,7 @@ export type HazardSourceLoader = (
 ) => Promise<HazardSourceLoadResult>;
 
 interface USGSFeature {
-  id: string;
+  id?: unknown;
   properties: {
     title?: string;
     place?: string;
@@ -64,12 +62,12 @@ interface USGSFeature {
 }
 
 interface NASAEvent {
-  id: string;
+  id?: unknown;
   title: string;
   categories?: Array<{ title?: string }>;
   geometry?: Array<{
     type: string;
-    coordinates: unknown;
+    coordinates: number[];
     date?: string;
   }>;
 }
@@ -77,7 +75,7 @@ interface NASAEvent {
 interface GDACSFeature {
   geometry?: Geometry;
   properties?: {
-    eventid?: string | number;
+    eventid?: unknown;
     name?: string;
     eventname?: string;
     description?: string;
@@ -85,6 +83,9 @@ interface GDACSFeature {
     alertlevel?: "Red" | "Orange" | string;
     severitydata?: { severitytext?: string };
     url?: { report?: string };
+    lastupdate?: string;
+    last_update?: string;
+    eventdate?: string;
   };
 }
 
@@ -128,6 +129,16 @@ export function detectHazardTypeFromTitle(title: string): string {
   return "UNKNOWN";
 }
 
+function readStableSourceEventId(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return undefined;
+}
+
+function toIsoTimestamp(value: number | undefined): string | undefined {
+  return value === undefined ? undefined : new Date(value).toISOString();
+}
+
 export async function fetchUSGSEarthquakes(
   sourceFetch: HazardSourceFetch = fetch,
 ): Promise<ServerHazard[]> {
@@ -137,29 +148,40 @@ export async function fetchUSGSEarthquakes(
   }
 
   const data = (await response.json()) as USGSResponse;
-  return (data.features ?? []).map((feature) => {
-    const magnitude = feature.properties.mag;
-    return {
-      id: feature.id,
-      title: feature.properties.title || feature.properties.place || "Unknown Event",
-      type: "EARTHQUAKE",
-      severity:
-        magnitude && magnitude >= 6.0
-          ? "WARNING"
-          : magnitude && magnitude >= 5.0
-            ? "WATCH"
-            : "ADVISORY",
-      description: `Magnitude ${magnitude ?? "N/A"} earthquake - ${
-        feature.properties.place ?? "Unknown location"
-      }`,
-      geometry: feature.geometry,
-      magnitude,
-      timestamp: feature.properties.time
-        ? new Date(feature.properties.time).toISOString()
-        : undefined,
-      source: "USGS",
-    } satisfies ServerHazard;
-  });
+  return (data.features ?? [])
+    .map((feature): ServerHazard | null => {
+      const sourceEventId = readStableSourceEventId(feature.id);
+      if (!sourceEventId) return null;
+
+      const eventId = createHazardEventId("usgs", sourceEventId);
+      const observedAt = toIsoTimestamp(feature.properties.time);
+      const type = "EARTHQUAKE";
+      const magnitude = feature.properties.mag;
+      return {
+        schemaVersion: "1",
+        eventId,
+        sourceEventId,
+        sourceId: "usgs",
+        layerId: resolveHazardLayerId(type),
+        id: eventId,
+        title: feature.properties.title || feature.properties.place || "Unknown Event",
+        type,
+        severity:
+          magnitude && magnitude >= 6.0
+            ? "WARNING"
+            : magnitude && magnitude >= 5.0
+              ? "WATCH"
+              : "ADVISORY",
+        description: `Magnitude ${magnitude ?? "N/A"} earthquake - ${
+          feature.properties.place ?? "Unknown location"
+        }`,
+        geometry: feature.geometry,
+        magnitude,
+        ...(observedAt ? { timestamp: observedAt, observedAt } : {}),
+        source: "USGS",
+      } satisfies ServerHazard;
+    })
+    .filter((hazard): hazard is ServerHazard => Boolean(hazard));
 }
 
 export async function fetchNASAEONET(
@@ -173,12 +195,22 @@ export async function fetchNASAEONET(
   const data = (await response.json()) as NASAResponse;
   return (data.events ?? [])
     .map((event): ServerHazard | null => {
+      const sourceEventId = readStableSourceEventId(event.id);
+      if (!sourceEventId) return null;
+
       const category = event.categories?.[0]?.title || "UNKNOWN";
       const hazardType = mapNASACategoryToType(category);
       const geom = event.geometry?.length ? event.geometry[event.geometry.length - 1] : undefined;
       if (!geom) return null;
+      const eventId = createHazardEventId("nasa-eonet", sourceEventId);
+      const observedAt = geom.date ? new Date(geom.date).toISOString() : undefined;
       return {
-        id: event.id,
+        schemaVersion: "1",
+        eventId,
+        sourceEventId,
+        sourceId: "nasa-eonet",
+        layerId: resolveHazardLayerId(hazardType),
+        id: eventId,
         title: event.title,
         type: hazardType,
         severity: "ADVISORY",
@@ -187,7 +219,7 @@ export async function fetchNASAEONET(
           type: geom.type,
           coordinates: geom.coordinates,
         },
-        timestamp: geom.date ? new Date(geom.date).toISOString() : undefined,
+        ...(observedAt ? { timestamp: observedAt, observedAt } : {}),
         source: "NASA EONET",
       };
     })
@@ -207,6 +239,8 @@ export async function fetchGDACS(sourceFetch: HazardSourceFetch = fetch): Promis
     const geometry = feature.geometry;
     const properties = feature.properties;
     if (!geometry?.coordinates || !properties) continue;
+    const sourceEventId = readStableSourceEventId(properties.eventid);
+    if (!sourceEventId) continue;
 
     const title = properties.name || properties.eventname || "Unknown Event";
     const description = properties.description || properties.htmldescription || "";
@@ -219,15 +253,23 @@ export async function fetchGDACS(sourceFetch: HazardSourceFetch = fetch): Promis
         : properties.alertlevel === "Orange"
           ? "WATCH"
           : "ADVISORY";
+    const eventId = createHazardEventId("gdacs", sourceEventId);
+    const updatedAt = properties.lastupdate || properties.last_update || undefined;
 
     results.push({
-      id: `gdacs-${properties.eventid || Date.now()}`,
+      schemaVersion: "1",
+      eventId,
+      sourceEventId,
+      sourceId: "gdacs",
+      layerId: resolveHazardLayerId(hazardType),
+      id: eventId,
       title,
       type: hazardType,
       severity,
       description,
       geometry,
       source: "GDACS",
+      ...(updatedAt ? { updatedAt } : {}),
       url: properties.url?.report || undefined,
     });
   }

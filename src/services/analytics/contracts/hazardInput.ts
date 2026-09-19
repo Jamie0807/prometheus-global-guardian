@@ -2,6 +2,8 @@
  * 定义分析服务的灾害输入契约。
  */
 import type { HazardData } from "../analyticsTypes";
+import type { HazardLayerId, HazardSourceId } from "../../../../shared/hazards/hazard-event";
+import { createHazardEventId } from "../../../../shared/hazards/hazard-event";
 import { AnalyticsContractError, parseFiniteNumber, parseRecord } from "./common";
 
 const allowedKeys = new Set([
@@ -14,6 +16,27 @@ const allowedKeys = new Set([
   "severity",
   "source",
   "populationExposed",
+  "schemaVersion",
+  "eventId",
+  "sourceEventId",
+  "sourceId",
+  "layerId",
+  "observedAt",
+  "updatedAt",
+  "confidence",
+]);
+
+const hazardSourceIds = new Set<HazardSourceId>(["disasteraware", "usgs", "nasa-eonet", "gdacs"]);
+
+const hazardLayerIds = new Set<HazardLayerId>([
+  "earthquake",
+  "volcanic",
+  "hydrological",
+  "meteorological",
+  "fire",
+  "land",
+  "drought",
+  "unknown",
 ]);
 
 function parseNonBlankString(value: unknown, path: string, maxLength: number): string {
@@ -52,6 +75,52 @@ function parsePopulationExposed(value: unknown, path: string): number | null | u
   return population;
 }
 
+function parseSchemaVersion(value: unknown, path: string): "1" | undefined {
+  if (value === undefined) return undefined;
+  if (value !== "1") throw new AnalyticsContractError(path);
+  return "1";
+}
+
+function parseOptionalText(value: unknown, path: string, maxLength: number): string | undefined {
+  if (value === undefined) return undefined;
+  return parseNonBlankString(value, path, maxLength);
+}
+
+function parseSourceId(value: unknown, path: string): HazardSourceId | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !hazardSourceIds.has(value as HazardSourceId)) {
+    throw new AnalyticsContractError(path);
+  }
+  return value as HazardSourceId;
+}
+
+function parseLayerId(value: unknown, path: string): HazardLayerId | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new AnalyticsContractError(path);
+  }
+  return hazardLayerIds.has(value as HazardLayerId) ? (value as HazardLayerId) : "unknown";
+}
+
+function parseConfidence(value: unknown, path: string): number | undefined {
+  if (value === undefined) return undefined;
+  const confidence = parseFiniteNumber(value, path);
+  if (confidence < 0 || confidence > 1) throw new AnalyticsContractError(path);
+  return confidence;
+}
+
+function validateEventIdentity(
+  eventId: string | undefined,
+  sourceId: HazardSourceId | undefined,
+  sourceEventId: string | undefined,
+  path: string,
+): void {
+  if (eventId === undefined || sourceId === undefined || sourceEventId === undefined) return;
+  if (eventId !== createHazardEventId(sourceId, sourceEventId)) {
+    throw new AnalyticsContractError(`${path}.eventId`);
+  }
+}
+
 export function parseAnalyticsHazardData(value: unknown, path = "hazard"): HazardData {
   const record = parseRecord(value, path);
   for (const key of Object.keys(record)) {
@@ -71,6 +140,16 @@ export function parseAnalyticsHazardData(value: unknown, path = "hazard"): Hazar
     record.populationExposed,
     `${path}.populationExposed`,
   );
+  const schemaVersion = parseSchemaVersion(record.schemaVersion, `${path}.schemaVersion`);
+  const eventId = parseOptionalText(record.eventId, `${path}.eventId`, 128);
+  const sourceEventId = parseOptionalText(record.sourceEventId, `${path}.sourceEventId`, 128);
+  const sourceId = parseSourceId(record.sourceId, `${path}.sourceId`);
+  const layerId = parseLayerId(record.layerId, `${path}.layerId`);
+  const observedAt = parseOptionalText(record.observedAt, `${path}.observedAt`, 64);
+  const updatedAt = parseOptionalText(record.updatedAt, `${path}.updatedAt`, 64);
+  const confidence = parseConfidence(record.confidence, `${path}.confidence`);
+
+  validateEventIdentity(eventId, sourceId, sourceEventId, path);
 
   return {
     id: parseNonBlankString(record.id, `${path}.id`, 128),
@@ -89,6 +168,14 @@ export function parseAnalyticsHazardData(value: unknown, path = "hazard"): Hazar
     ...(severity === undefined ? {} : { severity }),
     ...(source === undefined ? {} : { source }),
     ...(populationExposed === undefined ? {} : { populationExposed }),
+    ...(schemaVersion === undefined ? {} : { schemaVersion }),
+    ...(eventId === undefined ? {} : { eventId }),
+    ...(sourceEventId === undefined ? {} : { sourceEventId }),
+    ...(sourceId === undefined ? {} : { sourceId }),
+    ...(layerId === undefined ? {} : { layerId }),
+    ...(observedAt === undefined ? {} : { observedAt }),
+    ...(updatedAt === undefined ? {} : { updatedAt }),
+    ...(confidence === undefined ? {} : { confidence }),
   };
 }
 

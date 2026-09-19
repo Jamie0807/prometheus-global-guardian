@@ -2,6 +2,7 @@
  * 定义分析服务的数据类型及兼容类型。
  */
 import type { AnalyticsSuccess } from "./contracts/common";
+import type { HazardLayerId, HazardSourceId } from "../../../shared/hazards/hazard-event";
 
 export type {
   AnalyticsErrorEnvelope,
@@ -41,6 +42,14 @@ export interface HazardData {
   severity?: string;
   source?: string;
   populationExposed?: number | null;
+  schemaVersion?: "1";
+  eventId?: string;
+  sourceEventId?: string;
+  sourceId?: HazardSourceId;
+  layerId?: HazardLayerId;
+  observedAt?: string;
+  updatedAt?: string;
+  confidence?: number;
 }
 
 export interface AnalysisRequest {

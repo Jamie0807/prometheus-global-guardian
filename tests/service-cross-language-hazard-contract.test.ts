@@ -15,11 +15,120 @@ type AnalyticsHazardFixture = {
   invalid: Array<{ rule: string; value: unknown }>;
 };
 
+type CanonicalHazardFixture = {
+  valid: {
+    complete: Record<string, unknown>;
+    optionalOmitted: Record<string, unknown>;
+    unknownType: Record<string, unknown>;
+  };
+  invalid: Array<{ rule: string; value: Record<string, unknown> }>;
+};
+
 const fixture = JSON.parse(
   readFileSync(new URL("../contracts/analytics-hazard-data.json", import.meta.url), "utf8"),
 ) as AnalyticsHazardFixture;
 
+const canonicalFixture = JSON.parse(
+  readFileSync(new URL("../contracts/hazard-event.json", import.meta.url), "utf8"),
+) as CanonicalHazardFixture;
+
+function toAnalyticsHazard(event: Record<string, unknown>): Record<string, unknown> {
+  const geometry = event.geometry as { coordinates: [number, number, ...number[]] };
+  return {
+    id: event.eventId,
+    type: event.type,
+    title: event.title,
+    coordinates: geometry.coordinates.slice(0, 2),
+    timestamp: event.observedAt ?? "2026-09-11T00:00:00.000Z",
+    source: event.sourceId,
+    schemaVersion: event.schemaVersion,
+    eventId: event.eventId,
+    sourceEventId: event.sourceEventId,
+    sourceId: event.sourceId,
+    layerId: event.layerId,
+    ...(event.observedAt === undefined ? {} : { observedAt: event.observedAt }),
+    ...(event.updatedAt === undefined ? {} : { updatedAt: event.updatedAt }),
+    ...(event.severity === undefined ? {} : { severity: event.severity }),
+    ...(event.confidence === undefined ? {} : { confidence: event.confidence }),
+    ...(event.magnitude === undefined ? {} : { magnitude: event.magnitude }),
+  };
+}
+
 describe("cross-language analytics hazard contract", () => {
+  it("preserves canonical fields while adapting geometry to legacy analytics coordinates", () => {
+    const canonical = toAnalyticsHazard(canonicalFixture.valid.complete);
+    const canonicalInput = { ...canonicalFixture.valid.complete, source: "usgs" };
+
+    expect(formatHazards([canonicalInput])).toMatchObject([canonical]);
+    expect(parseAnalyticsHazardData(canonical)).toEqual(canonical);
+  });
+
+  it("normalizes unknown canonical layers to unknown in the shared sample", () => {
+    const canonical = toAnalyticsHazard({
+      ...canonicalFixture.valid.unknownType,
+      layerId: "future-layer",
+    });
+
+    expect(parseAnalyticsHazardData(canonical)).toMatchObject({ layerId: "unknown" });
+    expect(formatHazards([canonical])).toMatchObject([{ layerId: "unknown" }]);
+  });
+
+  it("rejects canonical confidence outside the inclusive range", () => {
+    for (const confidence of [-0.01, 1.01, null, "0.8"]) {
+      expect(() =>
+        parseAnalyticsHazardData(
+          toAnalyticsHazard({ ...canonicalFixture.valid.complete, confidence }),
+        ),
+      ).toThrowError(expect.objectContaining({ path: "hazard.confidence" }));
+    }
+  });
+
+  it("rejects canonical event IDs that disagree with source identity", () => {
+    expect(() =>
+      parseAnalyticsHazardData(
+        toAnalyticsHazard({
+          ...canonicalFixture.valid.complete,
+          eventId: "usgs:other-event",
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ path: "hazard.eventId" }));
+  });
+
+  it("accepts omitted canonical optional fields while rejecting explicit null", () => {
+    const omitted = toAnalyticsHazard(canonicalFixture.valid.optionalOmitted);
+    expect(parseAnalyticsHazardData(omitted)).toEqual(omitted);
+
+    for (const field of [
+      "schemaVersion",
+      "eventId",
+      "sourceEventId",
+      "sourceId",
+      "layerId",
+      "observedAt",
+      "updatedAt",
+      "confidence",
+    ] as const) {
+      expect(() =>
+        parseAnalyticsHazardData({
+          ...omitted,
+          [field]: null,
+        }),
+      ).toThrowError(expect.objectContaining({ path: `hazard.${field}` }));
+    }
+  });
+
+  it("rejects every invalid shared canonical sample", () => {
+    for (const entry of canonicalFixture.invalid) {
+      expect(() => parseAnalyticsHazardData(toAnalyticsHazard(entry.value))).toThrow(
+        AnalyticsContractError,
+      );
+    }
+  });
+
+  it("keeps the existing legacy analytics sample compatible", () => {
+    expect(parseAnalyticsHazardData(fixture.valid.complete)).toEqual(fixture.valid.complete);
+  });
+
   it("accepts the shared valid hazard samples without changing their values", () => {
     expect(parseAnalyticsHazardData(fixture.valid.complete)).toEqual(fixture.valid.complete);
     expect(parseAnalyticsHazardData(fixture.valid.nullableOptionalValues)).toEqual(

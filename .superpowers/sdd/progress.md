@@ -51,3 +51,12 @@
 - [x] Task 5：项目文档、协作规则与完整验证。README、优化清单、规格与英文提交主题规则已同步；BFF 74/74、Python 40/40、E2E 1/1、类型检查、构建、格式和 lint 通过。
 
 前端边界类型治理第二阶段最终复核：8 个其余 Analytics 接口均已迁移到 `unknown` 后运行时契约解析；最终复核无 Critical/Important。lint、格式检查、合同/客户端/服务端类型检查、Service 139 项、组件 51 项和构建通过；根目录 `pnpm test` 的 34 个 BFF 用例在当前沙箱因禁止监听 `0.0.0.0` 报 `EPERM`，与本次改动无关。
+
+## 2026-09-19 统一灾害事件与图层注册表
+
+- [x] Task 1：共享事件模型、图层注册表和跨语言样本；17/17 定向测试、客户端/服务端类型检查通过，任务级复核 Approved，Minor 仅为注册表完整性测试可增强。
+- [x] Task 2：四个 BFF 数据源 canonical 适配；canonical 测试 4/4、服务测试 215/215，任务级复核与修复后复核均 Approved；Node 24 engine warning 作为环境 Minor 保留。
+- [x] Task 3：浏览器 Hazard 契约、Worker 和地图转换；服务/适配器/地图测试 32/32、MapView 17/17、客户端类型检查通过，任务级复核与修复后复核均 Approved；Worker 缺少独立运行时测试作为非阻塞建议保留。
+- [x] Task 4：Analytics 输入和 Python 跨语言契约；TS 41/41、Python 55/55、服务测试 234/234，修复后任务级复核 Approved；canonical 显式 null 在两端统一拒绝，字段省略保持兼容。
+- [x] Task 5：质量检查和 AI 灾害上下文；BFF 88/88、服务 235/235、组件 84/84、Python 56/56，修复后任务级复核 Approved；旧 source fallback 和 prompt 敏感样本清洗已验证。
+- [x] Task 6：文档、格式清单和完整验收；仅修改允许的文档/配置文件，BFF 88/88、Service 235/235、组件 84/84、E2E 1/1、Python 56/56，类型检查、Lint、格式、构建和 diff 检查通过；最终整体复核 Approved。

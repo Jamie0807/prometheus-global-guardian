@@ -24,27 +24,29 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 通过 FastAPI 提供统计、预测、风险、ETL、质量、统一模型和透视分析；
 - 通过 Express BFF 完成 DisasterAware 服务端授权、受限代理、多源灾害聚合和 AI 流式代理；
 - 通过前端 Service 运行时解析、Python Pydantic 模型和共享 JSON 样本维护 Analytics 输入边界；
+- 通过 `shared/hazards/` 与 `contracts/hazard-event.json` 维护统一事件/图层注册表，向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
 - 通过 lint、格式检查、TypeScript 类型检查、多层自动化测试和构建命令执行质量检查。
 
 当前仓库没有部署工作流，Docker Compose 只定义本地完整栈启动方式。以下能力不属于当前已实现范围：
 
 - 面向公网部署的身份系统、角色授权、网关、共享限流和集中告警；
 - AI 会话服务端持久化、跨刷新恢复、用户级隔离、成本配额和熔断；
-- Analytics 4D `data` 内部字段和事件/图层注册表的完整跨语言共享契约；
+- Analytics 4D `data` 内部字段的完整跨语言共享契约、复杂几何与历史回放；
+- 数据源健康检查、数据库/PostGIS 技术设计、历史快照和审计存储；
 - 完整视觉回归、真实第三方服务集成测试和自动发布。
 
 ## 3. 术语
 
-| 术语             | 含义                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| Browser / 浏览器 | Vite 构建的 React 客户端运行环境。`VITE_*` 值会进入浏览器构建产物，只能承载公开配置。                   |
-| BFF              | Express 服务。负责静态客户端、DisasterAware 授权与受限代理、灾害聚合和 AI Provider 路由。               |
-| Analytics        | 独立 FastAPI 服务及其分析算法。浏览器通过 `VITE_PYTHON_API_URL` 直接访问。                              |
-| Hazard           | 地图、分析、AI 上下文和报告流程共同消费的灾害领域记录。                                                 |
-| Service 边界     | `src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                        |
-| Provider         | BFF 调用的 AI 上游；当前实现支持 ai-workflow 与 Volcengine Ark。                                        |
-| 共享契约工件     | `contracts/analytics-hazard-data.json`，供 TypeScript 与 Python 测试共同读取的 Analytics 灾害输入样本。 |
-| 管理接口         | FastAPI 的 `/metrics` 与 `/cache/clear`；启用后要求静态管理令牌。                                       |
+| 术语             | 含义                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser / 浏览器 | Vite 构建的 React 客户端运行环境。`VITE_*` 值会进入浏览器构建产物，只能承载公开配置。                                                              |
+| BFF              | Express 服务。负责静态客户端、DisasterAware 授权与受限代理、灾害聚合和 AI Provider 路由。                                                          |
+| Analytics        | 独立 FastAPI 服务及其分析算法。浏览器通过 `VITE_PYTHON_API_URL` 直接访问。                                                                         |
+| Hazard           | 地图、分析、AI 上下文和报告流程共同消费的灾害领域记录。                                                                                            |
+| Service 边界     | `src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                                                                   |
+| Provider         | BFF 调用的 AI 上游；当前实现支持 ai-workflow 与 Volcengine Ark。                                                                                   |
+| 共享契约工件     | `contracts/analytics-hazard-data.json` 与 `contracts/hazard-event.json`，供 TypeScript 与 Python 测试共同读取的 Analytics 输入和统一灾害事件样本。 |
+| 管理接口         | FastAPI 的 `/metrics` 与 `/cache/clear`；启用后要求静态管理令牌。                                                                                  |
 
 ## 4. 系统上下文与拓扑
 
@@ -94,29 +96,29 @@ flowchart LR
 
 ## 6. 目录地图
 
-| 路径                                  | 责任                                                                        |
-| ------------------------------------- | --------------------------------------------------------------------------- |
-| `src/App.tsx`                         | 客户端组合根、初始授权、Provider 装配、视图选择和组件懒加载。               |
-| `src/features/`                       | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。 |
-| `src/components/`                     | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。         |
-| `src/hooks/`                          | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                        |
-| `src/config/`、`src/utils/`           | 浏览器公开配置、日志、通知和无业务归属的纯工具。                            |
-| `src/state/`                          | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                   |
-| `src/services/`                       | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。    |
-| `src/types/`                          | 客户端共享领域类型。                                                        |
-| `src/workers/`                        | 浏览器 Worker 数据处理。                                                    |
-| `server.ts`                           | Express 应用装配、授权、灾害 API、静态资源和监听入口。                      |
-| `server/ai/`                          | AI Provider 配置、路由判定、请求处理和流协议转换。                          |
-| `server/hazards/`                     | 公共灾害源获取、适配、缓存和聚合。                                          |
-| `server/security/`                    | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                      |
-| `shared/`                             | 浏览器与 Node 代码可复用的安全日志等模块。                                  |
-| `python-analytics-service/app/`       | FastAPI 应用工厂、core、routes、schemas 和应用服务。                        |
-| `python-analytics-service/analytics/` | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                       |
-| `contracts/`                          | 跨语言契约样本。                                                            |
-| `tests/`                              | BFF、前端 Service、组件、契约和 E2E 自动化测试。                            |
-| `python-analytics-service/tests/`     | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
-| `.github/workflows/`                  | 当前 GitHub Actions 质量工作流。                                            |
-| `docs/`                               | 当前测试基线、优化清单、本规格书和历史过程记录。                            |
+| 路径                                  | 责任                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/App.tsx`                         | 客户端组合根、初始授权、Provider 装配、视图选择和组件懒加载。                |
+| `src/features/`                       | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。  |
+| `src/components/`                     | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。          |
+| `src/hooks/`                          | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                         |
+| `src/config/`、`src/utils/`           | 浏览器公开配置、日志、通知和无业务归属的纯工具。                             |
+| `src/state/`                          | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                    |
+| `src/services/`                       | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。     |
+| `src/types/`                          | 客户端共享领域类型。                                                         |
+| `src/workers/`                        | 浏览器 Worker 数据处理。                                                     |
+| `server.ts`                           | Express 应用装配、授权、灾害 API、静态资源和监听入口。                       |
+| `server/ai/`                          | AI Provider 配置、路由判定、请求处理和流协议转换。                           |
+| `server/hazards/`                     | 公共灾害源获取、适配、缓存和聚合。                                           |
+| `server/security/`                    | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                       |
+| `shared/hazards/`                     | 浏览器与 Node 共用的 canonical 灾害事件类型、来源/图层注册表和事件 ID 规则。 |
+| `python-analytics-service/app/`       | FastAPI 应用工厂、core、routes、schemas 和应用服务。                         |
+| `python-analytics-service/analytics/` | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                        |
+| `contracts/`                          | Analytics 与统一灾害事件的跨语言契约样本。                                   |
+| `tests/`                              | BFF、前端 Service、组件、契约和 E2E 自动化测试。                             |
+| `python-analytics-service/tests/`     | Python 模型、路由、服务与算法自动化测试及手工脚本。                          |
+| `.github/workflows/`                  | 当前 GitHub Actions 质量工作流。                                             |
+| `docs/`                               | 当前测试基线、优化清单、本规格书和历史过程记录。                             |
 
 ## 7. 运行单元与职责边界
 
@@ -259,11 +261,13 @@ sequenceDiagram
 
 `meta` 记录首选源、是否使用 fallback、各来源状态和 stale 状态。Worker 只返回清洗后的 hazards；`useHazardData` 在主线程分别写入 Worker 结果和原始 `response.meta`。客户端用取消、请求去重和序号防护避免筛选或刷新变化时写入迟到响应。
 
+BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边界生成 canonical `eventId`、`sourceEventId`、`sourceId`、`layerId`、观测/更新时间和置信度字段；浏览器 parser、Worker 和地图转换保留同一事件标识。未知来源或图层安全回退为 `unknown`，旧 `id`、`source` 和 `timestamp` 字段仍在迁移期兼容解析。
+
 ### 8.2 Analytics
 
 前端先用 `formatHazards` 统一 Hazard 字段，再通过 `parseAnalyticsHazardData` 检查待发送数据。浏览器直接向 FastAPI `/api/v1/*` 发送请求；响应先读为 `unknown`，再由端点对应 parser 构造成类型化成功结果。
 
-共同输入字段为 `id`、`type`、`title`、`coordinates`、`timestamp`、`magnitude`、`severity`、`source` 和可选 `populationExposed`。坐标顺序为 `[longitude, latitude]`。Python Pydantic 是服务端最终请求门禁。成功响应和错误响应分别使用 `contracts/analytics-response-envelope.json`、`contracts/analytics-error-envelope.json` 作为双端共享样本；输入摘要只返回 SHA-256，不保存原始请求。
+共同输入保留旧版 `id`、`timestamp` 和 `source` 兼容字段，并优先使用 `eventId`、`sourceEventId`、`sourceId`、`layerId`、`observedAt`、`updatedAt` 和 `confidence` 等 canonical 字段；`type`、`title`、`coordinates`、`magnitude`、`severity` 和可选 `populationExposed` 继续受原有边界约束。坐标顺序为 `[longitude, latitude]`，置信度必须在 `[0, 1]`。Python Pydantic 是服务端最终请求门禁。成功响应和错误响应分别使用 `contracts/analytics-response-envelope.json`、`contracts/analytics-error-envelope.json`，事件输入使用 `contracts/hazard-event.json` 作为双端共享样本；输入摘要只返回 SHA-256，不保存原始请求。
 
 ### 8.3 AI 流式会话
 
@@ -275,12 +279,12 @@ sequenceDiagram
 
 ## 9. 跨语言契约与测试责任
 
-`contracts/analytics-hazard-data.json` 是 TypeScript 与 Python 共同读取的 Analytics 灾害输入样本。双方不互相导入实现代码：
+`contracts/analytics-hazard-data.json` 与 `contracts/hazard-event.json` 是 TypeScript 与 Python 共同读取的 Analytics 灾害输入和统一事件样本。双方不互相导入实现代码：
 
 - TypeScript 侧由 `formatHazards`、运行时 parser 和 `tests/service-cross-language-hazard-contract.test.ts` 验证；
 - Python 侧由 Pydantic `HazardData`、请求模型和 `python-analytics-service/tests/test_cross_language_hazard_contract.py` 验证；
 - 修改共同输入字段、默认值、长度、坐标、数值或未知字段策略时，必须同步更新共享样本和双端测试；
-- Analytics 响应由 Python 统一 helper 生成版本化成功/错误信封，前端 parser 对元数据成组校验并保留迁移期旧响应兼容；双方共同读取 `contracts/analytics-response-envelope.json` 和 `contracts/analytics-error-envelope.json`。`data` 内部业务字段和 4D 事件/图层模型仍由各领域 parser 维护。
+- Analytics 响应由 Python 统一 helper 生成版本化成功/错误信封，前端 parser 对元数据成组校验并保留迁移期旧响应兼容；双方共同读取 `contracts/analytics-response-envelope.json`、`contracts/analytics-error-envelope.json` 和 `contracts/hazard-event.json`。`data` 内部业务字段和 4D 扩展仍由各领域 parser 维护，不能据此推断复杂几何或历史回放已经完成。
 
 ## 10. 配置与秘密边界
 
@@ -413,7 +417,9 @@ Compose 中：
 
 ### 14.3 数据与产品
 
-- Analytics 请求侧 HazardData 与顶层响应信封已有共享输入/输出样本，4D `data` 内部字段和事件/图层注册表仍未统一；
+- Analytics 请求侧 HazardData、顶层响应信封和灾害事件/图层注册表已有共享输入/输出样本；4D `data` 内部字段的完整跨语言模型仍未统一；
+- 数据源健康检查尚未形成成功率、延迟、最后更新时间、陈旧状态和降级原因的统一指标契约；
+- 当前没有 PostgreSQL/PostGIS 历史数据层，复杂几何、历史快照、回放和审计仍需先完成技术设计并确认需求；
 - 多来源 severity 与 magnitude 不天然可比较，统一强度排序需要先定义业务换算规则；
 - 预测置信度、风险阈值、估算 magnitude 和质量规则仍需要真实业务样本校准；
 - 当前报告下载格式与界面文案的闭环仍在优化清单中；
@@ -424,6 +430,7 @@ Compose 中：
 - 新增接口前先定义输入、输出、失败语义和测试，再接入页面或路由；
 - 外部 JSON、浏览器事件和网络响应保持 `unknown` 边界，解析成功后再进入领域类型；
 - 调整 Analytics 共同输入时同步修改共享 JSON 样本和 TypeScript/Python 双端测试；
+- 统一灾害事件字段以 `shared/hazards/` 和 `contracts/hazard-event.json` 为边界；未知来源或图层回退为 `unknown`，旧字段兼容不得扩大到未经校验的原始文本；
 - 服务端凭据只由 BFF 或 Python 运行时读取，不得进入 `VITE_*` 或前端构建产物；
 - 新增 BFF 上游能力时继续采用显式路径、方法、query、body、header、超时和响应大小边界；
 - 不部署阶段优先保持测试可复现和提交边界清晰；身份、共享限流、集中观测和告警在决定公网部署时单独设计；
@@ -437,5 +444,5 @@ Compose 中：
 - React 与 Service：`src/App.tsx`、`src/state/`、`src/features/`、`src/services/`、`src/hooks/useAIChatSession.ts`；
 - Express BFF：`server.ts`、`server/ai/`、`server/hazards/`、`server/security/`、`shared/logging.ts`；
 - Python：`python-analytics-service/app/`、`python-analytics-service/analytics/`、`python-analytics-service/security.py`、`python-analytics-service/log_config.py`；
-- 契约与测试：`contracts/analytics-hazard-data.json`、`tests/`、`python-analytics-service/tests/`；
+- 契约与测试：`shared/hazards/`、`contracts/analytics-hazard-data.json`、`contracts/hazard-event.json`、`tests/`、`python-analytics-service/tests/`；
 - 持续维护文档：`README.md`、`python-analytics-service/README.md`、`docs/TESTING_BASELINE.md`、`docs/PROJECT_OPTIMIZATION_BACKLOG.md`、`AGENTS.md`。

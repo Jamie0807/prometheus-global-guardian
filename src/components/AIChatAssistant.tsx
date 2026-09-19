@@ -140,6 +140,8 @@ const AIChatAssistant: React.FC = () => {
         severity: h.severity,
         timestamp: h.timestamp,
         magnitude: h.magnitude,
+        sourceId: h.sourceId,
+        layerId: h.layerId,
       })),
     };
   }, [hazards]);

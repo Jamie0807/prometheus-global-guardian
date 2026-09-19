@@ -1,9 +1,16 @@
 /**
  * 灾害数据 Worker
- * 在 Worker 中过滤无效坐标并按 id 去重。
+ * 在 Worker 中过滤无效坐标并按 canonical eventId 去重。
  */
 
+import type { HazardLayerId, HazardSourceId } from "../types";
+
 export interface WorkerHazard {
+  schemaVersion: "1";
+  eventId: string;
+  sourceEventId: string;
+  sourceId: HazardSourceId;
+  layerId: HazardLayerId;
   id: string;
   title: string;
   type: string;
@@ -12,6 +19,9 @@ export interface WorkerHazard {
   geometry: { type: string; coordinates: number[] };
   magnitude?: number;
   time?: string;
+  observedAt?: string;
+  updatedAt?: string;
+  confidence?: number;
   source?: string;
   url?: string;
 }
@@ -39,7 +49,8 @@ function isValidCoord(coords: number[]): boolean {
 function dedup(hazards: WorkerHazard[]): WorkerHazard[] {
   const seen = new Map<string, WorkerHazard>();
   for (const h of hazards) {
-    if (!seen.has(h.id)) seen.set(h.id, h);
+    const identity = h.eventId || h.id;
+    if (!seen.has(identity)) seen.set(identity, h);
   }
   return Array.from(seen.values());
 }

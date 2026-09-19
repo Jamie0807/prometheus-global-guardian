@@ -2,6 +2,7 @@
  * 提供灾害数据到 GeoJSON 要素的转换工具。
  */
 import type { Hazard } from "../../../types";
+import type { HazardLayerId, HazardSourceId } from "../../../types";
 import { HAZARD_COLORS, defaultColor } from "../../../config/hazardColors";
 
 export interface HazardPointGeometry {
@@ -22,6 +23,9 @@ export interface HazardFeatureCollection<TProperties> {
 
 export interface HazardLodProperties {
   readonly id: string;
+  readonly eventId: string;
+  readonly sourceId: HazardSourceId;
+  readonly layerId: HazardLayerId;
   readonly title: string;
   readonly type: string;
   readonly severity: string | undefined;
@@ -52,15 +56,21 @@ export function createLodFeatureCollection(
   hazards: readonly Hazard[],
 ): HazardFeatureCollection<HazardLodProperties> {
   const features: HazardPointFeature<HazardLodProperties>[] = [];
+  const seenEventIds = new Set<string>();
 
   for (const hazard of hazards) {
     const coordinates = getPointCoordinates(hazard);
     if (!coordinates) continue;
+    if (seenEventIds.has(hazard.eventId)) continue;
+    seenEventIds.add(hazard.eventId);
 
     features.push({
       type: "Feature",
       properties: {
         id: hazard.id,
+        eventId: hazard.eventId,
+        sourceId: hazard.sourceId,
+        layerId: hazard.layerId,
         title: hazard.title,
         type: hazard.type,
         severity: hazard.severity,

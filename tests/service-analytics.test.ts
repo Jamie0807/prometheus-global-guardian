@@ -435,6 +435,38 @@ describe("analytics service", () => {
     ]);
   });
 
+  it("rejects explicit null canonical fields from top-level and properties inputs", () => {
+    const canonicalFields = [
+      "schemaVersion",
+      "eventId",
+      "sourceEventId",
+      "sourceId",
+      "layerId",
+      "observedAt",
+      "updatedAt",
+      "confidence",
+    ] as const;
+
+    for (const field of canonicalFields) {
+      const topLevelInput = {
+        id: "hazard-null-top-level",
+        geometry: { type: "Point", coordinates: [1, 2] },
+        [field]: null,
+      } as unknown as Parameters<typeof formatHazards>[0][number];
+      expect(() => formatHazards([topLevelInput])).toThrow(AnalyticsContractError);
+
+      expect(() =>
+        formatHazards([
+          {
+            id: "hazard-null-properties",
+            geometry: { type: "Point", coordinates: [1, 2] },
+            properties: { [field]: null },
+          },
+        ]),
+      ).toThrow(AnalyticsContractError);
+    }
+  });
+
   it("uses safe fallbacks for missing fields", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-02-03T04:05:06.000Z"));

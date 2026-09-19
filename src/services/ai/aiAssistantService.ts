@@ -5,6 +5,8 @@
  * 仅在特定的服务端配置错误时返回演示回复。
  */
 
+import type { HazardLayerId, HazardSourceId } from "../../../shared/hazards/hazard-event";
+
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 
 export type ChatRole = "user" | "assistant" | "system";
@@ -28,6 +30,8 @@ export interface DisasterContext {
     severity?: string;
     timestamp?: string;
     magnitude?: number;
+    sourceId?: HazardSourceId;
+    layerId?: HazardLayerId;
   }>;
 }
 

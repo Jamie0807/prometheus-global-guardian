@@ -140,6 +140,9 @@ function MapStateControls() {
   return (
     <>
       <div data-testid="map-state-hazard-ids">{hazards.map((hazard) => hazard.id).join(",")}</div>
+      <div data-testid="map-state-event-ids">
+        {hazards.map((hazard) => hazard.eventId).join(",")}
+      </div>
       <button type="button" onClick={() => void refresh()}>
         refresh-map-data
       </button>
@@ -176,6 +179,11 @@ describe("MapView", () => {
     mapMocks.fetchHazardFeed.mockResolvedValue({
       hazards: [
         {
+          schemaVersion: "1",
+          eventId: "disasteraware:hazard-1",
+          sourceEventId: "hazard-1",
+          sourceId: "disasteraware",
+          layerId: "hydrological",
           id: "hazard-1",
           title: "<script>window.__xss = true</script>",
           type: '<img src=x onerror="window.__xss = true">',
@@ -223,6 +231,7 @@ describe("MapView", () => {
     renderMapView();
 
     await waitFor(() => expect(mapMocks.addSource).toHaveBeenCalled());
+    expect(screen.getByTestId("map-state-event-ids")).toHaveTextContent("disasteraware:hazard-1");
   });
 
   it("passes a DOM popup node to Mapbox for external hazard text", async () => {

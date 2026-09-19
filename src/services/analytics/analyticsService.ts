@@ -11,6 +11,7 @@
 import { requestRaw } from "../http/httpClient";
 import type { Hazard } from "../../types";
 import type { AnalysisRequest, HazardData } from "./analyticsTypes";
+import type { HazardSourceId } from "../../../shared/hazards/hazard-event";
 import type { AnalyticsSuccess } from "./contracts/common";
 import {
   AnalyticsBusinessError,
@@ -509,9 +510,18 @@ export async function getQualityHistory(
 export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
   return hazards.map((hazard, idx) => {
     const properties = hazard.properties;
+    const eventId = readCanonicalField(hazard, properties, "eventId");
+    const sourceEventId = readCanonicalField(hazard, properties, "sourceEventId");
+    const sourceId = readCanonicalField(hazard, properties, "sourceId");
+    const layerId = readCanonicalField(hazard, properties, "layerId");
+    const schemaVersion = readCanonicalField(hazard, properties, "schemaVersion");
+    const observedAt = readCanonicalField(hazard, properties, "observedAt");
+    const updatedAt = readCanonicalField(hazard, properties, "updatedAt");
+    const confidence = readCanonicalField(hazard, properties, "confidence");
+    const source = hazard.source ?? properties?.source ?? sourceLabel(sourceId);
 
     const candidate = {
-      id: String(hazard.id ?? properties?.id ?? `hazard-${idx}-${Date.now()}`),
+      id: String(hazard.id ?? eventId ?? properties?.id ?? `hazard-${idx}-${Date.now()}`),
       type: String(hazard.type ?? properties?.type ?? "未分类"),
       title: toBoundedText(
         hazard.title ?? properties?.title ?? hazard.description ?? properties?.description,
@@ -521,7 +531,7 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
       coordinates: toCoordinates(hazard.geometry?.coordinates, `hazards.${idx}.coordinates`) ??
         toCoordinates(properties?.coordinates, `hazards.${idx}.properties.coordinates`) ?? [0, 0],
       timestamp: toBoundedText(
-        hazard.timestamp ?? properties?.timestamp,
+        hazard.timestamp ?? properties?.timestamp ?? observedAt,
         new Date().toISOString(),
         64,
       ),
@@ -530,15 +540,52 @@ export function formatHazards(hazards: readonly HazardInput[]): HazardData[] {
         `hazards.${idx}.magnitude`,
       ),
       severity: String(hazard.severity ?? properties?.severity ?? "unknown"),
-      source: String(hazard.source ?? properties?.source ?? "DisasterAWARE"),
+      source: String(source ?? "DisasterAWARE"),
       populationExposed: toNullableNumber(
         hazard.populationExposed ?? properties?.populationExposed,
         `hazards.${idx}.populationExposed`,
       ),
-    } satisfies HazardData;
+      ...(schemaVersion === undefined ? {} : { schemaVersion }),
+      ...(eventId === undefined ? {} : { eventId }),
+      ...(sourceEventId === undefined ? {} : { sourceEventId }),
+      ...(sourceId === undefined ? {} : { sourceId }),
+      ...(layerId === undefined ? {} : { layerId }),
+      ...(observedAt === undefined ? {} : { observedAt }),
+      ...(updatedAt === undefined ? {} : { updatedAt }),
+      ...(confidence === undefined ? {} : { confidence }),
+    };
 
     return parseAnalyticsHazardData(candidate, `hazards.${idx}`);
   });
+}
+
+function readCanonicalField(
+  hazard: HazardInput,
+  properties: HazardProperties | undefined,
+  key: string,
+): unknown {
+  if (Object.prototype.hasOwnProperty.call(hazard, key)) {
+    return hazard[key as keyof HazardInput];
+  }
+  if (properties && Object.prototype.hasOwnProperty.call(properties, key)) {
+    return properties[key];
+  }
+  return undefined;
+}
+
+function sourceLabel(sourceId: unknown): string | undefined {
+  switch (sourceId as HazardSourceId | undefined) {
+    case "disasteraware":
+      return "DisasterAWARE";
+    case "usgs":
+      return "USGS";
+    case "nasa-eonet":
+      return "NASA EONET";
+    case "gdacs":
+      return "GDACS";
+    default:
+      return undefined;
+  }
 }
 
 function toCoordinates(value: unknown, path: string): HazardData["coordinates"] | undefined {

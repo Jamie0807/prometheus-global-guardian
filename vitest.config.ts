@@ -6,6 +6,6 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["tests/service-*.test.ts"],
+    include: ["tests/service-*.test.ts", "tests/server-hazard-event-registry.test.ts"],
   },
 });

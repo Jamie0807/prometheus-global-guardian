@@ -1,20 +1,14 @@
 /**
  * 定义应用共享的领域数据类型。
  */
-export interface Hazard {
+import type { HazardEvent, HazardSourceId } from "../../shared/hazards/hazard-event";
+
+export type { HazardLayerId, HazardSourceId } from "../../shared/hazards/hazard-event";
+
+export interface Hazard extends HazardEvent {
   id: string;
-  title: string;
-  type: string;
-  severity?: string;
-  geometry: {
-    type: string;
-    coordinates: number[];
-  };
-  description: string;
   source: string;
-  magnitude?: number;
   timestamp?: string;
-  url?: string;
 }
 
 export interface HazardType {
@@ -62,7 +56,6 @@ export interface DisasterAwareAuthResponse {
   refreshToken: string;
 }
 
-export type HazardSourceId = "disasteraware" | "usgs" | "nasa-eonet" | "gdacs";
 export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback" | "stale";
 
 export interface HazardSourceStatus {

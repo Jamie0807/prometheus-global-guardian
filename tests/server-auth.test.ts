@@ -193,7 +193,12 @@ test("GET /api/hazards prefers DisasterAWARE and does not request fallback sourc
   };
   assert.deepEqual(body.hazards, [
     {
-      id: "1",
+      schemaVersion: "1",
+      eventId: "disasteraware:1",
+      sourceEventId: "1",
+      sourceId: "disasteraware",
+      layerId: "hydrological",
+      id: "disasteraware:1",
       title: "Primary flood",
       type: "FLOOD",
       geometry: { type: "Point", coordinates: [121.47, 31.23] },
@@ -201,6 +206,7 @@ test("GET /api/hazards prefers DisasterAWARE and does not request fallback sourc
       source: "DisasterAWARE",
       severity: "HIGH",
       timestamp: "2026-09-09T00:00:00.000Z",
+      observedAt: "2026-09-09T00:00:00.000Z",
     },
   ]);
   assert.deepEqual(body.meta, {
@@ -258,7 +264,12 @@ test("GET /api/hazards serves an unexpired DisasterAWARE cache after both live a
       return {
         hazards: [
           {
-            id: "fallback-1",
+            schemaVersion: "1",
+            eventId: "gdacs:fallback-1",
+            sourceEventId: "fallback-1",
+            sourceId: "gdacs",
+            layerId: "fire",
+            id: "gdacs:fallback-1",
             title: "Fallback wildfire",
             type: "WILDFIRE",
             description: "Fallback fixture",
@@ -296,7 +307,7 @@ test("GET /api/hazards serves an unexpired DisasterAWARE cache after both live a
   };
   assert.deepEqual(
     secondBody.hazards.map((hazard) => hazard.id),
-    ["cached-1", "fallback-1"],
+    ["disasteraware:cached-1", "gdacs:fallback-1"],
   );
   assert.equal(secondBody.meta.stale, true);
   assert.equal(secondBody.meta.fallbackUsed, true);
@@ -375,7 +386,7 @@ test("GET /api/hazards retries a timed-out DisasterAWARE request once", async (t
   };
   assert.deepEqual(
     body.hazards.map((hazard) => hazard.id),
-    ["retry-1"],
+    ["disasteraware:retry-1"],
   );
   assert.equal(body.meta.stale, false);
   assert.equal(body.meta.sources[0]?.status, "success");
@@ -392,7 +403,12 @@ test("GET /api/hazards removes duplicate source and id pairs from aggregated haz
     async () => ({
       hazards: [
         {
-          id: "duplicate-1",
+          schemaVersion: "1",
+          eventId: "gdacs:duplicate-1",
+          sourceEventId: "duplicate-1",
+          sourceId: "gdacs",
+          layerId: "hydrological",
+          id: "gdacs:duplicate-1",
           title: "First",
           type: "FLOOD",
           description: "fixture",
@@ -400,7 +416,12 @@ test("GET /api/hazards removes duplicate source and id pairs from aggregated haz
           source: "GDACS",
         },
         {
-          id: "duplicate-1",
+          schemaVersion: "1",
+          eventId: "gdacs:duplicate-1",
+          sourceEventId: "duplicate-1",
+          sourceId: "gdacs",
+          layerId: "hydrological",
+          id: "gdacs:duplicate-1",
           title: "Second",
           type: "FLOOD",
           description: "fixture",
@@ -417,7 +438,7 @@ test("GET /api/hazards removes duplicate source and id pairs from aggregated haz
   const body = (await response.json()) as { hazards: Array<{ id: string; title: string }> };
   assert.deepEqual(
     body.hazards.map(({ id, title }) => ({ id, title })),
-    [{ id: "duplicate-1", title: "Second" }],
+    [{ id: "gdacs:duplicate-1", title: "Second" }],
   );
 });
 
@@ -438,7 +459,12 @@ for (const primaryResponse of ["empty", "unavailable"] as const) {
         return {
           hazards: [
             {
-              id: "public-1",
+              schemaVersion: "1",
+              eventId: "gdacs:public-1",
+              sourceEventId: "public-1",
+              sourceId: "gdacs",
+              layerId: "hydrological",
+              id: "gdacs:public-1",
               title: "Public flood",
               type: "FLOOD",
               description: "Public fixture",
@@ -467,7 +493,7 @@ for (const primaryResponse of ["empty", "unavailable"] as const) {
     };
     assert.deepEqual(
       body.hazards.map((hazard) => hazard.id),
-      ["public-1"],
+      ["gdacs:public-1"],
     );
     assert.equal(body.meta.fallbackUsed, true);
     assert.deepEqual(sourceSummaries(body.meta.sources), [

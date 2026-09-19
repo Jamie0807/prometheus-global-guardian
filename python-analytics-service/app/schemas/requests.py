@@ -4,13 +4,25 @@ import math
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 MAX_HAZARDS = 1_000
 MAX_FILTER_VALUES = 100
 MAX_SOURCE_RECORDS = 1_000
 MAX_FILTER_TEXT_LENGTH = 128
+
+HazardSourceId = Literal["disasteraware", "usgs", "nasa-eonet", "gdacs"]
+KNOWN_HAZARD_LAYERS = {
+    "earthquake",
+    "volcanic",
+    "hydrological",
+    "meteorological",
+    "fire",
+    "land",
+    "drought",
+    "unknown",
+}
 
 FilterText = Annotated[str, Field(min_length=1, max_length=MAX_FILTER_TEXT_LENGTH)]
 
@@ -27,6 +39,14 @@ class HazardData(BaseModel):
     severity: str | None = Field(default=None, min_length=1, max_length=64)
     source: str = Field(default="DisasterAWARE", min_length=1, max_length=64)
     populationExposed: int | None = Field(default=None, ge=0, le=1_000_000_000)
+    schemaVersion: Literal["1"] | None = None
+    eventId: str | None = Field(default=None, min_length=1, max_length=128)
+    sourceEventId: str | None = Field(default=None, min_length=1, max_length=128)
+    sourceId: HazardSourceId | None = None
+    layerId: str | None = Field(default=None, min_length=1, max_length=64)
+    observedAt: str | None = Field(default=None, min_length=1, max_length=64)
+    updatedAt: str | None = Field(default=None, min_length=1, max_length=64)
+    confidence: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
 
     @field_validator("coordinates", mode="before")
     @classmethod
@@ -48,12 +68,63 @@ class HazardData(BaseModel):
             raise ValueError("numeric fields must contain JSON numbers")
         return value
 
-    @field_validator("id", "type", "title", "timestamp", "severity", "source")
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def validate_confidence_input_type(cls, value: object) -> object:
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("confidence must contain a JSON number")
+        return value
+
+    @field_validator(
+        "schemaVersion",
+        "eventId",
+        "sourceEventId",
+        "sourceId",
+        "observedAt",
+        "updatedAt",
+        mode="before",
+    )
+    @classmethod
+    def reject_null_canonical_optional_fields(cls, value: object) -> object:
+        if value is None:
+            raise ValueError("canonical optional fields must be omitted instead of null")
+        return value
+
+    @field_validator("layerId", mode="before")
+    @classmethod
+    def normalize_layer_id(cls, value: object) -> object:
+        if value is None or not isinstance(value, str) or not value.strip():
+            raise ValueError("layerId must be a non-blank string")
+        return value if value in KNOWN_HAZARD_LAYERS else "unknown"
+
+    @field_validator(
+        "id",
+        "type",
+        "title",
+        "timestamp",
+        "severity",
+        "source",
+        "eventId",
+        "sourceEventId",
+        "observedAt",
+        "updatedAt",
+    )
     @classmethod
     def validate_text_fields(cls, value: str | None) -> str | None:
         if value is not None and not value.strip():
             raise ValueError("text fields must not be blank")
         return value
+
+    @model_validator(mode="after")
+    def validate_event_identity(self) -> "HazardData":
+        if (
+            self.eventId is not None
+            and self.sourceId is not None
+            and self.sourceEventId is not None
+            and self.eventId != f"{self.sourceId}:{self.sourceEventId}"
+        ):
+            raise ValueError("eventId must match sourceId and sourceEventId")
+        return self
 
     @field_validator("coordinates")
     @classmethod

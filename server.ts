@@ -13,6 +13,8 @@ import {
 } from "./server/hazards/hazard-source.js";
 import { loadLocalEnv } from "./server/env.js";
 import { createServerLogger } from "./server/logging.js";
+import { createHazardEventId } from "./shared/hazards/hazard-event.js";
+import { resolveHazardLayerId } from "./shared/hazards/hazard-layer-registry.js";
 import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
 import {
   createForwardHeaders,
@@ -61,37 +63,53 @@ function readFiniteNumber(record: DisasterAwareHazard, key: string): number | un
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function adaptDisasterAwareHazards(payload: unknown): ServerHazard[] {
+function readStableHazardEventId(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return undefined;
+}
+
+export function adaptDisasterAwareHazards(payload: unknown): ServerHazard[] {
   if (!Array.isArray(payload)) return [];
 
-  return payload.filter(isRecord).map((hazard, index) => {
+  return payload.filter(isRecord).flatMap((hazard) => {
     const latitude = readFiniteNumber(hazard, "latitude");
     const longitude = readFiniteNumber(hazard, "longitude");
-    const hazardId = hazard.hazard_ID;
-    const timestamp = readString(hazard, "create_Date");
+    const sourceEventId = readStableHazardEventId(hazard.hazard_ID);
+    if (!sourceEventId) return [];
+
+    const eventId = createHazardEventId("disasteraware", sourceEventId);
+    const type = readString(hazard, "type_ID", "UNKNOWN");
+    const observedAt = readString(hazard, "create_Date");
+    const updatedAt = readString(hazard, "last_Update");
     const severity = readString(hazard, "severity_ID");
 
-    return {
-      id:
-        typeof hazardId === "number" || typeof hazardId === "string"
-          ? String(hazardId)
-          : `da-${index}`,
-      title: readString(hazard, "hazard_Name", "Unknown Hazard"),
-      type: readString(hazard, "type_ID", "UNKNOWN"),
-      geometry: {
-        type: "Point",
-        coordinates:
-          latitude === undefined || longitude === undefined ? [0, 0] : [longitude, latitude],
-      },
-      description: readString(
-        hazard,
-        "description",
-        readString(hazard, "hazard_Name", "No description available"),
-      ),
-      source: readString(hazard, "creator", "DisasterAWARE"),
-      ...(severity ? { severity } : {}),
-      ...(timestamp ? { timestamp } : {}),
-    } satisfies ServerHazard;
+    return [
+      {
+        schemaVersion: "1",
+        eventId,
+        sourceEventId,
+        sourceId: "disasteraware",
+        layerId: resolveHazardLayerId(type),
+        id: eventId,
+        title: readString(hazard, "hazard_Name", "Unknown Hazard"),
+        type,
+        geometry: {
+          type: "Point",
+          coordinates:
+            latitude === undefined || longitude === undefined ? [0, 0] : [longitude, latitude],
+        },
+        description: readString(
+          hazard,
+          "description",
+          readString(hazard, "hazard_Name", "No description available"),
+        ),
+        source: readString(hazard, "creator", "DisasterAWARE"),
+        ...(severity ? { severity } : {}),
+        ...(observedAt ? { timestamp: observedAt, observedAt } : {}),
+        ...(updatedAt ? { updatedAt } : {}),
+      } satisfies ServerHazard,
+    ];
   });
 }
 
@@ -388,9 +406,7 @@ export function createApp(options: CreateAppOptions = {}): Application {
       );
     }
 
-    const uniqueHazards = [
-      ...new Map(hazards.map((hazard) => [`${hazard.source}:${hazard.id}`, hazard])).values(),
-    ];
+    const uniqueHazards = [...new Map(hazards.map((hazard) => [hazard.eventId, hazard])).values()];
     const filtered = typeFilter
       ? uniqueHazards.filter((hazard) => typeFilter.has(hazard.type.toUpperCase()))
       : uniqueHazards;

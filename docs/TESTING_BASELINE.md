@@ -25,11 +25,11 @@
 
 | 范围             | 已配置的测试文件或用例 | 本次结果     |
 | ---------------- | ---------------------- | ------------ |
-| BFF 单元测试     | 6 个 Node 原生测试文件 | 84/84 通过   |
-| Service 单元测试 | 17 个 Vitest 文件      | 194/194 通过 |
-| React 组件测试   | 16 个 Vitest 文件      | 81/81 通过   |
+| BFF 单元测试     | 6 个 Node 原生测试文件 | 88/88 通过   |
+| Service 单元测试 | 19 个 Vitest 文件      | 235/235 通过 |
+| React 组件测试   | 16 个 Vitest 文件      | 84/84 通过   |
 | Playwright E2E   | 1 个 `*.spec.ts` 文件  | 1/1 通过     |
-| Python unittest  | 7 个 `test_*.py` 模块  | 49/49 通过   |
+| Python unittest  | 7 个 `test_*.py` 模块  | 56/56 通过   |
 
 本轮 Node、Python、浏览器和构建验证均完成；Node 24.16.0 会根据项目声明输出 engine warning，功能验证结果不受影响。
 

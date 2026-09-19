@@ -33,6 +33,8 @@ interface DataQualityMonitorProps {
   source?: string;
 }
 
+const CANONICAL_SOURCE_IDS = new Set(["disasteraware", "usgs", "nasa-eonet", "gdacs"]);
+
 const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
   hazards,
   source = "DisasterAWARE",
@@ -41,6 +43,22 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
   const [thresholds, setThresholds] = useState<QualityThresholds | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const canonicalSources = hazards.map((hazard) => hazard.sourceId);
+  const hasCanonicalSource = canonicalSources.some(
+    (sourceId) => typeof sourceId === "string" && sourceId.trim().length > 0,
+  );
+  const hasOneValidCanonicalSource =
+    hasCanonicalSource &&
+    canonicalSources.every(
+      (sourceId) => typeof sourceId === "string" && CANONICAL_SOURCE_IDS.has(sourceId),
+    ) &&
+    new Set(canonicalSources).size === 1;
+  const qualitySource = hasOneValidCanonicalSource
+    ? canonicalSources[0]
+    : hasCanonicalSource
+      ? "unknown"
+      : source;
 
   const loadThresholds = useCallback(async () => {
     try {
@@ -55,7 +73,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const result = await assessDataQuality(hazards, source);
+      const result = await assessDataQuality(hazards, qualitySource);
       setQualityReport(result.data);
     } catch {
       setQualityReport(null);
@@ -64,7 +82,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [hazards, source]);
+  }, [hazards, qualitySource]);
 
   useEffect(() => {
     void loadThresholds();

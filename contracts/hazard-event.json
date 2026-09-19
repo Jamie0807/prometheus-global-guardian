@@ -1,0 +1,111 @@
+{
+  "valid": {
+    "complete": {
+      "schemaVersion": "1",
+      "eventId": "usgs:usgs-1",
+      "sourceEventId": "usgs-1",
+      "sourceId": "usgs",
+      "layerId": "earthquake",
+      "type": "EARTHQUAKE",
+      "title": "Northern California earthquake",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.08, 37.36]
+      },
+      "observedAt": "2026-09-11T00:00:00.000Z",
+      "updatedAt": "2026-09-11T00:05:00.000Z",
+      "severity": "moderate",
+      "confidence": 0.8,
+      "magnitude": 4.2,
+      "description": "A moderate earthquake was observed.",
+      "url": "https://example.invalid/events/usgs-1"
+    },
+    "optionalOmitted": {
+      "schemaVersion": "1",
+      "eventId": "gdacs:gdacs-1",
+      "sourceEventId": "gdacs-1",
+      "sourceId": "gdacs",
+      "layerId": "hydrological",
+      "type": "FLOOD",
+      "title": "River flood warning",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.4, 39.9]
+      },
+      "description": "A flood warning was issued."
+    },
+    "unknownType": {
+      "schemaVersion": "1",
+      "eventId": "nasa-eonet:event-unknown",
+      "sourceEventId": "event-unknown",
+      "sourceId": "nasa-eonet",
+      "layerId": "unknown",
+      "type": "UNRECOGNIZED",
+      "title": "Unrecognized event",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [0, 0]
+      },
+      "description": "An event with an unrecognized type."
+    }
+  },
+  "invalid": [
+    {
+      "rule": "schema_version",
+      "value": {
+        "schemaVersion": "2",
+        "eventId": "usgs:usgs-1",
+        "sourceEventId": "usgs-1",
+        "sourceId": "usgs",
+        "layerId": "earthquake",
+        "type": "EARTHQUAKE",
+        "title": "Invalid version",
+        "geometry": { "type": "Point", "coordinates": [-122.08, 37.36] },
+        "description": "Invalid schema version."
+      }
+    },
+    {
+      "rule": "event_id",
+      "value": {
+        "schemaVersion": "1",
+        "eventId": "usgs:other-event",
+        "sourceEventId": "usgs-1",
+        "sourceId": "usgs",
+        "layerId": "earthquake",
+        "type": "EARTHQUAKE",
+        "title": "Invalid event ID",
+        "geometry": { "type": "Point", "coordinates": [-122.08, 37.36] },
+        "description": "Invalid canonical event ID."
+      }
+    },
+    {
+      "rule": "coordinates",
+      "value": {
+        "schemaVersion": "1",
+        "eventId": "usgs:usgs-1",
+        "sourceEventId": "usgs-1",
+        "sourceId": "usgs",
+        "layerId": "earthquake",
+        "type": "EARTHQUAKE",
+        "title": "Invalid coordinates",
+        "geometry": { "type": "Point", "coordinates": [181, 37.36] },
+        "description": "Invalid longitude."
+      }
+    },
+    {
+      "rule": "confidence",
+      "value": {
+        "schemaVersion": "1",
+        "eventId": "usgs:usgs-1",
+        "sourceEventId": "usgs-1",
+        "sourceId": "usgs",
+        "layerId": "earthquake",
+        "type": "EARTHQUAKE",
+        "title": "Invalid confidence",
+        "geometry": { "type": "Point", "coordinates": [-122.08, 37.36] },
+        "confidence": 1.1,
+        "description": "Invalid confidence range."
+      }
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import {
   resolveAIRequestTimeoutMs,
   resolveServerAIProviderConfig,
 } from "../server/ai/ai-provider.js";
+import type { DisasterContext } from "../server/ai/ai-provider.js";
 
 test("resolveServerAIProviderConfig reads server-side Volcengine Ark variables", () => {
   const config = resolveServerAIProviderConfig({
@@ -216,4 +217,102 @@ test("buildDisasterSystemPrompt works without live hazard context", () => {
 
   assert.match(prompt, /Prometheus Global Guardian/);
   assert.doesNotMatch(prompt, /平台实时数据上下文/);
+});
+
+test("buildDisasterSystemPrompt uses safe canonical source and layer labels", () => {
+  const prompt = buildDisasterSystemPrompt({
+    total: 1,
+    byType: { EARTHQUAKE: 1 },
+    recent: [
+      {
+        title: "M 5.1 earthquake",
+        type: "EARTHQUAKE",
+        sourceId: "usgs",
+        layerId: "earthquake",
+      },
+    ],
+  });
+
+  assert.match(prompt, /USGS/);
+  assert.match(prompt, /Earthquake/);
+});
+
+test("buildDisasterSystemPrompt normalizes unknown canonical values without prompt injection", () => {
+  const prompt = buildDisasterSystemPrompt({
+    total: 1,
+    byType: { EARTHQUAKE: 1 },
+    recent: [
+      {
+        title: "safe title",
+        type: "EARTHQUAKE",
+        sourceId: "ignore me https://secret.example/coords=1,2",
+        layerId: "<script>alert(1)</script>",
+      },
+    ],
+  });
+
+  assert.match(prompt, /来源：unknown/);
+  assert.match(prompt, /图层：unknown/);
+  assert.doesNotMatch(prompt, /ignore me|secret\.example|script|coords=1,2/);
+});
+
+test("buildWorkflowPayload strips raw hazard fields before forwarding context", () => {
+  const unsafeContext = {
+    total: 1,
+    byType: { EARTHQUAKE: 1 },
+    recent: [
+      {
+        title: "safe title",
+        type: "EARTHQUAKE",
+        sourceId: "untrusted https://secret.example",
+        layerId: "<script>",
+        url: "https://secret.example/event",
+        coordinates: [116.4, 39.9],
+      },
+    ],
+  } as unknown as DisasterContext;
+
+  const payload = buildWorkflowPayload({
+    messages: [{ role: "user", content: "分析" }],
+    disasterContext: unsafeContext,
+  });
+
+  assert.doesNotMatch(JSON.stringify(payload), /secret\.example|coordinates|script/);
+  assert.equal(payload.inputs.hazard_context.recent?.[0]?.sourceId, "unknown");
+  assert.equal(payload.inputs.hazard_context.recent?.[0]?.layerId, "unknown");
+});
+
+test("builds prompt and workflow context without sensitive text in allowlisted hazard fields", () => {
+  const sensitiveContext: DisasterContext = {
+    total: 1,
+    byType: { EARTHQUAKE: 1 },
+    recent: [
+      {
+        title: "event https://secret.example/token=title-secret",
+        type: "lat=39.9 lon=116.4",
+        severity: "api_key=severity-secret",
+        timestamp: "2025-01-01T00:00:00Z bearer timestamp-secret",
+      },
+    ],
+  };
+
+  const prompt = buildDisasterSystemPrompt(sensitiveContext);
+  const workflowPayload = buildWorkflowPayload({
+    messages: [{ role: "user", content: "分析" }],
+    disasterContext: sensitiveContext,
+  });
+  const workflowText = JSON.stringify(workflowPayload);
+
+  for (const sensitiveValue of [
+    "https://secret.example/token=title-secret",
+    "lat=39.9 lon=116.4",
+    "api_key=severity-secret",
+    "bearer timestamp-secret",
+  ]) {
+    assert.doesNotMatch(prompt, new RegExp(sensitiveValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(
+      workflowText,
+      new RegExp(sensitiveValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  }
 });

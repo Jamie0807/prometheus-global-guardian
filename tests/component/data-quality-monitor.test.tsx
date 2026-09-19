@@ -19,6 +19,11 @@ vi.mock("../../src/services/analytics/analyticsService", () => ({
 const hazards: Hazard[] = [
   {
     id: "hazard-1",
+    eventId: "usgs:hazard-1",
+    sourceEventId: "hazard-1",
+    sourceId: "usgs",
+    layerId: "earthquake",
+    schemaVersion: "1",
     title: "Test earthquake",
     type: "EARTHQUAKE",
     geometry: { type: "Point", coordinates: [116.4, 39.9] },
@@ -77,6 +82,7 @@ describe("DataQualityMonitor", () => {
     render(<DataQualityMonitor hazards={hazards} />);
 
     expect(await screen.findByText("34.4")).toBeInTheDocument();
+    expect(serviceMocks.assessDataQuality).toHaveBeenCalledWith(hazards, "usgs");
     expect(screen.getByText("失败")).toBeInTheDocument();
     expect(screen.getByText("77.8%")).toBeInTheDocument();
     expect(screen.getByText("缺少必填字段： latitude, longitude")).toBeInTheDocument();
@@ -93,6 +99,56 @@ describe("DataQualityMonitor", () => {
     expect(screen.getByText("校验并统一数据源名称")).toBeInTheDocument();
     expect(screen.getByText("使用标准阈值重新计算严重程度")).toBeInTheDocument();
     expect(screen.getByText("更新或归档过期记录")).toBeInTheDocument();
+  });
+
+  it("falls back to the legacy source for non-empty legacy hazard data", async () => {
+    const legacyHazards = [
+      {
+        ...hazards[0],
+        source: "USGS",
+        sourceId: undefined,
+        layerId: undefined,
+      },
+    ] as unknown as Hazard[];
+
+    render(<DataQualityMonitor hazards={legacyHazards} source="USGS" />);
+
+    await screen.findByText("34.4");
+    expect(serviceMocks.assessDataQuality).toHaveBeenCalledWith(legacyHazards, "USGS");
+  });
+
+  it("uses unknown for mixed canonical and legacy hazard data", async () => {
+    const mixedHazards = [
+      hazards[0],
+      {
+        ...hazards[0],
+        id: "hazard-2",
+        eventId: "legacy:hazard-2",
+        source: "USGS",
+        sourceId: undefined,
+        layerId: undefined,
+      },
+    ] as unknown as Hazard[];
+
+    render(<DataQualityMonitor hazards={mixedHazards} source="USGS" />);
+
+    await screen.findByText("34.4");
+    expect(serviceMocks.assessDataQuality).toHaveBeenCalledWith(mixedHazards, "unknown");
+  });
+
+  it("uses unknown when a non-empty canonical source is invalid", async () => {
+    const invalidCanonicalHazards = [
+      {
+        ...hazards[0],
+        source: "USGS",
+        sourceId: "untrusted-source",
+      },
+    ] as unknown as Hazard[];
+
+    render(<DataQualityMonitor hazards={invalidCanonicalHazards} source="USGS" />);
+
+    await screen.findByText("34.4");
+    expect(serviceMocks.assessDataQuality).toHaveBeenCalledWith(invalidCanonicalHazards, "unknown");
   });
 
   it("shows an error instead of rendering a rejected quality report", async () => {

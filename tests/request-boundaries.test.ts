@@ -124,4 +124,25 @@ test("AI request boundary rejects invalid shapes and excessive message input", (
     }),
     true,
   );
+  assert.equal(
+    isValidAIRequest({
+      messages: [message],
+      disasterContext: {
+        recent: [{ title: "Flood", type: "FLOOD", sourceId: "gdacs", layerId: "hydrological" }],
+      },
+    }),
+    true,
+  );
+  for (const canonicalField of ["sourceId", "layerId"]) {
+    for (const value of ["", "x".repeat(1001), 42]) {
+      assert.equal(
+        isValidAIRequest({
+          messages: [message],
+          disasterContext: { recent: [{ title: "Flood", type: "FLOOD", [canonicalField]: value }] },
+        }),
+        false,
+        `${canonicalField}=${String(value)}`,
+      );
+    }
+  }
 });
