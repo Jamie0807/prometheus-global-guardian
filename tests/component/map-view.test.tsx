@@ -22,6 +22,7 @@ const mapMocks = vi.hoisted(() => ({
   popupSetDOMContent: vi.fn(),
   popupSetLngLat: vi.fn(),
   popupAddTo: vi.fn(),
+  markerElements: [] as HTMLElement[],
   fetchHazardFeed: vi.fn(),
   fetchHazardsActive: vi.fn(),
   fetchUSGSEarthquakes: vi.fn(),
@@ -79,6 +80,13 @@ vi.mock("mapbox-gl", () => ({
       easeTo = mapMocks.easeTo;
     },
     Marker: class {
+      private readonly element: HTMLElement;
+
+      constructor(element: HTMLElement) {
+        this.element = element;
+        mapMocks.markerElements.push(element);
+      }
+
       setLngLat() {
         return this;
       }
@@ -90,7 +98,7 @@ vi.mock("mapbox-gl", () => ({
       }
       remove() {}
       getElement() {
-        return document.createElement("div");
+        return this.element;
       }
     },
     Popup: class {
@@ -175,6 +183,7 @@ function renderHeader() {
 describe("MapView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mapMocks.markerElements.length = 0;
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
     mapMocks.fetchHazardFeed.mockResolvedValue({
       hazards: [
@@ -232,6 +241,40 @@ describe("MapView", () => {
 
     await waitFor(() => expect(mapMocks.addSource).toHaveBeenCalled());
     expect(screen.getByTestId("map-state-event-ids")).toHaveTextContent("disasteraware:hazard-1");
+  });
+
+  it("keeps individual hazard markers hidden when data arrives at a clustered zoom", async () => {
+    const pending = pendingHazardFeed();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => pending.promise);
+    mapMocks.getZoom.mockReturnValue(1.5);
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.addSource).toHaveBeenCalledWith("hazards-lod", expect.anything()),
+    );
+    await waitFor(() => expect(mapMocks.on).toHaveBeenCalledWith("zoom", expect.any(Function)));
+    await act(async () => {
+      pending.resolve({
+        hazards: [
+          {
+            id: "late-hazard",
+            eventId: "disasteraware:late-hazard",
+            sourceId: "disasteraware",
+            layerId: "hydrological",
+            title: "Late hazard",
+            type: "FLOOD",
+            geometry: { type: "Point", coordinates: [120, 30] },
+            description: "Loaded after the map layers",
+            source: "test",
+          },
+        ],
+        meta: null,
+      });
+      await pending.promise;
+    });
+
+    await waitFor(() => expect(mapMocks.markerElements).toHaveLength(1));
+    expect(mapMocks.markerElements[0]?.style.display).toBe("none");
   });
 
   it("passes a DOM popup node to Mapbox for external hazard text", async () => {

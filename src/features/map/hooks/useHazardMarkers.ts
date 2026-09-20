@@ -6,6 +6,7 @@ import mapboxgl from "mapbox-gl";
 
 import { HAZARD_COLORS, defaultColor } from "../../../config/hazardColors";
 import type { Hazard } from "../../../types";
+import { getMapLodVisibility } from "../utils/mapLod";
 import { createHazardPopupContent } from "../utils/hazardPopupContent";
 
 export function useHazardMarkers(
@@ -37,6 +38,7 @@ export function useHazardMarkers(
     // 其他图层激活时，标记初始保持隐藏。
     const selected =
       filter === "ALL" ? hazards : hazards.filter((hazard) => hazard.type === filter);
+    const showMarkers = getMapLodVisibility(map.getZoom(), hidden).showMarkers;
     selected.forEach((hazard) => {
       const [longitude, latitude] = hazard.geometry.coordinates;
       if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return;
@@ -48,7 +50,7 @@ export function useHazardMarkers(
         borderRadius: "50%",
         backgroundColor: HAZARD_COLORS[hazard.type] ?? defaultColor,
         border: "2px solid white",
-        display: hidden ? "none" : "block",
+        display: showMarkers ? "block" : "none",
       });
       const popup = new mapboxgl.Popup({ offset: 25 }).setDOMContent(
         createHazardPopupContent(hazard),
