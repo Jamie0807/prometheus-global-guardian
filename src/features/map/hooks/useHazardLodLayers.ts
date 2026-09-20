@@ -7,6 +7,7 @@ import mapboxgl from "mapbox-gl";
 import type { GeoJSONSource, Map, MapMouseEvent } from "mapbox-gl";
 
 import type { Hazard } from "../../../types";
+import type { MapViewMode } from "../state/MapStateContext";
 import { createLodFeatureCollection } from "../utils/hazardGeojson";
 import {
   MAP_LAYER_IDS,
@@ -22,6 +23,7 @@ export function useHazardLodLayers(
   hazards: readonly Hazard[],
   mapRevision: number,
   showHeatmap: boolean,
+  viewMode: MapViewMode,
   setMarkerVisibility: (visible: boolean) => void,
 ) {
   const applyLod = useCallback(
@@ -44,11 +46,11 @@ export function useHazardLodLayers(
         map.setLayoutProperty(
           buildingLayer,
           "visibility",
-          visibility.showBuildings ? "visible" : "none",
+          visibility.showBuildings && viewMode === "3d" ? "visible" : "none",
         );
       setMarkerVisibility(visibility.showMarkers);
     },
-    [mapRef, setMarkerVisibility, showHeatmap],
+    [mapRef, setMarkerVisibility, showHeatmap, viewMode],
   );
 
   useEffect(() => {
@@ -69,11 +71,12 @@ export function useHazardLodLayers(
       source: MAP_SOURCE_IDS.lod,
       filter: ["has", "point_count"],
       paint: {
-        "circle-color": ["step", ["get", "point_count"], "#3b82f6", 20, "#f59e0b", 50, "#ef4444"],
-        "circle-radius": ["step", ["get", "point_count"], 18, 20, 28, 50, 38],
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "rgba(255,255,255,0.8)",
-        "circle-opacity": 0.85,
+        "circle-color": ["step", ["get", "point_count"], "#3988ff", 20, "#f4a63a", 50, "#f15b69"],
+        "circle-radius": ["step", ["get", "point_count"], 16, 20, 24, 50, 32],
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "rgba(220,242,255,0.94)",
+        "circle-opacity": 0.82,
+        "circle-blur": 0.04,
       },
     });
     map.addLayer({
@@ -95,10 +98,10 @@ export function useHazardLodLayers(
       filter: ["!", ["has", "point_count"]],
       paint: {
         "circle-color": ["coalesce", ["get", "color"], "#888888"],
-        "circle-radius": 6,
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "#fff",
-        "circle-opacity": 0.9,
+        "circle-radius": 5,
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "#e8f5ff",
+        "circle-opacity": 0.96,
       },
     });
   }, [mapRef, mapRevision]);
@@ -117,7 +120,11 @@ export function useHazardLodLayers(
     onZoom();
     return () => {
       // 组件保持挂载时地图样式可能被替换；移除监听器，避免失效地图保留此闭包。
-      map.off("zoom", onZoom);
+      try {
+        map.off("zoom", onZoom);
+      } catch {
+        // Mapbox may already have disposed the event registry during map.remove().
+      }
     };
   }, [applyLod, mapRef, mapRevision]);
 
@@ -136,7 +143,7 @@ export function useHazardLodLayers(
     let active = true;
 
     const onClusterClick = (event: MapMouseEvent) => {
-      const feature = event.features?.[0];
+      const feature = event.features?.[0]?.toJSON();
       const clusterId = feature?.properties?.cluster_id;
       const geometry = feature?.geometry;
       if (
@@ -166,7 +173,7 @@ export function useHazardLodLayers(
     };
 
     const onUnclusteredClick = (event: MapMouseEvent) => {
-      const id = event.features?.[0]?.properties?.id;
+      const id = event.features?.[0]?.toJSON().properties?.id;
       if (typeof id !== "string") return;
       const hazard = hazards.find((candidate) => candidate.id === id);
       if (!hazard) return;
@@ -180,8 +187,16 @@ export function useHazardLodLayers(
     map.on("click", MAP_LAYER_IDS.unclustered, onUnclusteredClick);
     return () => {
       active = false;
-      map.off("click", MAP_LAYER_IDS.clusters, onClusterClick);
-      map.off("click", MAP_LAYER_IDS.unclustered, onUnclusteredClick);
+      try {
+        map.off("click", MAP_LAYER_IDS.clusters, onClusterClick);
+      } catch {
+        // Mapbox may already have disposed the event registry during map.remove().
+      }
+      try {
+        map.off("click", MAP_LAYER_IDS.unclustered, onUnclusteredClick);
+      } catch {
+        // Mapbox may already have disposed the event registry during map.remove().
+      }
     };
   }, [hazards, mapRef, mapRevision, showHeatmap]);
 

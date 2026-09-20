@@ -16,14 +16,18 @@ import { useHazardData } from "../hooks/useHazardData";
 import type { Hazard, HazardFeedResponse } from "../../../types";
 import { notify } from "../../../utils/notifications";
 
+export type MapViewMode = "2d" | "3d";
+
 export type MapStateValue = {
   hazards: Hazard[];
   filter: string;
   mapStyle: string;
+  viewMode: MapViewMode;
   showHeatmap: boolean;
   sourceMeta: HazardFeedResponse["meta"] | null;
   setFilter(filter: string): void;
   setMapStyle(mapStyle: string): void;
+  setViewMode(mode: MapViewMode): void;
   toggleHeatmap(): void;
   refresh(): Promise<void>;
 };
@@ -33,6 +37,7 @@ const MapStateContext = createContext<MapStateValue | undefined>(undefined);
 export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Element {
   const [filter, setFilter] = useState("ALL");
   const [mapStyle, setMapStyle] = useState("dark-v11");
+  const [viewMode, setViewMode] = useState<MapViewMode>("2d");
   const [showHeatmap, setShowHeatmap] = useState(false);
   const toggleHeatmap = useCallback(() => setShowHeatmap((value) => !value), []);
   const { disasters, refresh, sourceMeta } = useHazardData(filter);
@@ -53,14 +58,16 @@ export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Ele
       hazards: disasters,
       filter,
       mapStyle,
+      viewMode,
       showHeatmap,
       sourceMeta,
       setFilter,
       setMapStyle,
+      setViewMode,
       toggleHeatmap,
       refresh,
     }),
-    [disasters, filter, mapStyle, refresh, showHeatmap, sourceMeta, toggleHeatmap],
+    [disasters, filter, mapStyle, refresh, showHeatmap, sourceMeta, toggleHeatmap, viewMode],
   );
 
   return <MapStateContext.Provider value={value}>{children}</MapStateContext.Provider>;

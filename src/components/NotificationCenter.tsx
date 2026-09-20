@@ -32,44 +32,18 @@ const NotificationCenter: React.FC = () => {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="notification-center">
       {/* 通知按钮 */}
       <button
+        type="button"
+        className="header-action notification-trigger"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: "relative",
-          backgroundColor: "#2a2a2a",
-          border: "1px solid #4CAF50",
-          color: "#fff",
-          padding: "10px 15px",
-          borderRadius: "8px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
       >
-        🔔 通知
+        <span aria-hidden="true">🔔</span>
+        <span>通知</span>
         {unreadCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: "-5px",
-              right: "-5px",
-              backgroundColor: "#f44336",
-              color: "#fff",
-              borderRadius: "50%",
-              width: "20px",
-              height: "20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "11px",
-              fontWeight: "bold",
-            }}
-          >
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
+          <span className="notification-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>
         )}
       </button>
 

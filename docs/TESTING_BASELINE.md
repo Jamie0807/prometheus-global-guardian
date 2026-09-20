@@ -26,22 +26,22 @@
 | 范围             | 已配置的测试文件或用例 | 本次结果     |
 | ---------------- | ---------------------- | ------------ |
 | BFF 单元测试     | 6 个 Node 原生测试文件 | 92/92 通过   |
-| Service 单元测试 | 19 个 Vitest 文件      | 235/235 通过 |
-| React 组件测试   | 16 个 Vitest 文件      | 84/84 通过   |
+| Service 单元测试 | 20 个 Vitest 文件      | 245/245 通过 |
+| React 组件测试   | 19 个 Vitest 文件      | 105/105 通过 |
 | Playwright E2E   | 1 个 `*.spec.ts` 文件  | 1/1 通过     |
 | Python unittest  | 7 个 `test_*.py` 模块  | 56/56 通过   |
 
-2026-09-20 本轮 Node、Python、浏览器和构建验证均完成：BFF 92/92、Service 235/235、组件 84/84、E2E 1/1、Python 56/56。Node 24.16.0 会根据项目声明输出 engine warning，功能验证结果不受影响。
+2026-09-20 Orbital 地图升级后完整验证通过：BFF 92/92、Service 245/245、组件 105/105、E2E 1/1、Python 56/56；lint、格式、客户端/服务端/契约类型检查及生产构建均通过。Node 24.16.0 会根据项目声明输出 engine warning，功能验证结果不受影响。
 
 ## 测试边界
 
-单元测试验证 BFF provider、AI 路由和流式转换、DisasterAware 代理边界，以及前端 HTTP、灾害数据适配、地图 GeoJSON/LOD、灾害强度字段读取、Analytics 结果展示适配和 AI Service。BFF 边界覆盖路由白名单、编码路径绕过、请求体、query、请求头、限流、超时、token 缓存和错误脱敏。组件测试验证状态面板、统计概览折线图、数据质量面板和 Mapbox/Worker mock 下的地图热力图切换。E2E 验证生产构建首页加载、灾害类型筛选、AI 助手打开和 mock 流式消息展示。
+单元测试验证 BFF provider、AI 路由和流式转换、DisasterAware 代理边界，以及前端 HTTP、灾害数据适配、地图 GeoJSON/LOD、灾害强度字段读取、Analytics 结果展示适配和 AI Service。BFF 边界覆盖路由白名单、编码路径绕过、请求体、query、请求头、限流、超时、token 缓存和错误脱敏。组件测试覆盖状态面板与图例折叠、默认 2D/3D 切换、DEM 生命周期及失败降级、外部 Tiles 回退、地图标签和 Mapbox/Worker mock 下的热力图切换。E2E 验证生产构建首页、灾害筛选、AI 助手、2D/3D 控件状态，以及桌面和 390px 窄屏的浮层视口与重叠边界。
 
 E2E 通过 Playwright route mock 隔离 DisasterAware、公开灾害源、Mapbox 和 AI provider，不访问真实第三方服务，也不要求本地配置真实账号或模型 Key。失败时保留截图，重试时保留 trace。
 
 Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。`test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。
 
-当前尚未纳入完整 Node 基线的范围包括 Python 核心算法测试、桌面与移动端视觉回归、所有弹窗和路由流程，以及真实外部服务集成测试。质量工作流在各自的触发条件下分别运行 `pnpm run test:baseline` 与 `pnpm run test:python`；这描述工作流配置，不表示分支保护已将它们设为 required checks。
+当前尚未纳入完整 Node 基线的范围包括 Python 核心算法测试、基于截图差异的桌面与移动端视觉回归、所有弹窗和路由流程，以及真实外部服务集成测试。质量工作流在各自的触发条件下分别运行 `pnpm run test:baseline` 与 `pnpm run test:python`；这描述工作流配置，不表示分支保护已将它们设为 required checks。
 
 ## 本次环境限制
 

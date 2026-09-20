@@ -4,21 +4,36 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mapMocks = vi.hoisted(() => ({
+  constructorOptions: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn(),
+  removeLayer: vi.fn(),
   getLayer: vi.fn(() => undefined),
   getSource: vi.fn(() => undefined),
   setLayoutProperty: vi.fn(),
+  setPaintProperty: vi.fn(),
   on: vi.fn(),
   off: vi.fn(),
   once: vi.fn(),
   remove: vi.fn(),
   setFog: vi.fn(),
+  setProjection: vi.fn(),
+  setTerrain: vi.fn(),
+  removeSource: vi.fn(),
   getZoom: vi.fn(() => 1.5),
+  getPitch: vi.fn(() => 0),
+  getStyle: vi.fn(() => ({
+    layers: [
+      { id: "country-label", type: "symbol", layout: { "text-field": "{name}" } },
+      { id: "settlement-major-label", type: "symbol", layout: { "text-field": "{name}" } },
+      { id: "road-label", type: "symbol", layout: { "text-field": "{name}" } },
+    ],
+  })),
   addControl: vi.fn(),
   removeControl: vi.fn(),
   setStyle: vi.fn(),
   easeTo: vi.fn(),
+  jumpTo: vi.fn(),
   popupSetDOMContent: vi.fn(),
   popupSetLngLat: vi.fn(),
   popupAddTo: vi.fn(),
@@ -55,7 +70,8 @@ vi.stubGlobal("Worker", WorkerMock);
 vi.mock("mapbox-gl", () => ({
   default: {
     Map: class {
-      constructor() {
+      constructor(options: unknown) {
+        mapMocks.constructorOptions(options);
         queueMicrotask(() => {
           const loadRegistration = mapMocks.on.mock.calls
             .filter(([event]) => event === "load")
@@ -65,19 +81,27 @@ vi.mock("mapbox-gl", () => ({
       }
       addSource = mapMocks.addSource;
       addLayer = mapMocks.addLayer;
+      removeLayer = mapMocks.removeLayer;
       getLayer = mapMocks.getLayer;
       getSource = mapMocks.getSource;
       setLayoutProperty = mapMocks.setLayoutProperty;
+      setPaintProperty = mapMocks.setPaintProperty;
       on = mapMocks.on;
       off = mapMocks.off;
       once = mapMocks.once;
       remove = mapMocks.remove;
       setFog = mapMocks.setFog;
+      setProjection = mapMocks.setProjection;
+      setTerrain = mapMocks.setTerrain;
+      removeSource = mapMocks.removeSource;
       getZoom = mapMocks.getZoom;
+      getPitch = mapMocks.getPitch;
+      getStyle = mapMocks.getStyle;
       addControl = mapMocks.addControl;
       removeControl = mapMocks.removeControl;
       setStyle = mapMocks.setStyle;
       easeTo = mapMocks.easeTo;
+      jumpTo = mapMocks.jumpTo;
     },
     Marker: class {
       private readonly element: HTMLElement;
@@ -143,7 +167,8 @@ function pendingHazardFeed() {
 }
 
 function MapStateControls() {
-  const { hazards, refresh, setFilter } = useMapState();
+  const { filter, hazards, refresh, setFilter, showHeatmap, toggleHeatmap, viewMode, setViewMode } =
+    useMapState();
 
   return (
     <>
@@ -151,11 +176,20 @@ function MapStateControls() {
       <div data-testid="map-state-event-ids">
         {hazards.map((hazard) => hazard.eventId).join(",")}
       </div>
+      <div data-testid="map-state-view-mode">{viewMode}</div>
+      <div data-testid="map-state-filter">{filter}</div>
+      <div data-testid="map-state-heatmap">{String(showHeatmap)}</div>
       <button type="button" onClick={() => void refresh()}>
         refresh-map-data
       </button>
       <button type="button" onClick={() => setFilter("FLOOD")}>
         filter-flood
+      </button>
+      <button type="button" onClick={toggleHeatmap}>
+        toggle-heatmap-state
+      </button>
+      <button type="button" onClick={() => setViewMode("3d")}>
+        enable-3d-state
       </button>
     </>
   );
@@ -184,6 +218,8 @@ describe("MapView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mapMocks.markerElements.length = 0;
+    mapMocks.getSource.mockImplementation(() => undefined);
+    mapMocks.getLayer.mockImplementation(() => undefined);
     Object.defineProperty(document, "hidden", { configurable: true, value: false });
     mapMocks.fetchHazardFeed.mockResolvedValue({
       hazards: [
@@ -236,6 +272,43 @@ describe("MapView", () => {
     expect(screen.getByTitle("显示标记")).toHaveTextContent("标记");
   });
 
+  it("exposes an accessible 2D and 3D view toggle in the map header", () => {
+    renderHeader();
+
+    expect(screen.getByRole("heading", { level: 1, name: "全球灾害态势" })).toBeInTheDocument();
+    expect(screen.getByText("PROMETHEUS · GLOBAL GUARDIAN")).toBeInTheDocument();
+    const twoDButton = screen.getByRole("button", { name: "2D 视图" });
+    const threeDButton = screen.getByRole("button", { name: "3D 地形" });
+
+    expect(threeDButton).toHaveTextContent("3D 地形");
+    expect(twoDButton).toHaveAttribute("aria-pressed", "true");
+    expect(threeDButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(threeDButton);
+    expect(twoDButton).toHaveAttribute("aria-pressed", "false");
+    expect(threeDButton).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps filter and heatmap state when the view mode changes", async () => {
+    render(
+      <MapStateProvider>
+        <MapView />
+        <MapStateControls />
+      </MapStateProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("map-state-hazard-ids")).toHaveTextContent("hazard-1"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "filter-flood" }));
+    fireEvent.click(screen.getByRole("button", { name: "toggle-heatmap-state" }));
+    fireEvent.click(screen.getByRole("button", { name: "enable-3d-state" }));
+
+    expect(screen.getByTestId("map-state-view-mode")).toHaveTextContent("3d");
+    expect(screen.getByTestId("map-state-filter")).toHaveTextContent("FLOOD");
+    expect(screen.getByTestId("map-state-heatmap")).toHaveTextContent("true");
+    expect(screen.getByTestId("map-state-hazard-ids")).toHaveTextContent("hazard-1");
+  });
+
   it("renders the map container", async () => {
     renderMapView();
 
@@ -277,6 +350,103 @@ describe("MapView", () => {
     expect(mapMocks.markerElements[0]?.style.display).toBe("none");
   });
 
+  it("restyles country and settlement labels for a restrained high-contrast map", async () => {
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.setPaintProperty).toHaveBeenCalledWith(
+        "country-label",
+        "text-color",
+        "#bfd2e5",
+      ),
+    );
+    expect(mapMocks.setPaintProperty).toHaveBeenCalledWith(
+      "country-label",
+      "text-halo-color",
+      "#071222",
+    );
+    expect(mapMocks.setPaintProperty).not.toHaveBeenCalledWith(
+      "road-label",
+      "text-color",
+      expect.anything(),
+    );
+  });
+
+  it("starts in 2D without terrain and enables Terrain after switching to 3D", async () => {
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.addSource).toHaveBeenCalledWith("hazards-lod", expect.anything()),
+    );
+    expect(mapMocks.constructorOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ projection: "mercator" }),
+    );
+    expect(mapMocks.setProjection).toHaveBeenCalledWith("mercator");
+    expect(mapMocks.addSource).not.toHaveBeenCalledWith("orbital-terrain-dem", expect.anything());
+
+    fireEvent.click(screen.getByRole("button", { name: "enable-3d-state" }));
+
+    await waitFor(() =>
+      expect(mapMocks.addSource).toHaveBeenCalledWith(
+        "orbital-terrain-dem",
+        expect.objectContaining({ type: "raster-dem" }),
+      ),
+    );
+    expect(mapMocks.setTerrain).toHaveBeenCalledWith({
+      source: "orbital-terrain-dem",
+      exaggeration: 1.8,
+    });
+    expect(mapMocks.setProjection).toHaveBeenCalledWith("globe");
+  });
+
+  it("only adds the building extrusion layer while 3D mode is active", async () => {
+    renderMapView();
+
+    await waitFor(() =>
+      expect(mapMocks.addLayer).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "lod-clusters" }),
+      ),
+    );
+    expect(
+      mapMocks.addLayer.mock.calls.some(
+        ([layer]) => (layer as { id: string }).id === "3d-buildings",
+      ),
+    ).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "enable-3d-state" }));
+
+    await waitFor(() =>
+      expect(
+        mapMocks.addLayer.mock.calls.some(
+          ([layer]) => (layer as { id: string }).id === "3d-buildings",
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("cleans up map hooks safely after the Mapbox instance is removed", async () => {
+    const view = renderMapView();
+    await waitFor(() => expect(mapMocks.addSource).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "enable-3d-state" }));
+    await waitFor(() =>
+      expect(mapMocks.addSource).toHaveBeenCalledWith("orbital-terrain-dem", expect.anything()),
+    );
+
+    mapMocks.remove.mockImplementationOnce(() => {
+      mapMocks.getSource.mockImplementation(() => {
+        throw new Error("style already removed");
+      });
+      mapMocks.getLayer.mockImplementation(() => {
+        throw new Error("style already removed");
+      });
+      mapMocks.off.mockImplementation(() => {
+        throw new Error("event registry already removed");
+      });
+    });
+
+    expect(() => view.unmount()).not.toThrow();
+  });
+
   it("passes a DOM popup node to Mapbox for external hazard text", async () => {
     renderMapView();
 
@@ -307,8 +477,10 @@ describe("MapView", () => {
     clusterClick({
       features: [
         {
-          properties: { cluster_id: 42 },
-          geometry: { type: "Point", coordinates: [120, 30] },
+          toJSON: () => ({
+            properties: { cluster_id: 42 },
+            geometry: { type: "Point", coordinates: [120, 30] },
+          }),
         },
       ],
     });
@@ -337,8 +509,10 @@ describe("MapView", () => {
     clusterClick({
       features: [
         {
-          properties: { cluster_id: 42 },
-          geometry: { type: "Point", coordinates: [120, 30] },
+          toJSON: () => ({
+            properties: { cluster_id: 42 },
+            geometry: { type: "Point", coordinates: [120, 30] },
+          }),
         },
       ],
     });
@@ -368,8 +542,10 @@ describe("MapView", () => {
     clusterClick({
       features: [
         {
-          properties: { cluster_id: 42 },
-          geometry: { type: "Point", coordinates: [120, 30] },
+          toJSON: () => ({
+            properties: { cluster_id: 42 },
+            geometry: { type: "Point", coordinates: [120, 30] },
+          }),
         },
       ],
     });
@@ -390,7 +566,7 @@ describe("MapView", () => {
     )?.[2] as (event: unknown) => void;
 
     unclusteredClick({
-      features: [{ properties: { id: "hazard-1" } }],
+      features: [{ toJSON: () => ({ properties: { id: "hazard-1" } }) }],
       lngLat: { lng: 120, lat: 30 },
     });
 

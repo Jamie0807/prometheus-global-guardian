@@ -8,15 +8,18 @@ import { useMapState } from "../features/map/state/MapStateContext";
 
 const Header: React.FC = () => {
   const { activeView, openModal, openView } = useUIState();
-  const { showHeatmap, toggleHeatmap } = useMapState();
+  const { showHeatmap, toggleHeatmap, viewMode, setViewMode } = useMapState();
   return (
     <header className="header">
       <div className="header-content">
-        <h1 className="platform-title">实时全球环境灾害监控平台与可视化平台</h1>
+        <div className="platform-brand">
+          <p className="platform-kicker">PROMETHEUS · GLOBAL GUARDIAN</p>
+          <h1 className="platform-title">全球灾害态势</h1>
+        </div>
 
         <div className="header-buttons">
           <button
-            className="btn btn-ai"
+            className="btn header-action"
             aria-label="打开 AI 灾害分析助手"
             onClick={() => openModal("ai")}
           >
@@ -32,7 +35,7 @@ const Header: React.FC = () => {
           </button>
 
           <button
-            className="btn btn-analytics"
+            className="btn header-action"
             aria-label="打开数据分析面板"
             onClick={() => openView("analytics")}
           >
@@ -48,7 +51,7 @@ const Header: React.FC = () => {
           </button>
 
           <button
-            className="btn btn-primary"
+            className="btn header-action"
             aria-label="打开保存报告弹窗"
             onClick={() => openModal("save-report")}
           >
@@ -64,7 +67,7 @@ const Header: React.FC = () => {
           </button>
 
           <button
-            className="btn btn-secondary"
+            className="btn header-action"
             aria-label="打开设置弹窗"
             onClick={() => openModal("settings")}
           >
@@ -86,14 +89,37 @@ const Header: React.FC = () => {
           </button>
 
           {activeView === "map" && (
-            <button
-              type="button"
-              className={`btn btn-secondary btn-heatmap ${showHeatmap ? "active" : ""}`}
-              title={showHeatmap ? "显示标记" : "显示热力图"}
-              onClick={toggleHeatmap}
-            >
-              <span>{showHeatmap ? "标记" : "热力图"}</span>
-            </button>
+            <>
+              <div className="map-mode-switch" role="group" aria-label="地图视图模式">
+                <button
+                  type="button"
+                  className={`map-mode-button ${viewMode === "2d" ? "active" : ""}`}
+                  aria-label="2D 视图"
+                  aria-pressed={viewMode === "2d"}
+                  onClick={() => setViewMode("2d")}
+                >
+                  2D
+                </button>
+                <button
+                  type="button"
+                  className={`map-mode-button ${viewMode === "3d" ? "active" : ""}`}
+                  aria-label="3D 地形"
+                  aria-pressed={viewMode === "3d"}
+                  onClick={() => setViewMode("3d")}
+                >
+                  3D 地形
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className={`btn header-action ${showHeatmap ? "active" : ""}`}
+                title={showHeatmap ? "显示标记" : "显示热力图"}
+                onClick={toggleHeatmap}
+              >
+                <span>{showHeatmap ? "标记" : "热力图"}</span>
+              </button>
+            </>
           )}
 
           <NotificationCenter />

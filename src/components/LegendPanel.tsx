@@ -12,10 +12,22 @@ const LegendPanel: React.FC = () => {
   }));
 
   return (
-    <div className="legend-panel" id="legend-panel">
-      <div className="legend-header">
-        <div className="legend-title">
-          <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
+    <details
+      className="legend-panel orbital-overlay"
+      id="legend-panel"
+      aria-label="灾害类型图例"
+      open
+    >
+      <summary className="legend-header">
+        <span className="legend-title">
+          <svg
+            aria-hidden="true"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="white"
+            viewBox="0 0 24 24"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -24,24 +36,29 @@ const LegendPanel: React.FC = () => {
             ></path>
           </svg>
           <span>灾害类型</span>
-        </div>
-      </div>
+        </span>
+        <span className="legend-summary-count">{hazardList.length} 类</span>
+        <span className="overlay-chevron" aria-hidden="true" />
+      </summary>
 
-      <div className="legend-items">
-        {hazardList.map(({ color, label }) => (
-          <div className="legend-item" key={label}>
-            <div
-              className="legend-color"
-              style={{
-                backgroundColor: color,
-                boxShadow: `0 0 8px ${color}`,
-              }}
-            ></div>
-            <span className="legend-label">{label}</span>
-          </div>
-        ))}
+      <div className="legend-content">
+        <ul className="legend-items">
+          {hazardList.map(({ color, label }) => (
+            <li className="legend-item" key={label}>
+              <span
+                aria-hidden="true"
+                className="legend-color"
+                style={{
+                  backgroundColor: color,
+                  boxShadow: `0 0 6px ${color}`,
+                }}
+              />
+              <span className="legend-label">{label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-    </div>
+    </details>
   );
 };
 

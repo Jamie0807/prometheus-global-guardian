@@ -30,13 +30,17 @@ vi.mock("../../src/utils/notifications", () => ({
 import { MapStateProvider, useMapState } from "../../src/features/map/state/MapStateContext";
 
 function MapStateProbe() {
-  const { filter, setFilter } = useMapState();
+  const { filter, setFilter, viewMode, setViewMode } = useMapState();
 
   return (
     <>
       <p>{filter}</p>
+      <p data-testid="map-view-mode">{viewMode}</p>
       <button type="button" onClick={() => setFilter("FLOOD")}>
         filter-flood
+      </button>
+      <button type="button" onClick={() => setViewMode("3d")}>
+        enable-3d
       </button>
     </>
   );
@@ -68,6 +72,21 @@ describe("MapStateContext", () => {
     await user.click(screen.getByRole("button", { name: "filter-flood" }));
 
     expect(screen.getByText("FLOOD")).toBeInTheDocument();
+  });
+
+  it("starts in 2D and updates the shared map view mode", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MapStateProvider>
+        <MapStateProbe />
+      </MapStateProvider>,
+    );
+
+    expect(screen.getByTestId("map-view-mode")).toHaveTextContent("2d");
+    await user.click(screen.getByRole("button", { name: "enable-3d" }));
+
+    expect(screen.getByTestId("map-view-mode")).toHaveTextContent("3d");
   });
 
   it("uses the existing update notification for initial and later hazard growth", async () => {
