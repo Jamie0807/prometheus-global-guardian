@@ -2,7 +2,7 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LineChart } from "../../src/components/DataVisualization";
+import { LineChart, ProgressBar } from "../../src/components/DataVisualization";
 import { getXAxisLabelIndexes } from "../../src/utils/chartLabels";
 
 describe("LineChart X-axis labels", () => {
@@ -26,5 +26,26 @@ describe("LineChart X-axis labels", () => {
     expect(screen.getByText("#846")).toBeInTheDocument();
     expect(labels[0]).toHaveStyle({ left: "0%", transform: "translateX(0)" });
     expect(labels.at(-1)).toHaveStyle({ left: "100%", transform: "translateX(-100%)" });
+  });
+});
+
+describe("ProgressBar", () => {
+  it("renders a visible themed fill at the displayed percentage", () => {
+    render(
+      <ProgressBar
+        label="EARTHQUAKE"
+        value={498}
+        max={1000}
+        color="var(--analytics-accent, #67e8f9)"
+      />,
+    );
+
+    const progress = screen.getByRole("progressbar", { name: "EARTHQUAKE" });
+    const fill = progress.firstElementChild as HTMLDivElement;
+
+    expect(screen.getByText("49.8%")).toBeInTheDocument();
+    expect(progress).toHaveAttribute("aria-valuenow", "498");
+    expect(fill.style.width).toBe("49.8%");
+    expect(fill.style.backgroundColor).toBe("var(--analytics-accent, #67e8f9)");
   });
 });

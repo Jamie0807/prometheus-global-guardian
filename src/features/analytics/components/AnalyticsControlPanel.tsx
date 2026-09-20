@@ -3,6 +3,7 @@
  */
 import { type ReactNode } from "react";
 import { AlertBox, LoadingSpinner } from "../../../components/DataVisualization";
+import AnalyticsIcon from "./AnalyticsIcon";
 import type {
   StatisticsResponse,
   PredictionsResponse,
@@ -33,25 +34,23 @@ export default function AnalyticsControlPanel({
 }: AnalyticsControlPanelProps) {
   return (
     <div
+      className="analytics-surface"
       style={{
-        background: "linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)",
         padding: "30px",
         borderRadius: "16px",
         marginBottom: "30px",
-        border: "1px solid rgba(76, 175, 80, 0.2)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
       }}
     >
       <h2
+        className="analytics-heading"
         style={{
-          color: "#4CAF50",
           marginBottom: "24px",
-          textShadow: "0 0 10px rgba(76, 175, 80, 0.3)",
           fontSize: "20px",
           fontWeight: "bold",
         }}
       >
-        🔬 Python分析功能
+        <AnalyticsIcon name="analysis" size={20} />
+        Python分析功能
       </h2>
 
       {serviceStatus === "offline" ? (
@@ -63,29 +62,21 @@ export default function AnalyticsControlPanel({
           />
           <button
             onClick={() => void onCheckService()}
+            className="analytics-action"
             style={{
               marginTop: "10px",
-              background: "linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)",
-              color: "#4CAF50",
               padding: "12px 24px",
-              border: "1px solid #4CAF50",
+              border: "1px solid var(--analytics-border)",
               borderRadius: "8px",
               cursor: "pointer",
               fontSize: "14px",
               fontWeight: "500",
-              boxShadow: "0 4px 12px rgba(76, 175, 80, 0.2)",
+              boxShadow: "none",
               transition: "all 0.3s ease",
             }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.transform = "translateY(-2px)";
-              event.currentTarget.style.boxShadow = "0 6px 20px rgba(76, 175, 80, 0.3)";
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.transform = "translateY(0)";
-              event.currentTarget.style.boxShadow = "0 4px 12px rgba(76, 175, 80, 0.2)";
-            }}
           >
-            🔄 重试连接
+            <AnalyticsIcon name="refresh" />
+            重试连接
           </button>
         </div>
       ) : null}
@@ -102,28 +93,29 @@ export default function AnalyticsControlPanel({
 
       {(statistics || predictions || riskAssessment) && !loading ? (
         <div
+          className="analytics-surface--inset"
           style={{
             marginBottom: "20px",
             padding: "16px",
-            background: "linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)",
             borderRadius: "12px",
-            border: "1px solid #4CAF50",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            boxShadow: "0 4px 16px rgba(76, 175, 80, 0.15)",
           }}
         >
           <div>
             <div
               style={{
-                color: "#4CAF50",
+                color: "var(--analytics-state-normal)",
                 fontSize: "14px",
                 fontWeight: "bold",
                 marginBottom: "5px",
               }}
             >
-              ✅ 分析完成
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <AnalyticsIcon name="check" size={16} />
+                分析完成
+              </span>
             </div>
             <div style={{ color: "#888", fontSize: "12px" }}>
               已生成统计分析、预测模型和风险评估报告
@@ -131,29 +123,21 @@ export default function AnalyticsControlPanel({
           </div>
           <button
             onClick={() => void onRunAnalysis()}
+            className="analytics-action"
             style={{
-              background: "linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)",
-              color: "#4CAF50",
               padding: "12px 24px",
-              border: "1px solid #4CAF50",
+              border: "1px solid var(--analytics-border)",
               borderRadius: "8px",
               cursor: "pointer",
               fontSize: "14px",
               fontWeight: "500",
               whiteSpace: "nowrap",
-              boxShadow: "0 4px 12px rgba(76, 175, 80, 0.2)",
+              boxShadow: "none",
               transition: "all 0.3s ease",
             }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.transform = "translateY(-2px)";
-              event.currentTarget.style.boxShadow = "0 6px 20px rgba(76, 175, 80, 0.3)";
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.transform = "translateY(0)";
-              event.currentTarget.style.boxShadow = "0 4px 12px rgba(76, 175, 80, 0.2)";
-            }}
           >
-            🔄 重新分析
+            <AnalyticsIcon name="refresh" />
+            重新分析
           </button>
         </div>
       ) : null}

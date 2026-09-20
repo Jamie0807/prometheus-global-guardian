@@ -11,8 +11,8 @@ interface AnalyticsChartsTabProps {
 export default function AnalyticsChartsTab({ hazards }: AnalyticsChartsTabProps) {
   return (
     <div
+      className="analytics-surface analytics-tab-panel"
       style={{
-        backgroundColor: "#0a0a0a",
         padding: "20px",
         borderRadius: "8px",
         marginTop: "20px",

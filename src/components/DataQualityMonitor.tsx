@@ -96,10 +96,22 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
 
   const getStatusBadge = (status: string): React.ReactElement => {
     const colorMap: { [key: string]: { bg: string; text: string } } = {
-      pass: { bg: "rgba(76, 175, 80, 0.2)", text: "#66BB6A" },
-      warning: { bg: "rgba(255, 193, 7, 0.2)", text: "#FFD54F" },
-      fail: { bg: "rgba(239, 83, 80, 0.2)", text: "#EF5350" },
-      excellent: { bg: "rgba(33, 150, 243, 0.2)", text: "#64B5F6" },
+      pass: {
+        bg: "color-mix(in srgb, var(--analytics-state-normal, #67e8f9) 20%, transparent)",
+        text: "var(--analytics-state-normal, #67e8f9)",
+      },
+      warning: {
+        bg: "color-mix(in srgb, var(--analytics-state-warning, #fbbf24) 20%, transparent)",
+        text: "var(--analytics-state-warning, #fbbf24)",
+      },
+      fail: {
+        bg: "color-mix(in srgb, var(--analytics-state-danger, #fb7185) 20%, transparent)",
+        text: "var(--analytics-state-danger, #fb7185)",
+      },
+      excellent: {
+        bg: "color-mix(in srgb, var(--analytics-state-normal, #67e8f9) 20%, transparent)",
+        text: "var(--analytics-state-normal, #67e8f9)",
+      },
     };
 
     const normalizedStatus = status.toLowerCase();
@@ -133,16 +145,19 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     const percentage = (score * 100).toFixed(1);
     const thresholdScore = thresholds?.[name] ?? 0.9;
     const threshold = (thresholdScore * 100).toFixed(0);
-    const isPassing = score >= thresholdScore;
+    const scoreColor =
+      score >= 0.95
+        ? "var(--analytics-state-normal, #67e8f9)"
+        : score >= 0.85
+          ? "var(--analytics-state-warning, #fbbf24)"
+          : "var(--analytics-state-danger, #fb7185)";
 
     return (
       <div
+        className="analytics-quality-dimension analytics-surface--inset"
         style={{
-          background: "linear-gradient(135deg, #1a1a1a 0%, #252525 100%)",
           padding: "16px",
           borderRadius: "8px",
-          border: "1px solid rgba(76, 175, 80, 0.2)",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
         }}
       >
         <div
@@ -153,12 +168,14 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
             marginBottom: "8px",
           }}
         >
-          <h4 style={{ fontSize: "14px", fontWeight: "500", color: "#4CAF50" }}>{label}</h4>
+          <h4 className="analytics-heading" style={{ fontSize: "14px", fontWeight: "500" }}>
+            {label}
+          </h4>
           <span
             style={{
               fontSize: "20px",
               fontWeight: "bold",
-              color: score >= 0.95 ? "#4CAF50" : score >= 0.85 ? "#FFA726" : "#EF5350",
+              color: scoreColor,
             }}
           >
             {percentage}%
@@ -167,7 +184,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
         <div
           style={{
             width: "100%",
-            background: "#0a0a0a",
+            background: "var(--analytics-surface-inset, #0a0a0a)",
             borderRadius: "9999px",
             height: "8px",
             marginBottom: "4px",
@@ -178,14 +195,14 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
               height: "8px",
               borderRadius: "9999px",
               transition: "all 0.3s ease",
-              background: isPassing
-                ? "linear-gradient(90deg, #4CAF50, #66BB6A)"
-                : "linear-gradient(90deg, #EF5350, #FF7043)",
+              background: `linear-gradient(90deg, ${scoreColor}, color-mix(in srgb, ${scoreColor} 72%, white))`,
               width: `${percentage}%`,
             }}
           ></div>
         </div>
-        <p style={{ fontSize: "12px", color: "#888" }}>阈值: {threshold}%</p>
+        <p style={{ fontSize: "12px", color: "var(--analytics-muted, #888)" }}>
+          阈值: {threshold}%
+        </p>
       </div>
     );
   };
@@ -202,11 +219,13 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
             height: "32px",
             width: "32px",
             border: "2px solid transparent",
-            borderTopColor: "#2196F3",
-            borderRightColor: "#2196F3",
+            borderTopColor: "var(--analytics-accent, #67e8f9)",
+            borderRightColor: "var(--analytics-accent, #67e8f9)",
           }}
         ></div>
-        <span style={{ marginLeft: "12px", color: "#4CAF50" }}>正在评估数据质量...</span>
+        <span style={{ marginLeft: "12px", color: "var(--analytics-accent, #67e8f9)" }}>
+          正在评估数据质量...
+        </span>
       </div>
     );
   }
@@ -215,14 +234,25 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     return (
       <div
         style={{
-          background: "rgba(239, 83, 80, 0.1)",
-          border: "1px solid rgba(239, 83, 80, 0.3)",
+          background: "color-mix(in srgb, var(--analytics-state-danger, #fb7185) 10%, transparent)",
+          border:
+            "1px solid color-mix(in srgb, var(--analytics-state-danger, #fb7185) 30%, transparent)",
           borderRadius: "8px",
           padding: "16px",
         }}
       >
-        <p style={{ color: "#EF5350", fontWeight: "500" }}>质量评估失败</p>
-        <p style={{ color: "#FF7043", fontSize: "14px", marginTop: "4px" }}>{error}</p>
+        <p style={{ color: "var(--analytics-state-danger, #fb7185)", fontWeight: "500" }}>
+          质量评估失败
+        </p>
+        <p
+          style={{
+            color: "var(--analytics-state-danger, #fb7185)",
+            fontSize: "14px",
+            marginTop: "4px",
+          }}
+        >
+          {error}
+        </p>
       </div>
     );
   }
@@ -230,15 +260,14 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
   if (!qualityReport) {
     return (
       <div
+        className="analytics-surface--inset"
         style={{
-          background: "#1a1a1a",
-          border: "1px solid #333",
           borderRadius: "8px",
           padding: "16px",
           textAlign: "center",
         }}
       >
-        <p style={{ color: "#888" }}>暂无质量评估数据</p>
+        <p style={{ color: "var(--analytics-muted, #888)" }}>暂无质量评估数据</p>
       </div>
     );
   }
@@ -247,17 +276,18 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {/* 总体得分 */}
       <div
+        className="analytics-quality-overall-score analytics-surface"
         style={{
-          background: "linear-gradient(135deg, #2196F3 0%, #9C27B0 100%)",
           borderRadius: "12px",
           padding: "24px",
-          color: "#fff",
-          boxShadow: "0 4px 20px rgba(33, 150, 243, 0.3)",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}>
+            <h3
+              className="analytics-heading"
+              style={{ fontSize: "18px", fontWeight: "600", marginBottom: "4px" }}
+            >
               数据质量综合评分
             </h3>
             <p style={{ color: "rgba(255, 255, 255, 0.8)", fontSize: "14px" }}>
@@ -275,7 +305,10 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
 
       {/* 五维质量评估 */}
       <div>
-        <h4 style={{ fontSize: "18px", fontWeight: "600", color: "#4CAF50", marginBottom: "16px" }}>
+        <h4
+          className="analytics-heading"
+          style={{ fontSize: "18px", fontWeight: "600", marginBottom: "16px" }}
+        >
           五维质量评估
         </h4>
         <div
@@ -297,8 +330,9 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
       {qualityReport.issues && qualityReport.issues.length > 0 && (
         <div
           style={{
-            background: "rgba(255, 193, 7, 0.1)",
-            border: "1px solid rgba(255, 193, 7, 0.3)",
+            background:
+              "color-mix(in srgb, var(--analytics-state-warning, #fbbf24) 6%, transparent)",
+            border: "1px solid var(--analytics-border-soft, rgba(148, 193, 225, 0.13))",
             borderRadius: "8px",
             padding: "16px",
           }}
@@ -307,7 +341,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
             style={{
               fontSize: "16px",
               fontWeight: "600",
-              color: "#FFC107",
+              color: "var(--analytics-state-warning, #fbbf24)",
               marginBottom: "12px",
               display: "flex",
               alignItems: "center",
@@ -332,7 +366,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
                 key={idx}
                 style={{
                   fontSize: "14px",
-                  color: "#FFD54F",
+                  color: "var(--analytics-state-warning, #fbbf24)",
                   display: "flex",
                   alignItems: "flex-start",
                 }}
@@ -349,8 +383,8 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
       {qualityReport.recommendations && qualityReport.recommendations.length > 0 && (
         <div
           style={{
-            background: "rgba(33, 150, 243, 0.1)",
-            border: "1px solid rgba(33, 150, 243, 0.3)",
+            background: "color-mix(in srgb, var(--analytics-chart-2) 8%, transparent)",
+            border: "1px solid var(--analytics-border-soft, rgba(148, 193, 225, 0.13))",
             borderRadius: "8px",
             padding: "16px",
           }}
@@ -359,7 +393,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
             style={{
               fontSize: "16px",
               fontWeight: "600",
-              color: "#2196F3",
+              color: "var(--analytics-accent, #67e8f9)",
               marginBottom: "12px",
               display: "flex",
               alignItems: "center",
@@ -384,7 +418,7 @@ const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({
                 key={idx}
                 style={{
                   fontSize: "14px",
-                  color: "#64B5F6",
+                  color: "var(--analytics-chart-2)",
                   display: "flex",
                   alignItems: "flex-start",
                 }}

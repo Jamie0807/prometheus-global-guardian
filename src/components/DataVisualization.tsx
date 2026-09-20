@@ -2,6 +2,7 @@
  * 提供通用数据可视化与指标展示组件。
  */
 import React from "react";
+import AnalyticsIcon from "../features/analytics/components/AnalyticsIcon";
 import { getXAxisLabelIndexes } from "../utils/chartLabels";
 
 interface LineChartProps {
@@ -17,7 +18,7 @@ interface LineChartProps {
 export const LineChart: React.FC<LineChartProps> = ({
   data,
   title,
-  color = "#4CAF50",
+  color = "var(--analytics-accent, #67e8f9)",
   xLabel = "",
   yLabel = "",
   showDots = true,
@@ -27,14 +28,24 @@ export const LineChart: React.FC<LineChartProps> = ({
     return (
       <div
         style={{
-          backgroundColor: "#1a1a1a",
+          backgroundColor: "var(--analytics-surface-inset, #1a1a1a)",
           padding: "20px",
           borderRadius: "8px",
-          border: "1px solid #333",
+          border: "1px solid var(--analytics-border-soft, #333)",
         }}
       >
-        <h4 style={{ color: "#fff", marginBottom: "15px" }}>{title}</h4>
-        <div style={{ color: "#888", textAlign: "center", padding: "40px" }}>暂无数据</div>
+        <h4
+          className="analytics-icon-heading"
+          style={{ color: "var(--analytics-accent, #fff)", marginBottom: "15px" }}
+        >
+          <AnalyticsIcon name="chart" size={18} />
+          {title}
+        </h4>
+        <div
+          style={{ color: "var(--analytics-muted, #888)", textAlign: "center", padding: "40px" }}
+        >
+          暂无数据
+        </div>
       </div>
     );
   }
@@ -60,14 +71,21 @@ export const LineChart: React.FC<LineChartProps> = ({
 
   return (
     <div
+      className="analytics-surface--inset"
       style={{
-        backgroundColor: "#1a1a1a",
+        backgroundColor: "var(--analytics-surface-inset, #1a1a1a)",
         padding: "20px",
         borderRadius: "8px",
-        border: "1px solid #333",
+        border: "1px solid var(--analytics-border-soft, #333)",
       }}
     >
-      <h4 style={{ color: "#fff", marginBottom: "15px" }}>{title}</h4>
+      <h4
+        className="analytics-icon-heading"
+        style={{ color: "var(--analytics-accent, #fff)", marginBottom: "15px" }}
+      >
+        <AnalyticsIcon name="chart" size={18} />
+        {title}
+      </h4>
       <div style={{ position: "relative", height: `${chartHeight}px`, marginBottom: "10px" }}>
         <svg
           width="100%"
@@ -87,11 +105,11 @@ export const LineChart: React.FC<LineChartProps> = ({
                   y1={y}
                   x2={chartWidth}
                   y2={y}
-                  stroke="#333"
+                  stroke="var(--analytics-border-soft, #333)"
                   strokeWidth="1"
                   strokeDasharray="4 4"
                 />
-                <text x="5" y={y - 5} fill="#666" fontSize="10">
+                <text x="5" y={y - 5} fill="var(--analytics-muted, #666)" fontSize="10">
                   {value.toFixed(1)}
                 </text>
               </g>
@@ -122,13 +140,19 @@ export const LineChart: React.FC<LineChartProps> = ({
                     cy={p.y}
                     r="4"
                     fill={color}
-                    stroke="#1a1a1a"
+                    stroke="var(--analytics-border-soft, #1a1a1a)"
                     strokeWidth="2"
                     vectorEffect="non-scaling-stroke"
                   />
                   {/* 数据点标签 - 数据太多时不显示 */}
                   {showValueLabel && (
-                    <text x={p.x} y={p.y - 10} fill="#888" fontSize="10" textAnchor="middle">
+                    <text
+                      x={p.x}
+                      y={p.y - 10}
+                      fill="var(--analytics-muted, #888)"
+                      fontSize="10"
+                      textAnchor="middle"
+                    >
                       {p.value.toFixed(1)}
                     </text>
                   )}
@@ -144,7 +168,7 @@ export const LineChart: React.FC<LineChartProps> = ({
           position: "relative",
           marginTop: "10px",
           fontSize: "11px",
-          color: "#666",
+          color: "var(--analytics-muted, #666)",
           height: "20px",
           overflow: "hidden",
         }}
@@ -182,7 +206,7 @@ export const LineChart: React.FC<LineChartProps> = ({
             justifyContent: "space-between",
             marginTop: "15px",
             fontSize: "12px",
-            color: "#888",
+            color: "var(--analytics-muted, #888)",
           }}
         >
           {xLabel && <div>{xLabel}</div>}
@@ -199,19 +223,30 @@ interface BarChartProps {
   color?: string;
 }
 
-export const BarChart: React.FC<BarChartProps> = ({ data, title, color = "#4CAF50" }) => {
+export const BarChart: React.FC<BarChartProps> = ({
+  data,
+  title,
+  color = "var(--analytics-accent, #67e8f9)",
+}) => {
   const maxValue = Math.max(...Object.values(data));
 
   return (
     <div
+      className="analytics-surface--inset"
       style={{
-        backgroundColor: "#1a1a1a",
+        backgroundColor: "var(--analytics-surface-inset, #1a1a1a)",
         padding: "20px",
         borderRadius: "8px",
-        border: "1px solid #333",
+        border: "1px solid var(--analytics-border-soft, #333)",
       }}
     >
-      <h4 style={{ color: "#fff", marginBottom: "15px" }}>{title}</h4>
+      <h4
+        className="analytics-icon-heading"
+        style={{ color: "var(--analytics-accent, #fff)", marginBottom: "15px" }}
+      >
+        <AnalyticsIcon name="chart" size={18} />
+        {title}
+      </h4>
       {Object.entries(data).map(([key, value]) => (
         <div key={key} style={{ marginBottom: "12px" }}>
           <div
@@ -227,7 +262,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, title, color = "#4CAF5
           </div>
           <div
             style={{
-              backgroundColor: "#0a0a0a",
+              backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
               height: "8px",
               borderRadius: "4px",
               overflow: "hidden",
@@ -261,34 +296,42 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   label,
   value,
   unit = "",
-  color = "#4CAF50",
+  color = "var(--analytics-accent, #67e8f9)",
   trend,
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
   const trendIcon = trend === "up" ? "↑" : trend === "down" ? "↓" : "→";
-  const trendColor = trend === "up" ? "#4CAF50" : trend === "down" ? "#f44336" : "#ff9800";
+  const trendColor =
+    trend === "up"
+      ? "var(--analytics-state-normal, #67e8f9)"
+      : trend === "down"
+        ? "var(--analytics-state-danger, #fb7185)"
+        : "var(--analytics-state-warning, #fbbf24)";
 
   return (
     <div
+      className="analytics-surface"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
-        background: isHovered
-          ? "linear-gradient(135deg, #252525 0%, #1a1a1a 100%)"
-          : "linear-gradient(135deg, #1a1a1a 0%, #252525 100%)",
+        background: "var(--analytics-surface, linear-gradient(135deg, #1a1a1a 0%, #252525 100%))",
         padding: "20px",
         borderRadius: "12px",
-        border: `1px solid ${isHovered ? color : "rgba(76, 175, 80, 0.2)"}`,
+        border: "1px solid var(--analytics-border, rgba(103, 232, 249, 0.2))",
         position: "relative",
-        boxShadow: isHovered
-          ? `0 8px 24px rgba(0,0,0,0.4), 0 0 20px ${color}40`
-          : "0 4px 16px rgba(0,0,0,0.2)",
         transform: isHovered ? "translateY(-4px)" : "translateY(0)",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         cursor: "pointer",
       }}
     >
-      <div style={{ color: "#888", fontSize: "12px", marginBottom: "10px", fontWeight: "500" }}>
+      <div
+        style={{
+          color: "var(--analytics-muted, #888)",
+          fontSize: "12px",
+          marginBottom: "10px",
+          fontWeight: "500",
+        }}
+      >
         {label}
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
@@ -297,12 +340,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
             color,
             fontSize: "28px",
             fontWeight: "bold",
-            textShadow: `0 0 10px ${color}40`,
+            textShadow: "0 0 10px var(--analytics-accent-glow, rgba(56, 189, 248, 0.4))",
           }}
         >
           {typeof value === "number" ? value.toFixed(2) : value}
         </div>
-        {unit && <div style={{ color: "#666", fontSize: "14px" }}>{unit}</div>}
+        {unit && (
+          <div style={{ color: "var(--analytics-muted, #666)", fontSize: "14px" }}>{unit}</div>
+        )}
       </div>
       {trend && (
         <div
@@ -334,10 +379,12 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   label,
   value,
   max,
-  color = "#4CAF50",
+  color = "var(--analytics-accent, #67e8f9)",
   showPercentage = true,
 }) => {
-  const percentage = (value / max) * 100;
+  const safeMax = Math.max(max, 0);
+  const boundedValue = Math.min(Math.max(value, 0), safeMax);
+  const percentage = safeMax > 0 ? (boundedValue / safeMax) * 100 : 0;
   const [isHovered, setIsHovered] = React.useState(false);
 
   return (
@@ -359,7 +406,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           style={{
             color,
             fontWeight: "bold",
-            textShadow: isHovered ? `0 0 8px ${color}60` : "none",
+            textShadow: isHovered
+              ? "0 0 8px var(--analytics-accent-glow, rgba(56, 189, 248, 0.4))"
+              : "none",
             transition: "all 0.3s ease",
           }}
         >
@@ -367,8 +416,15 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         </span>
       </div>
       <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={safeMax}
+        aria-valuenow={boundedValue}
+        aria-valuetext={showPercentage ? `${percentage.toFixed(1)}%` : `${value} / ${max}`}
         style={{
-          background: "linear-gradient(90deg, #0a0a0a 0%, #151515 100%)",
+          background:
+            "var(--analytics-surface-inset, linear-gradient(90deg, #0a0a0a 0%, #151515 100%))",
           height: "12px",
           borderRadius: "6px",
           overflow: "hidden",
@@ -379,12 +435,12 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       >
         <div
           style={{
-            background: `linear-gradient(90deg, ${color} 0%, ${color}dd 100%)`,
+            backgroundColor: color,
             height: "100%",
-            width: `${Math.min(percentage, 100)}%`,
+            width: `${percentage}%`,
             transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
             borderRadius: "6px",
-            boxShadow: isHovered ? `0 0 12px ${color}80` : `0 0 6px ${color}40`,
+            filter: isHovered ? "brightness(1.12)" : "none",
           }}
         />
       </div>
@@ -401,10 +457,14 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ level, size = "medium" }) 
   const [isHovered, setIsHovered] = React.useState(false);
 
   const config = {
-    low: { color: "#4CAF50", label: "低风险", icon: "✓" },
-    medium: { color: "#ff9800", label: "中风险", icon: "⚠" },
-    high: { color: "#f44336", label: "高风险", icon: "⚠" },
-    critical: { color: "#d32f2f", label: "极高风险", icon: "🚨" },
+    low: { color: "var(--analytics-state-normal, #67e8f9)", label: "低风险", icon: "✓" },
+    medium: { color: "var(--analytics-state-warning, #fbbf24)", label: "中风险", icon: "⚠" },
+    high: { color: "var(--analytics-state-danger, #fb7185)", label: "高风险", icon: "⚠" },
+    critical: {
+      color: "var(--analytics-state-danger, #fb7185)",
+      label: "极高风险",
+      icon: "🚨",
+    },
   };
 
   const sizeConfig = {
@@ -419,7 +479,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ level, size = "medium" }) 
   return (
     <span
       style={{
-        background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 82%, black), ${color})`,
         color: "#fff",
         padding,
         fontSize,
@@ -455,9 +515,9 @@ export const DataTable: React.FC<DataTableProps> = ({ headers, rows, maxHeight =
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)",
+        background: "var(--analytics-surface, linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%))",
         borderRadius: "12px",
-        border: "1px solid rgba(76, 175, 80, 0.2)",
+        border: "1px solid var(--analytics-border, rgba(103, 232, 249, 0.2))",
         overflow: "hidden",
         boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
       }}
@@ -468,7 +528,8 @@ export const DataTable: React.FC<DataTableProps> = ({ headers, rows, maxHeight =
             style={{
               position: "sticky",
               top: 0,
-              background: "linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)",
+              background:
+                "var(--analytics-surface-inset, linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%))",
               zIndex: 1,
             }}
           >
@@ -479,10 +540,10 @@ export const DataTable: React.FC<DataTableProps> = ({ headers, rows, maxHeight =
                   style={{
                     padding: "14px 12px",
                     textAlign: "left",
-                    color: "#4CAF50",
+                    color: "var(--analytics-accent, #67e8f9)",
                     fontWeight: "bold",
-                    borderBottom: "2px solid #4CAF50",
-                    textShadow: "0 0 8px rgba(76, 175, 80, 0.4)",
+                    borderBottom: "2px solid var(--analytics-accent, #67e8f9)",
+                    textShadow: "0 0 8px var(--analytics-accent-glow, rgba(56, 189, 248, 0.4))",
                     fontSize: "14px",
                   }}
                 >
@@ -499,10 +560,10 @@ export const DataTable: React.FC<DataTableProps> = ({ headers, rows, maxHeight =
                   borderBottom: "1px solid rgba(255,255,255,0.05)",
                   background:
                     hoveredRow === rowIdx
-                      ? "linear-gradient(90deg, rgba(76, 175, 80, 0.1) 0%, rgba(76, 175, 80, 0.05) 100%)"
+                      ? "linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, rgba(56, 189, 248, 0.05) 100%)"
                       : rowIdx % 2 === 0
-                        ? "linear-gradient(90deg, #1a1a1a 0%, #151515 100%)"
-                        : "linear-gradient(90deg, #0f0f0f 0%, #0a0a0a 100%)",
+                        ? "var(--analytics-surface-raised, linear-gradient(90deg, #1a1a1a 0%, #151515 100%))"
+                        : "var(--analytics-surface-inset, linear-gradient(90deg, #0f0f0f 0%, #0a0a0a 100%))",
                   transition: "all 0.3s ease",
                   cursor: "default",
                 }}
@@ -551,13 +612,13 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message = "加�
         style={{
           width: "50px",
           height: "50px",
-          border: "4px solid #333",
-          borderTop: "4px solid #4CAF50",
+          border: "4px solid var(--analytics-border-soft, #333)",
+          borderTop: "4px solid var(--analytics-accent, #67e8f9)",
           borderRadius: "50%",
           animation: "spin 1s linear infinite",
         }}
       />
-      <div style={{ color: "#888", fontSize: "14px" }}>{message}</div>
+      <div style={{ color: "var(--analytics-muted, #888)", fontSize: "14px" }}>{message}</div>
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -578,10 +639,22 @@ export const AlertBox: React.FC<AlertBoxProps> = ({ type, title, message }) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
   const config = {
-    info: { color: "#2196F3", icon: "ℹ", bg: "rgba(33, 150, 243, 0.1)" },
-    success: { color: "#4CAF50", icon: "✓", bg: "rgba(76, 175, 80, 0.1)" },
-    warning: { color: "#ff9800", icon: "⚠", bg: "rgba(255, 152, 0, 0.1)" },
-    error: { color: "#f44336", icon: "✕", bg: "rgba(244, 67, 54, 0.1)" },
+    info: { color: "#38bdf8", icon: "ℹ", bg: "rgba(56, 189, 248, 0.1)" },
+    success: {
+      color: "var(--analytics-state-normal, #67e8f9)",
+      icon: "✓",
+      bg: "color-mix(in srgb, var(--analytics-state-normal, #67e8f9) 10%, transparent)",
+    },
+    warning: {
+      color: "var(--analytics-state-warning, #fbbf24)",
+      icon: "⚠",
+      bg: "color-mix(in srgb, var(--analytics-state-warning, #fbbf24) 10%, transparent)",
+    },
+    error: {
+      color: "var(--analytics-state-danger, #fb7185)",
+      icon: "✕",
+      bg: "color-mix(in srgb, var(--analytics-state-danger, #fb7185) 10%, transparent)",
+    },
   };
 
   const { color, icon, bg } = config[type];

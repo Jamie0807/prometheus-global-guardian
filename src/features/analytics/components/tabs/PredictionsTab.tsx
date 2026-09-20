@@ -10,6 +10,7 @@ import {
 } from "../../../../services/analytics/analyticsPresentation";
 import type { PredictionModelResult, PredictionsResponse } from "../../types";
 import PredictionStatusBadge from "../PredictionStatusBadge";
+import AnalyticsIcon from "../AnalyticsIcon";
 
 interface PredictionsTabProps {
   predictions: PredictionsResponse;
@@ -22,14 +23,17 @@ function next7Days(prediction: PredictionModelResult): number[] | undefined {
 export default function PredictionsTab({ predictions }: PredictionsTabProps) {
   return (
     <div
+      className="analytics-surface analytics-tab-panel"
       style={{
-        backgroundColor: "#0a0a0a",
         padding: "20px",
         borderRadius: "8px",
         marginTop: "20px",
       }}
     >
-      <h3 style={{ color: "#4CAF50", marginBottom: "20px" }}>🔮 预测模型结果</h3>
+      <h3 className="analytics-heading" style={{ marginBottom: "20px" }}>
+        <AnalyticsIcon name="forecast" size={20} />
+        预测模型结果
+      </h3>
 
       {/* 总体风险评估 */}
       {predictions.data.overallRiskAssessment.status === "failed" && (
@@ -37,15 +41,17 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
       )}
       {predictions.data?.overallRiskAssessment && (
         <div
+          className="analytics-prediction-summary analytics-surface"
           style={{
-            backgroundColor: "#1a1a1a",
             padding: "25px",
             borderRadius: "12px",
-            border: "2px solid #4CAF50",
             marginBottom: "30px",
           }}
         >
-          <h4 style={{ color: "#4CAF50", marginBottom: "15px" }}>📊 总体风险评估</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            总体风险评估
+          </h4>
           <div
             style={{
               display: "grid",
@@ -54,10 +60,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
             }}
           >
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>风险分数</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                风险分数
+              </div>
               <div
                 style={{
-                  color: "#4CAF50",
+                  color: "var(--analytics-state-normal, #67e8f9)",
                   fontSize: "32px",
                   fontWeight: "bold",
                   marginTop: "5px",
@@ -67,7 +75,9 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               </div>
             </div>
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>风险等级</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                风险等级
+              </div>
               <div
                 style={{
                   color: "#fff",
@@ -80,10 +90,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               </div>
             </div>
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>平均准确率</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                平均准确率
+              </div>
               <div
                 style={{
-                  color: "#4CAF50",
+                  color: "var(--analytics-state-normal, #67e8f9)",
                   fontSize: "24px",
                   fontWeight: "bold",
                   marginTop: "5px",
@@ -98,12 +110,20 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               style={{
                 marginTop: "20px",
                 padding: "15px",
-                backgroundColor: "#0a0a0a",
+                backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                 borderRadius: "8px",
-                border: "1px solid #333",
+                border: "1px solid var(--analytics-border-soft, #333)",
               }}
             >
-              <div style={{ color: "#4CAF50", fontSize: "12px", marginBottom: "5px" }}>💡 建议</div>
+              <div
+                style={{
+                  color: "var(--analytics-state-normal, #67e8f9)",
+                  fontSize: "12px",
+                  marginBottom: "5px",
+                }}
+              >
+                <AnalyticsIcon name="idea" size={14} /> 建议
+              </div>
               <div style={{ color: "#fff", fontSize: "14px" }}>
                 {
                   formatRiskRecommendation({
@@ -118,7 +138,10 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
 
       {/* 多灾害类型7天趋势预测 */}
       <div style={{ marginBottom: "30px" }}>
-        <h4 style={{ color: "#fff", marginBottom: "15px" }}>📈 多灾害类型7天趋势预测</h4>
+        <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+          <AnalyticsIcon name="trend" />
+          多灾害类型7天趋势预测
+        </h4>
 
         <div
           style={{
@@ -130,10 +153,10 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
           {predictions.data?.earthquakePrediction && (
             <div
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "15px",
                 borderRadius: "8px",
-                border: "1px solid #4CAF50",
+                border: "1px solid var(--analytics-border-soft, #333)",
               }}
             >
               <div
@@ -144,8 +167,16 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   marginBottom: "10px",
                 }}
               >
-                <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "16px" }}>
-                  🌍 地震预测
+                <span
+                  className="analytics-icon-heading"
+                  style={{
+                    color: "var(--analytics-state-normal, #67e8f9)",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                  }}
+                >
+                  <AnalyticsIcon name="earthquake" size={18} />
+                  地震预测
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.earthquakePrediction} />
               </div>
@@ -153,7 +184,13 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
               {/* 7天预测数据 */}
               {next7Days(predictions.data.earthquakePrediction) ? (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      color: "var(--analytics-muted, #888)",
+                      fontSize: "11px",
+                      marginBottom: "8px",
+                    }}
+                  >
                     未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.earthquakePrediction)?.map(
@@ -164,11 +201,19 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "4px 0",
-                          borderBottom: "1px solid #333",
+                          borderBottom: "1px solid var(--analytics-border-soft, #333)",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
-                        <span style={{ color: "#4CAF50", fontSize: "11px", fontWeight: "bold" }}>
+                        <span style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>
+                          第 {idx + 1} 天
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--analytics-state-normal, #67e8f9)",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {count.toFixed(1)} 次
                         </span>
                       </div>
@@ -176,7 +221,13 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   )}
                 </div>
               ) : (
-                <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginTop: "5px",
+                  }}
+                >
                   {getPredictionDisplay(predictions.data.earthquakePrediction).detail}
                 </div>
               )}
@@ -187,10 +238,10 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
           {predictions.data?.volcanoPrediction && (
             <div
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "15px",
                 borderRadius: "8px",
-                border: "1px solid #FF9800",
+                border: "1px solid var(--analytics-border-soft, #333)",
               }}
             >
               <div
@@ -201,14 +252,28 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   marginBottom: "10px",
                 }}
               >
-                <span style={{ color: "#FF9800", fontWeight: "bold", fontSize: "16px" }}>
-                  🌋 火山预测
+                <span
+                  className="analytics-icon-heading"
+                  style={{
+                    color: "var(--analytics-chart-4)",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                  }}
+                >
+                  <AnalyticsIcon name="volcano" size={18} />
+                  火山预测
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.volcanoPrediction} />
               </div>
               {next7Days(predictions.data.volcanoPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      color: "var(--analytics-muted, #888)",
+                      fontSize: "11px",
+                      marginBottom: "8px",
+                    }}
+                  >
                     未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.volcanoPrediction)?.map(
@@ -219,11 +284,19 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "4px 0",
-                          borderBottom: "1px solid #333",
+                          borderBottom: "1px solid var(--analytics-border-soft, #333)",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
-                        <span style={{ color: "#FF9800", fontSize: "11px", fontWeight: "bold" }}>
+                        <span style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>
+                          第 {idx + 1} 天
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--analytics-chart-4)",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {count.toFixed(1)} 次
                         </span>
                       </div>
@@ -231,7 +304,13 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   )}
                 </div>
               ) : (
-                <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginTop: "5px",
+                  }}
+                >
                   {getPredictionDisplay(predictions.data.volcanoPrediction).detail}
                 </div>
               )}
@@ -242,10 +321,10 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
           {predictions.data?.stormPrediction && (
             <div
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "15px",
                 borderRadius: "8px",
-                border: "1px solid #2196F3",
+                border: "1px solid var(--analytics-border-soft, #333)",
               }}
             >
               <div
@@ -256,14 +335,28 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   marginBottom: "10px",
                 }}
               >
-                <span style={{ color: "#2196F3", fontWeight: "bold", fontSize: "16px" }}>
-                  ⛈️ 风暴预测
+                <span
+                  className="analytics-icon-heading"
+                  style={{
+                    color: "var(--analytics-chart-3)",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                  }}
+                >
+                  <AnalyticsIcon name="storm" size={18} />
+                  风暴预测
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.stormPrediction} />
               </div>
               {next7Days(predictions.data.stormPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      color: "var(--analytics-muted, #888)",
+                      fontSize: "11px",
+                      marginBottom: "8px",
+                    }}
+                  >
                     未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.stormPrediction)?.map(
@@ -274,11 +367,19 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "4px 0",
-                          borderBottom: "1px solid #333",
+                          borderBottom: "1px solid var(--analytics-border-soft, #333)",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
-                        <span style={{ color: "#2196F3", fontSize: "11px", fontWeight: "bold" }}>
+                        <span style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>
+                          第 {idx + 1} 天
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--analytics-chart-3)",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {count.toFixed(1)} 次
                         </span>
                       </div>
@@ -286,7 +387,13 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   )}
                 </div>
               ) : (
-                <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginTop: "5px",
+                  }}
+                >
                   {getPredictionDisplay(predictions.data.stormPrediction).detail}
                 </div>
               )}
@@ -297,10 +404,10 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
           {predictions.data?.floodPrediction && (
             <div
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "15px",
                 borderRadius: "8px",
-                border: "1px solid #00BCD4",
+                border: "1px solid var(--analytics-border-soft, #333)",
               }}
             >
               <div
@@ -311,14 +418,28 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   marginBottom: "10px",
                 }}
               >
-                <span style={{ color: "#00BCD4", fontWeight: "bold", fontSize: "16px" }}>
-                  🌊 洪水预测
+                <span
+                  className="analytics-icon-heading"
+                  style={{
+                    color: "var(--analytics-chart-1)",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                  }}
+                >
+                  <AnalyticsIcon name="flood" size={18} />
+                  洪水预测
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.floodPrediction} />
               </div>
               {next7Days(predictions.data.floodPrediction) ? (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      color: "var(--analytics-muted, #888)",
+                      fontSize: "11px",
+                      marginBottom: "8px",
+                    }}
+                  >
                     未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.floodPrediction)?.map(
@@ -329,11 +450,19 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "4px 0",
-                          borderBottom: "1px solid #333",
+                          borderBottom: "1px solid var(--analytics-border-soft, #333)",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
-                        <span style={{ color: "#00BCD4", fontSize: "11px", fontWeight: "bold" }}>
+                        <span style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>
+                          第 {idx + 1} 天
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--analytics-chart-1)",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {count.toFixed(1)} 次
                         </span>
                       </div>
@@ -341,7 +470,13 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   )}
                 </div>
               ) : (
-                <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginTop: "5px",
+                  }}
+                >
                   {getPredictionDisplay(predictions.data.floodPrediction).detail}
                 </div>
               )}
@@ -352,10 +487,10 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
           {predictions.data?.wildfirePrediction && (
             <div
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "15px",
                 borderRadius: "8px",
-                border: "1px solid #FF5722",
+                border: "1px solid var(--analytics-border-soft, #333)",
               }}
             >
               <div
@@ -366,14 +501,28 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   marginBottom: "10px",
                 }}
               >
-                <span style={{ color: "#FF5722", fontWeight: "bold", fontSize: "16px" }}>
-                  🔥 野火预测
+                <span
+                  className="analytics-icon-heading"
+                  style={{
+                    color: "var(--analytics-chart-4)",
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                  }}
+                >
+                  <AnalyticsIcon name="wildfire" size={18} />
+                  野火预测
                 </span>
                 <PredictionStatusBadge prediction={predictions.data.wildfirePrediction} />
               </div>
               {next7Days(predictions.data.wildfirePrediction) ? (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ color: "#888", fontSize: "11px", marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      color: "var(--analytics-muted, #888)",
+                      fontSize: "11px",
+                      marginBottom: "8px",
+                    }}
+                  >
                     未来 7 天预测：
                   </div>
                   {next7Days(predictions.data.wildfirePrediction)?.map(
@@ -384,11 +533,19 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           padding: "4px 0",
-                          borderBottom: "1px solid #333",
+                          borderBottom: "1px solid var(--analytics-border-soft, #333)",
                         }}
                       >
-                        <span style={{ color: "#888", fontSize: "11px" }}>第 {idx + 1} 天</span>
-                        <span style={{ color: "#FF5722", fontSize: "11px", fontWeight: "bold" }}>
+                        <span style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>
+                          第 {idx + 1} 天
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--analytics-chart-4)",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {count.toFixed(1)} 次
                         </span>
                       </div>
@@ -396,7 +553,13 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
                   )}
                 </div>
               ) : (
-                <div style={{ color: "#888", fontSize: "12px", marginTop: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginTop: "5px",
+                  }}
+                >
                   {getPredictionDisplay(predictions.data.wildfirePrediction).detail}
                 </div>
               )}
@@ -409,13 +572,16 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
       {predictions.data?.overallRiskAssessment?.modelWeights && (
         <div
           style={{
-            backgroundColor: "#1a1a1a",
+            backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
             padding: "20px",
             borderRadius: "8px",
-            border: "1px solid #333",
+            border: "1px solid var(--analytics-border-soft, #333)",
           }}
         >
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>⚖️ 模型权重分配</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            模型权重分配
+          </h4>
           <div
             style={{
               display: "grid",
@@ -426,10 +592,12 @@ export default function PredictionsTab({ predictions }: PredictionsTabProps) {
             {Object.entries(predictions.data.overallRiskAssessment.modelWeights).map(
               ([type, weight]: [string, number]) => (
                 <div key={type} style={{ textAlign: "center" }}>
-                  <div style={{ color: "#888", fontSize: "12px" }}>{type}</div>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    {type}
+                  </div>
                   <div
                     style={{
-                      color: "#4CAF50",
+                      color: "var(--analytics-state-normal, #67e8f9)",
                       fontSize: "24px",
                       fontWeight: "bold",
                       marginTop: "5px",

@@ -40,8 +40,8 @@ export default function AnalyticsPage() {
   const hasResults = statistics !== null || predictions !== null || riskAssessment !== null;
 
   return (
-    <div style={STYLES.container}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", color: "#fff" }}>
+    <div className="analytics-page" style={STYLES.container}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", color: "var(--analytics-text)" }}>
         <AnalyticsHeader serviceStatus={serviceStatus} onClose={closeView} />
         <AnalyticsSummaryGrid
           hazardCount={analyticsHazards.length}

@@ -9,6 +9,7 @@ import {
 } from "../../../../services/analytics/analyticsPresentation";
 import type { RiskAssessmentResponse } from "../../types";
 import RiskRecommendationLine from "../RiskRecommendationLine";
+import AnalyticsIcon from "../AnalyticsIcon";
 
 interface RiskTabProps {
   riskAssessment: RiskAssessmentResponse;
@@ -19,33 +20,44 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
   const hasTemporalRisks = temporalRisks !== null;
   return (
     <div
+      className="analytics-surface analytics-tab-panel"
       style={{
-        backgroundColor: "#0a0a0a",
         padding: "20px",
         borderRadius: "8px",
         marginTop: "20px",
       }}
     >
-      <h3 style={{ color: "#4CAF50", marginBottom: "20px" }}>⚠️ 风险评估报告</h3>
+      <h3 className="analytics-heading" style={{ marginBottom: "20px" }}>
+        <AnalyticsIcon name="warning" size={20} />
+        风险评估报告
+      </h3>
 
       {/* 总体风险等级 */}
       {riskAssessment.data?.overallRiskScore && (
         <div
+          className="analytics-risk-summary analytics-surface--inset"
           style={{
-            backgroundColor: "#1a1a1a",
             padding: "25px",
             borderRadius: "12px",
-            border: "2px solid #ff9800",
+            border: "1px solid var(--analytics-border-soft, #333)",
             marginBottom: "30px",
             textAlign: "center",
           }}
         >
-          <div style={{ color: "#888", fontSize: "14px", marginBottom: "15px" }}>总体风险等级</div>
+          <div
+            style={{
+              color: "var(--analytics-muted, #888)",
+              fontSize: "14px",
+              marginBottom: "15px",
+            }}
+          >
+            总体风险等级
+          </div>
           <div
             style={{
               fontSize: "32px",
               fontWeight: "bold",
-              color: "#4CAF50",
+              color: "var(--analytics-state-normal, #67e8f9)",
               marginBottom: "10px",
             }}
           >
@@ -54,7 +66,9 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
           <div style={{ fontSize: "18px", color: "#fff" }}>
             等级: {getRiskLevelLabel(riskAssessment.data.overallRiskScore.level)}
           </div>
-          <div style={{ fontSize: "14px", color: "#888", marginTop: "10px" }}>
+          <div
+            style={{ fontSize: "14px", color: "var(--analytics-muted, #888)", marginTop: "10px" }}
+          >
             趋势: {getTrendLabel(hasTemporalRisks ? temporalRisks.trend : "UNKNOWN")}
           </div>
         </div>
@@ -63,15 +77,17 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
       {/* 分类风险 */}
       {riskAssessment.data?.typeRisks && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>各类型风险分析</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            各类型风险分析
+          </h4>
           {Object.entries(riskAssessment.data.typeRisks).map(([type, risk]) => (
             <div
               key={type}
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "15px",
                 borderRadius: "8px",
-                border: "1px solid #333",
+                border: "1px solid var(--analytics-border-soft, #333)",
                 marginBottom: "12px",
               }}
             >
@@ -94,18 +110,25 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                   }}
                 >
                   <div>
-                    <span style={{ color: "#666" }}>事件数: </span>
-                    <span style={{ color: "#4CAF50", fontWeight: "bold" }}>{risk.count}</span>
+                    <span style={{ color: "var(--analytics-muted, #666)" }}>事件数: </span>
+                    <span
+                      style={{
+                        color: "var(--analytics-state-normal, #67e8f9)",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {risk.count}
+                    </span>
                   </div>
                   <div>
-                    <span style={{ color: "#666" }}>风险分数: </span>
+                    <span style={{ color: "var(--analytics-muted, #666)" }}>风险分数: </span>
                     <span style={{ color: "#fff", fontWeight: "bold" }}>
                       {formatAnalyticsNumber(risk.riskScore, 2)}
                     </span>
                   </div>
                   {risk.averageMagnitude !== undefined && risk.averageMagnitude !== null && (
                     <div>
-                      <span style={{ color: "#666" }}>平均震级: </span>
+                      <span style={{ color: "var(--analytics-muted, #666)" }}>平均震级: </span>
                       <span style={{ color: "#fff", fontWeight: "bold" }}>
                         {formatAnalyticsNumber(risk.averageMagnitude, 2)}
                       </span>
@@ -122,15 +145,24 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
       {riskAssessment.data?.geographicRisks && riskAssessment.data.geographicRisks.length > 0 && (
         <div
           style={{
-            backgroundColor: "#1a1a1a",
+            backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
             padding: "20px",
             borderRadius: "8px",
-            border: "1px solid #f44336",
+            border: "1px solid var(--analytics-border-soft, #333)",
             marginBottom: "20px",
           }}
         >
-          <h4 style={{ color: "#f44336", marginBottom: "15px" }}>🗺️ 地理风险分布</h4>
-          <div style={{ fontSize: "12px", color: "#888", marginBottom: "10px" }}>
+          <h4 className="analytics-heading analytics-icon-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="map" />
+            地理风险分布
+          </h4>
+          <div
+            style={{
+              fontSize: "12px",
+              color: "var(--analytics-muted, #888)",
+              marginBottom: "10px",
+            }}
+          >
             检测到 {riskAssessment.data.geographicRisks.length} 个风险区域
           </div>
           <div style={{ maxHeight: "200px", overflow: "auto" }}>
@@ -139,7 +171,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                 key={idx}
                 style={{
                   padding: "8px",
-                  borderBottom: "1px solid #333",
+                  borderBottom: "1px solid var(--analytics-border-soft, #333)",
                   fontSize: "12px",
                 }}
               >
@@ -154,7 +186,13 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                     <div style={{ color: "#fff" }}>
                       位置: [{area.location?.lat?.toFixed(4)}, {area.location?.lon?.toFixed(4)}]
                     </div>
-                    <div style={{ color: "#666", fontSize: "11px", marginTop: "3px" }}>
+                    <div
+                      style={{
+                        color: "var(--analytics-muted, #666)",
+                        fontSize: "11px",
+                        marginTop: "3px",
+                      }}
+                    >
                       灾害数量: {area.hazardCount}
                     </div>
                   </div>
@@ -164,10 +202,10 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
                       borderRadius: "4px",
                       backgroundColor:
                         area.riskLevel === "HIGH"
-                          ? "#f44336"
+                          ? "var(--analytics-state-warning, #fbbf24)"
                           : area.riskLevel === "MODERATE"
-                            ? "#ff9800"
-                            : "#4CAF50",
+                            ? "var(--analytics-chart-2)"
+                            : "var(--analytics-state-normal, #67e8f9)",
                       color: "#fff",
                       fontSize: "11px",
                       fontWeight: "bold",
@@ -186,14 +224,17 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
       {hasTemporalRisks && (
         <div
           style={{
-            backgroundColor: "#1a1a1a",
+            backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
             padding: "20px",
             borderRadius: "8px",
-            border: "1px solid #333",
+            border: "1px solid var(--analytics-border-soft, #333)",
             marginBottom: "20px",
           }}
         >
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>📊 时间趋势分析</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="trend" />
+            时间趋势分析
+          </h4>
           <div
             style={{
               display: "grid",
@@ -202,10 +243,10 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
             }}
           >
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>最近7天</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>最近7天</div>
               <div
                 style={{
-                  color: "#4CAF50",
+                  color: "var(--analytics-state-normal, #67e8f9)",
                   fontSize: "20px",
                   fontWeight: "bold",
                   marginTop: "5px",
@@ -215,7 +256,7 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
               </div>
             </div>
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>前7天</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>前7天</div>
               <div
                 style={{
                   color: "#fff",
@@ -228,10 +269,10 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
               </div>
             </div>
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>增长率</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>增长率</div>
               <div
                 style={{
-                  color: "#ff9800",
+                  color: "var(--analytics-state-warning, #fbbf24)",
                   fontSize: "20px",
                   fontWeight: "bold",
                   marginTop: "5px",
@@ -241,10 +282,10 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
               </div>
             </div>
             <div>
-              <div style={{ color: "#888", fontSize: "12px" }}>趋势</div>
+              <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>趋势</div>
               <div
                 style={{
-                  color: "#4CAF50",
+                  color: "var(--analytics-state-normal, #67e8f9)",
                   fontSize: "20px",
                   fontWeight: "bold",
                   marginTop: "5px",
@@ -262,13 +303,16 @@ export default function RiskTab({ riskAssessment }: RiskTabProps) {
         (riskAssessment.data?.recommendations?.length ?? 0) > 0) && (
         <div
           style={{
-            backgroundColor: "#1a1a1a",
+            backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
             padding: "20px",
             borderRadius: "8px",
-            border: "1px solid #4CAF50",
+            border: "1px solid var(--analytics-border-soft, #333)",
           }}
         >
-          <h4 style={{ color: "#4CAF50", marginBottom: "15px" }}>💡 规则建议</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="forecast" />
+            规则建议
+          </h4>
           <ul style={{ margin: 0, paddingLeft: "20px", color: "#fff" }}>
             {(riskAssessment.data.recommendationDetails.length > 0
               ? riskAssessment.data.recommendationDetails

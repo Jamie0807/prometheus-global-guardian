@@ -13,6 +13,7 @@ import type {
 } from "../../types";
 import type { PivotRow } from "../../../../services/analytics/contracts/pivot";
 import type { IntensitySeriesPoint } from "../../utils/analyticsTransforms";
+import AnalyticsIcon from "../AnalyticsIcon";
 
 interface OverviewTabProps {
   hazards: AnalyticsHazard[];
@@ -44,46 +45,47 @@ export default function OverviewTab({
   const statistics = { data: toOverviewStatistics(response.data) };
   return (
     <div
+      className="analytics-surface analytics-tab-panel"
       style={{
-        background: "linear-gradient(135deg, #0a0a0a 0%, #050505 100%)",
         padding: "24px",
         borderRadius: "12px",
         marginTop: "20px",
-        border: "1px solid rgba(76, 175, 80, 0.15)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
       }}
     >
       <h3
+        className="analytics-heading"
         style={{
-          color: "#4CAF50",
           marginBottom: "24px",
-          textShadow: "0 0 8px rgba(76, 175, 80, 0.3)",
           fontSize: "18px",
           fontWeight: "bold",
         }}
       >
-        📊 描述性统计分析
+        <AnalyticsIcon name="analysis" size={20} />
+        描述性统计分析
       </h3>
 
-      {/* 📈 折线图展示 */}
+      {/* 折线图展示 */}
       <div style={{ marginBottom: "30px" }}>
         <LineChart
           data={intensityData}
-          title="📊 灾害强度趋势分析（有效强度数据）"
-          color="#4CAF50"
+          title="灾害强度趋势分析（有效强度数据）"
+          color="var(--analytics-accent, #67e8f9)"
           xLabel="数据编号"
           yLabel="灾害强度"
           showDots={true}
           height={280}
         />
-        <div style={{ marginTop: "8px", color: "#888", fontSize: "12px" }}>
+        <div style={{ marginTop: "8px", color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
           有效强度数据：{intensityData.length} / {hazards.length}
         </div>
       </div>
 
       {/* 基础统计 */}
       <div style={{ marginBottom: "30px" }}>
-        <h4 style={{ color: "#fff", marginBottom: "15px" }}>📊 基本数据统计</h4>
+        <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+          <AnalyticsIcon name="analysis" />
+          基本数据统计
+        </h4>
         <div
           style={{
             display: "grid",
@@ -93,16 +95,16 @@ export default function OverviewTab({
         >
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "15px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
-            <div style={{ color: "#888", fontSize: "12px" }}>数据总量</div>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>数据总量</div>
             <div
               style={{
-                color: "#4CAF50",
+                color: "var(--analytics-state-normal, #67e8f9)",
                 fontSize: "24px",
                 fontWeight: "bold",
                 marginTop: "5px",
@@ -113,16 +115,16 @@ export default function OverviewTab({
           </div>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "15px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
-            <div style={{ color: "#888", fontSize: "12px" }}>灾害类型</div>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>灾害类型</div>
             <div
               style={{
-                color: "#4CAF50",
+                color: "var(--analytics-state-normal, #67e8f9)",
                 fontSize: "24px",
                 fontWeight: "bold",
                 marginTop: "5px",
@@ -133,16 +135,18 @@ export default function OverviewTab({
           </div>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "15px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
-            <div style={{ color: "#888", fontSize: "12px" }}>最常见灾害</div>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+              最常见灾害
+            </div>
             <div
               style={{
-                color: "#4CAF50",
+                color: "var(--analytics-state-normal, #67e8f9)",
                 fontSize: "20px",
                 fontWeight: "bold",
                 marginTop: "5px",
@@ -153,16 +157,18 @@ export default function OverviewTab({
           </div>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "15px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
-            <div style={{ color: "#888", fontSize: "12px" }}>数据覆盖度</div>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+              数据覆盖度
+            </div>
             <div
               style={{
-                color: "#4CAF50",
+                color: "var(--analytics-state-normal, #67e8f9)",
                 fontSize: "24px",
                 fontWeight: "bold",
                 marginTop: "5px",
@@ -184,19 +190,22 @@ export default function OverviewTab({
       </div>
       {statistics.data.inferentialStatistics?.confidenceIntervals && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>📐 数据可信度分析</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            数据可信度分析
+          </h4>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "20px",
               borderRadius: "8px",
-              border: "1px solid #4CAF50",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
             <div
               style={{
                 marginBottom: "10px",
-                color: "#4CAF50",
+                color: "var(--analytics-state-normal, #67e8f9)",
                 fontSize: "13px",
                 fontWeight: "500",
               }}
@@ -212,7 +221,9 @@ export default function OverviewTab({
                 }}
               >
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>当前平均值</div>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    当前平均值
+                  </div>
                   <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold" }}>
                     {formatAnalyticsNumber(
                       statistics.data.inferentialStatistics.confidenceIntervals.magnitude.mean,
@@ -221,8 +232,16 @@ export default function OverviewTab({
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>预计最低值</div>
-                  <div style={{ color: "#FF9800", fontSize: "20px", fontWeight: "bold" }}>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    预计最低值
+                  </div>
+                  <div
+                    style={{
+                      color: "var(--analytics-state-warning, #fbbf24)",
+                      fontSize: "20px",
+                      fontWeight: "bold",
+                    }}
+                  >
                     {formatAnalyticsNumber(
                       statistics.data.inferentialStatistics.confidenceIntervals.magnitude
                         .lowerBound,
@@ -231,8 +250,16 @@ export default function OverviewTab({
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>预计最高值</div>
-                  <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    预计最高值
+                  </div>
+                  <div
+                    style={{
+                      color: "var(--analytics-state-normal, #67e8f9)",
+                      fontSize: "20px",
+                      fontWeight: "bold",
+                    }}
+                  >
                     {formatAnalyticsNumber(
                       statistics.data.inferentialStatistics.confidenceIntervals.magnitude
                         .upperBound,
@@ -241,8 +268,16 @@ export default function OverviewTab({
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>上下浮动</div>
-                  <div style={{ color: "#2196F3", fontSize: "20px", fontWeight: "bold" }}>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    上下浮动
+                  </div>
+                  <div
+                    style={{
+                      color: "var(--analytics-chart-2)",
+                      fontSize: "20px",
+                      fontWeight: "bold",
+                    }}
+                  >
                     ±
                     {formatAnalyticsNumber(
                       statistics.data.inferentialStatistics.confidenceIntervals.magnitude
@@ -261,15 +296,17 @@ export default function OverviewTab({
                   style={{
                     marginTop: "15px",
                     padding: "12px",
-                    backgroundColor: "#0a0a0a",
+                    backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                     borderRadius: "6px",
                     fontSize: "12px",
-                    color: "#aaa",
+                    color: "var(--analytics-muted, #aaa)",
                     lineHeight: "1.6",
                   }}
                 >
-                  💡 根据当前数据分析，未来灾害强度大概率会在{" "}
-                  <span style={{ color: "#FF9800", fontWeight: "bold" }}>
+                  <AnalyticsIcon name="info" size={14} /> 根据当前数据分析，未来灾害强度大概率会在{" "}
+                  <span
+                    style={{ color: "var(--analytics-state-warning, #fbbf24)", fontWeight: "bold" }}
+                  >
                     {formatAnalyticsNumber(
                       statistics.data.inferentialStatistics.confidenceIntervals.magnitude
                         .lowerBound,
@@ -277,7 +314,9 @@ export default function OverviewTab({
                     )}
                   </span>{" "}
                   到{" "}
-                  <span style={{ color: "#4CAF50", fontWeight: "bold" }}>
+                  <span
+                    style={{ color: "var(--analytics-state-normal, #67e8f9)", fontWeight: "bold" }}
+                  >
                     {formatAnalyticsNumber(
                       statistics.data.inferentialStatistics.confidenceIntervals.magnitude
                         .upperBound,
@@ -294,13 +333,16 @@ export default function OverviewTab({
       {/* 数据分散程度 */}
       {statistics.data.descriptiveStatistics?.variabilityMeasures && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>📏 数据稳定性分析</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="ruler" />
+            数据稳定性分析
+          </h4>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "20px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
             <div
@@ -311,8 +353,16 @@ export default function OverviewTab({
               }}
             >
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>平均波动幅度</div>
-                <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  平均波动幅度
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-state-normal, #67e8f9)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.variabilityMeasures.standardDeviation !=
                   null ? (
                     formatAnalyticsNumber(
@@ -320,32 +370,64 @@ export default function OverviewTab({
                       2,
                     )
                   ) : (
-                    <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
+                    <span style={{ fontSize: "14px", color: "var(--analytics-muted, #666)" }}>
+                      暂无数据
+                    </span>
                   )}
                 </div>
-                <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #666)",
+                    fontSize: "10px",
+                    marginTop: "3px",
+                  }}
+                >
                   值越小越稳定
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>最大最小差距</div>
-                <div style={{ color: "#9C27B0", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  最大最小差距
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-chart-4)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.variabilityMeasures.range != null ? (
                     formatAnalyticsNumber(
                       statistics.data.descriptiveStatistics.variabilityMeasures.range,
                       2,
                     )
                   ) : (
-                    <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
+                    <span style={{ fontSize: "14px", color: "var(--analytics-muted, #666)" }}>
+                      暂无数据
+                    </span>
                   )}
                 </div>
-                <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #666)",
+                    fontSize: "10px",
+                    marginTop: "3px",
+                  }}
+                >
                   数据跨度范围
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>数据集中度</div>
-                <div style={{ color: "#FF9800", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  数据集中度
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-state-warning, #fbbf24)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.variabilityMeasures
                     .coefficientOfVariation != null ? (
                     statistics.data.descriptiveStatistics.variabilityMeasures
@@ -362,10 +444,18 @@ export default function OverviewTab({
                       "⊗ 分散"
                     )
                   ) : (
-                    <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
+                    <span style={{ fontSize: "14px", color: "var(--analytics-muted, #666)" }}>
+                      暂无数据
+                    </span>
                   )}
                 </div>
-                <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #666)",
+                    fontSize: "10px",
+                    marginTop: "3px",
+                  }}
+                >
                   整体分布状态
                 </div>
               </div>
@@ -376,14 +466,14 @@ export default function OverviewTab({
                 style={{
                   marginTop: "15px",
                   padding: "12px",
-                  backgroundColor: "#0a0a0a",
+                  backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                   borderRadius: "6px",
                   fontSize: "12px",
-                  color: "#aaa",
+                  color: "var(--analytics-muted, #aaa)",
                   lineHeight: "1.6",
                 }}
               >
-                💡{" "}
+                <AnalyticsIcon name="info" size={14} />{" "}
                 {statistics.data.descriptiveStatistics.variabilityMeasures.coefficientOfVariation *
                   100 <
                 15
@@ -403,13 +493,16 @@ export default function OverviewTab({
       {/* 数据分布情况 */}
       {statistics.data.descriptiveStatistics?.distributionMetrics && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>📊 数据分布特征</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            数据分布特征
+          </h4>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "20px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
             <div
@@ -420,10 +513,22 @@ export default function OverviewTab({
               }}
             >
               <div>
-                <div style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginBottom: "5px",
+                  }}
+                >
                   分布均衡性
                 </div>
-                <div style={{ color: "#4CAF50", fontSize: "18px", fontWeight: "bold" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-state-normal, #67e8f9)",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.distributionMetrics.skewness !==
                     undefined &&
                   statistics.data.descriptiveStatistics.distributionMetrics.skewness !== null ? (
@@ -436,10 +541,18 @@ export default function OverviewTab({
                       "⬇ 偏低"
                     )
                   ) : (
-                    <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
+                    <span style={{ fontSize: "14px", color: "var(--analytics-muted, #666)" }}>
+                      暂无数据
+                    </span>
                   )}
                 </div>
-                <div style={{ color: "#666", fontSize: "11px", marginTop: "3px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #666)",
+                    fontSize: "11px",
+                    marginTop: "3px",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.distributionMetrics.skewness !==
                     undefined &&
                   statistics.data.descriptiveStatistics.distributionMetrics.skewness !== null
@@ -453,38 +566,78 @@ export default function OverviewTab({
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginBottom: "5px",
+                  }}
+                >
                   中位数（中间值）
                 </div>
-                <div style={{ color: "#2196F3", fontSize: "18px", fontWeight: "bold" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-chart-2)",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.distributionMetrics.q50 != null ? (
                     formatAnalyticsNumber(
                       statistics.data.descriptiveStatistics.distributionMetrics.q50,
                       2,
                     )
                   ) : (
-                    <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
+                    <span style={{ fontSize: "14px", color: "var(--analytics-muted, #666)" }}>
+                      暂无数据
+                    </span>
                   )}
                 </div>
-                <div style={{ color: "#666", fontSize: "11px", marginTop: "3px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #666)",
+                    fontSize: "11px",
+                    marginTop: "3px",
+                  }}
+                >
                   一半数据在此值之上
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #888)",
+                    fontSize: "12px",
+                    marginBottom: "5px",
+                  }}
+                >
                   主要数据范围
                 </div>
-                <div style={{ color: "#FF9800", fontSize: "18px", fontWeight: "bold" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-state-warning, #fbbf24)",
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.descriptiveStatistics.distributionMetrics.iqr != null ? (
                     formatAnalyticsNumber(
                       statistics.data.descriptiveStatistics.distributionMetrics.iqr,
                       2,
                     )
                   ) : (
-                    <span style={{ fontSize: "14px", color: "#666" }}>暂无数据</span>
+                    <span style={{ fontSize: "14px", color: "var(--analytics-muted, #666)" }}>
+                      暂无数据
+                    </span>
                   )}
                 </div>
-                <div style={{ color: "#666", fontSize: "11px", marginTop: "3px" }}>
+                <div
+                  style={{
+                    color: "var(--analytics-muted, #666)",
+                    fontSize: "11px",
+                    marginTop: "3px",
+                  }}
+                >
                   中间50%数据的跨度
                 </div>
               </div>
@@ -496,13 +649,16 @@ export default function OverviewTab({
       {/* 异常数据识别 */}
       {statistics.data.anomalyDetection?.anomalyStatistics && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>🔍 异常数据检测</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            异常数据检测
+          </h4>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "20px",
               borderRadius: "8px",
-              border: "1px solid #FF9800",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
             <div
@@ -513,26 +669,58 @@ export default function OverviewTab({
               }}
             >
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>数据总量</div>
-                <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  数据总量
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-state-normal, #67e8f9)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.anomalyDetection.anomalyStatistics.totalRecords} 条
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>异常数据</div>
-                <div style={{ color: "#FF9800", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  异常数据
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-state-warning, #fbbf24)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.anomalyDetection.anomalyStatistics.iqrOutliers} 条
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>严重异常</div>
-                <div style={{ color: "#f44336", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  严重异常
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-state-danger, #fb7185)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {statistics.data.anomalyDetection.anomalyStatistics.zscoreOutliers} 条
                 </div>
               </div>
               <div>
-                <div style={{ color: "#888", fontSize: "12px" }}>数据质量</div>
-                <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
+                <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                  数据质量
+                </div>
+                <div
+                  style={{
+                    color: "var(--analytics-state-normal, #67e8f9)",
+                    fontSize: "20px",
+                    fontWeight: "bold",
+                  }}
+                >
                   {formatAnalyticsNumber(
                     statistics.data.anomalyDetection.anomalyStatistics.dataQualityScore,
                     1,
@@ -545,13 +733,13 @@ export default function OverviewTab({
               style={{
                 marginTop: "15px",
                 padding: "12px",
-                backgroundColor: "#0a0a0a",
+                backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                 borderRadius: "6px",
                 fontSize: "12px",
-                color: "#aaa",
+                color: "var(--analytics-muted, #aaa)",
               }}
             >
-              💡 异常数据占比{" "}
+              <AnalyticsIcon name="info" size={14} /> 异常数据占比{" "}
               {(
                 (statistics.data.anomalyDetection.anomalyStatistics.zscoreOutliers /
                   statistics.data.anomalyDetection.anomalyStatistics.totalRecords) *
@@ -571,25 +759,40 @@ export default function OverviewTab({
       {/* 灾害分类统计 */}
       {statistics.data.descriptiveStatistics?.typeDistribution && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>🗂️ 灾害分类统计</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            灾害分类统计
+          </h4>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "20px",
               borderRadius: "8px",
-              border: "1px solid #333",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
             <div style={{ marginBottom: "15px" }}>
-              <div style={{ color: "#FF9800", fontSize: "14px", fontWeight: "bold" }}>
+              <div
+                style={{
+                  color: "var(--analytics-state-warning, #fbbf24)",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                }}
+              >
                 最常见类型: {statistics.data.descriptiveStatistics.typeDistribution.mostCommon}
               </div>
             </div>
 
             {/* 类型计数 */}
             <div style={{ marginTop: "15px" }}>
-              <div style={{ color: "#888", fontSize: "12px", marginBottom: "10px" }}>
-                📊 按类型统计:
+              <div
+                style={{
+                  color: "var(--analytics-muted, #888)",
+                  fontSize: "12px",
+                  marginBottom: "10px",
+                }}
+              >
+                按类型统计:
               </div>
               {Object.entries(statistics.data.descriptiveStatistics.typeDistribution.counts).map(
                 ([type, count]: [string, number]) => (
@@ -599,13 +802,20 @@ export default function OverviewTab({
                       display: "flex",
                       justifyContent: "space-between",
                       padding: "8px",
-                      backgroundColor: "#0a0a0a",
+                      backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                       borderRadius: "4px",
                       marginBottom: "5px",
                     }}
                   >
                     <span style={{ color: "#fff" }}>{type}</span>
-                    <span style={{ color: "#4CAF50", fontWeight: "bold" }}>{count} 条</span>
+                    <span
+                      style={{
+                        color: "var(--analytics-state-normal, #67e8f9)",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {count} 条
+                    </span>
                   </div>
                 ),
               )}
@@ -613,8 +823,14 @@ export default function OverviewTab({
 
             {/* 百分比分布 */}
             <div style={{ marginTop: "15px" }}>
-              <div style={{ color: "#888", fontSize: "12px", marginBottom: "10px" }}>
-                📈 占比分布:
+              <div
+                style={{
+                  color: "var(--analytics-muted, #888)",
+                  fontSize: "12px",
+                  marginBottom: "10px",
+                }}
+              >
+                占比分布:
               </div>
               {Object.entries(
                 statistics.data.descriptiveStatistics.typeDistribution.percentages,
@@ -628,7 +844,13 @@ export default function OverviewTab({
                     }}
                   >
                     <span style={{ color: "#fff", fontSize: "12px" }}>{type}</span>
-                    <span style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
+                    <span
+                      style={{
+                        color: "var(--analytics-state-normal, #67e8f9)",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                      }}
+                    >
                       {percentage.toFixed(1)}%
                     </span>
                   </div>
@@ -636,7 +858,7 @@ export default function OverviewTab({
                     style={{
                       width: "100%",
                       height: "6px",
-                      backgroundColor: "#0a0a0a",
+                      backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                       borderRadius: "3px",
                       overflow: "hidden",
                     }}
@@ -645,7 +867,7 @@ export default function OverviewTab({
                       style={{
                         width: `${percentage}%`,
                         height: "100%",
-                        backgroundColor: "#4CAF50",
+                        backgroundColor: "var(--analytics-state-normal, #67e8f9)",
                         borderRadius: "3px",
                       }}
                     ></div>
@@ -662,13 +884,13 @@ export default function OverviewTab({
                 style={{
                   marginTop: "20px",
                   padding: "15px",
-                  backgroundColor: "#0a0a0a",
+                  backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                   borderRadius: "8px",
                 }}
               >
                 <div
                   style={{
-                    color: "#2196F3",
+                    color: "var(--analytics-chart-2)",
                     fontSize: "13px",
                     fontWeight: "bold",
                     marginBottom: "15px",
@@ -677,13 +899,14 @@ export default function OverviewTab({
                     gap: "8px",
                   }}
                 >
-                  🔍 4维透视表分析
+                  <AnalyticsIcon name="analysis" />
+                  4维透视表分析
                   {(pivot4DTrends || pivot4DRiskScores) && (
                     <span
                       style={{
                         fontSize: "10px",
                         padding: "2px 8px",
-                        backgroundColor: "#4CAF50",
+                        backgroundColor: "var(--analytics-state-normal, #67e8f9)",
                         borderRadius: "10px",
                         color: "#000",
                       }}
@@ -707,16 +930,28 @@ export default function OverviewTab({
                       <div
                         style={{
                           padding: "15px",
-                          backgroundColor: "#1a1a1a",
+                          backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                           borderRadius: "8px",
-                          border: "2px solid #4CAF50",
+                          border: "1px solid var(--analytics-border-soft, #333)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #888)",
+                            fontSize: "10px",
+                            marginBottom: "5px",
+                          }}
+                        >
                           时间维度
                         </div>
-                        <div style={{ color: "#4CAF50", fontSize: "28px", fontWeight: "bold" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-state-normal, #67e8f9)",
+                            fontSize: "28px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {
                             Object.keys(
                               statistics.data.descriptiveStatistics.typeDistribution
@@ -724,23 +959,41 @@ export default function OverviewTab({
                             ).length
                           }
                         </div>
-                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #666)",
+                            fontSize: "10px",
+                            marginTop: "3px",
+                          }}
+                        >
                           个时间段
                         </div>
                       </div>
                       <div
                         style={{
                           padding: "15px",
-                          backgroundColor: "#1a1a1a",
+                          backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                           borderRadius: "8px",
-                          border: "2px solid #2196F3",
+                          border: "1px solid var(--analytics-border-soft, #333)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #888)",
+                            fontSize: "10px",
+                            marginBottom: "5px",
+                          }}
+                        >
                           地理维度
                         </div>
-                        <div style={{ color: "#2196F3", fontSize: "28px", fontWeight: "bold" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-chart-2)",
+                            fontSize: "28px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {
                             Object.keys(
                               statistics.data.descriptiveStatistics.typeDistribution
@@ -748,23 +1001,41 @@ export default function OverviewTab({
                             ).length
                           }
                         </div>
-                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #666)",
+                            fontSize: "10px",
+                            marginTop: "3px",
+                          }}
+                        >
                           个区域
                         </div>
                       </div>
                       <div
                         style={{
                           padding: "15px",
-                          backgroundColor: "#1a1a1a",
+                          backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                           borderRadius: "8px",
-                          border: "2px solid #FF9800",
+                          border: "1px solid var(--analytics-border-soft, #333)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #888)",
+                            fontSize: "10px",
+                            marginBottom: "5px",
+                          }}
+                        >
                           类型维度
                         </div>
-                        <div style={{ color: "#FF9800", fontSize: "28px", fontWeight: "bold" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-accent)",
+                            fontSize: "28px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {
                             Object.keys(
                               statistics.data.descriptiveStatistics.typeDistribution
@@ -772,23 +1043,41 @@ export default function OverviewTab({
                             ).length
                           }
                         </div>
-                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #666)",
+                            fontSize: "10px",
+                            marginTop: "3px",
+                          }}
+                        >
                           种灾害
                         </div>
                       </div>
                       <div
                         style={{
                           padding: "15px",
-                          backgroundColor: "#1a1a1a",
+                          backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                           borderRadius: "8px",
-                          border: "2px solid #9C27B0",
+                          border: "1px solid var(--analytics-border-soft, #333)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #888)",
+                            fontSize: "10px",
+                            marginBottom: "5px",
+                          }}
+                        >
                           严重性维度
                         </div>
-                        <div style={{ color: "#9C27B0", fontSize: "28px", fontWeight: "bold" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-chart-4)",
+                            fontSize: "28px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {
                             Object.keys(
                               statistics.data.descriptiveStatistics.typeDistribution
@@ -796,23 +1085,41 @@ export default function OverviewTab({
                             ).length
                           }
                         </div>
-                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #666)",
+                            fontSize: "10px",
+                            marginTop: "3px",
+                          }}
+                        >
                           个等级
                         </div>
                       </div>
                       <div
                         style={{
                           padding: "15px",
-                          backgroundColor: "#1a1a1a",
+                          backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                           borderRadius: "8px",
-                          border: "2px solid #00BCD4",
+                          border: "1px solid var(--analytics-border-soft, #333)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ color: "#888", fontSize: "10px", marginBottom: "5px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #888)",
+                            fontSize: "10px",
+                            marginBottom: "5px",
+                          }}
+                        >
                           交叉分析
                         </div>
-                        <div style={{ color: "#00BCD4", fontSize: "28px", fontWeight: "bold" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-chart-1)",
+                            fontSize: "28px",
+                            fontWeight: "bold",
+                          }}
+                        >
                           {
                             Object.keys(
                               statistics.data.descriptiveStatistics.typeDistribution
@@ -820,7 +1127,13 @@ export default function OverviewTab({
                             ).length
                           }
                         </div>
-                        <div style={{ color: "#666", fontSize: "10px", marginTop: "3px" }}>
+                        <div
+                          style={{
+                            color: "var(--analytics-muted, #666)",
+                            fontSize: "10px",
+                            marginTop: "3px",
+                          }}
+                        >
                           组关联
                         </div>
                       </div>
@@ -831,20 +1144,21 @@ export default function OverviewTab({
                       style={{
                         marginTop: "15px",
                         padding: "15px",
-                        backgroundColor: "#1a1a1a",
+                        backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                         borderRadius: "8px",
-                        border: "1px solid #2196F3",
+                        border: "1px solid var(--analytics-border-soft, #333)",
                       }}
                     >
                       <div
                         style={{
-                          color: "#2196F3",
+                          color: "var(--analytics-chart-2)",
                           fontSize: "12px",
                           fontWeight: "bold",
                           marginBottom: "15px",
                         }}
                       >
-                        📊 多维数据透视详情
+                        <AnalyticsIcon name="analysis" size={16} />
+                        多维数据透视详情
                       </div>
 
                       {/* 时间维度数据 */}
@@ -857,13 +1171,13 @@ export default function OverviewTab({
                           <div style={{ marginBottom: "12px" }}>
                             <div
                               style={{
-                                color: "#4CAF50",
+                                color: "var(--analytics-state-normal, #67e8f9)",
                                 fontSize: "11px",
                                 fontWeight: "bold",
                                 marginBottom: "8px",
                               }}
                             >
-                              ⏰ 时间维度分布:
+                              <AnalyticsIcon name="clock" size={14} /> 时间维度分布:
                             </div>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {Object.entries(
@@ -876,14 +1190,21 @@ export default function OverviewTab({
                                     key={key}
                                     style={{
                                       padding: "6px 10px",
-                                      backgroundColor: "#0a0a0a",
+                                      backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                                       borderRadius: "4px",
                                       fontSize: "9px",
-                                      border: "1px solid #4CAF50",
+                                      border: "1px solid var(--analytics-border-soft, #333)",
                                     }}
                                   >
-                                    <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
-                                    <span style={{ color: "#4CAF50" }}>{key.split("_")[1]}</span>:{" "}
+                                    <span style={{ color: "var(--analytics-muted, #888)" }}>
+                                      {key.split("_")[0]}
+                                    </span>{" "}
+                                    <span
+                                      style={{ color: "var(--analytics-state-normal, #67e8f9)" }}
+                                    >
+                                      {key.split("_")[1]}
+                                    </span>
+                                    :{" "}
                                     <span style={{ color: "#fff", fontWeight: "bold" }}>
                                       {value}
                                     </span>
@@ -903,13 +1224,13 @@ export default function OverviewTab({
                           <div style={{ marginBottom: "12px" }}>
                             <div
                               style={{
-                                color: "#2196F3",
+                                color: "var(--analytics-chart-2)",
                                 fontSize: "11px",
                                 fontWeight: "bold",
                                 marginBottom: "8px",
                               }}
                             >
-                              🌍 地理维度分布:
+                              <AnalyticsIcon name="map" size={14} /> 地理维度分布:
                             </div>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {Object.entries(
@@ -922,14 +1243,19 @@ export default function OverviewTab({
                                     key={key}
                                     style={{
                                       padding: "6px 10px",
-                                      backgroundColor: "#0a0a0a",
+                                      backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                                       borderRadius: "4px",
                                       fontSize: "9px",
-                                      border: "1px solid #2196F3",
+                                      border: "1px solid var(--analytics-border-soft, #333)",
                                     }}
                                   >
-                                    <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
-                                    <span style={{ color: "#2196F3" }}>{key.split("_")[1]}</span>:{" "}
+                                    <span style={{ color: "var(--analytics-muted, #888)" }}>
+                                      {key.split("_")[0]}
+                                    </span>{" "}
+                                    <span style={{ color: "var(--analytics-chart-2)" }}>
+                                      {key.split("_")[1]}
+                                    </span>
+                                    :{" "}
                                     <span style={{ color: "#fff", fontWeight: "bold" }}>
                                       {value}
                                     </span>
@@ -949,13 +1275,13 @@ export default function OverviewTab({
                           <div style={{ marginBottom: "12px" }}>
                             <div
                               style={{
-                                color: "#9C27B0",
+                                color: "var(--analytics-chart-4)",
                                 fontSize: "11px",
                                 fontWeight: "bold",
                                 marginBottom: "8px",
                               }}
                             >
-                              ⚠️ 严重性维度分布:
+                              <AnalyticsIcon name="warning" size={14} /> 严重性维度分布:
                             </div>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {Object.entries(
@@ -966,14 +1292,19 @@ export default function OverviewTab({
                                   key={key}
                                   style={{
                                     padding: "6px 10px",
-                                    backgroundColor: "#0a0a0a",
+                                    backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                                     borderRadius: "4px",
                                     fontSize: "9px",
-                                    border: "1px solid #9C27B0",
+                                    border: "1px solid var(--analytics-border-soft, #333)",
                                   }}
                                 >
-                                  <span style={{ color: "#888" }}>{key.split("_")[0]}</span>{" "}
-                                  <span style={{ color: "#9C27B0" }}>{key.split("_")[1]}</span>:{" "}
+                                  <span style={{ color: "var(--analytics-muted, #888)" }}>
+                                    {key.split("_")[0]}
+                                  </span>{" "}
+                                  <span style={{ color: "var(--analytics-chart-4)" }}>
+                                    {key.split("_")[1]}
+                                  </span>
+                                  :{" "}
                                   <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
                                 </div>
                               ))}
@@ -991,13 +1322,13 @@ export default function OverviewTab({
                           <div>
                             <div
                               style={{
-                                color: "#00BCD4",
+                                color: "var(--analytics-chart-1)",
                                 fontSize: "11px",
                                 fontWeight: "bold",
                                 marginBottom: "8px",
                               }}
                             >
-                              🔀 交叉关联分析:
+                              <AnalyticsIcon name="analysis" size={14} /> 交叉关联分析:
                             </div>
                             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                               {Object.entries(
@@ -1008,13 +1339,13 @@ export default function OverviewTab({
                                   key={key}
                                   style={{
                                     padding: "6px 10px",
-                                    backgroundColor: "#0a0a0a",
+                                    backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                                     borderRadius: "4px",
                                     fontSize: "9px",
-                                    border: "1px solid #00BCD4",
+                                    border: "1px solid var(--analytics-border-soft, #333)",
                                   }}
                                 >
-                                  <span style={{ color: "#00BCD4" }}>{key}</span>:{" "}
+                                  <span style={{ color: "var(--analytics-chart-1)" }}>{key}</span>:{" "}
                                   <span style={{ color: "#fff", fontWeight: "bold" }}>{value}</span>
                                 </div>
                               ))}
@@ -1031,23 +1362,30 @@ export default function OverviewTab({
                     style={{
                       marginTop: "15px",
                       padding: "15px",
-                      backgroundColor: "#1a1a1a",
+                      backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                       borderRadius: "8px",
-                      border: "1px solid #4CAF50",
+                      border: "1px solid var(--analytics-border-soft, #333)",
                     }}
                   >
                     <div
                       style={{
-                        color: "#4CAF50",
+                        color: "var(--analytics-state-normal, #67e8f9)",
                         fontSize: "12px",
                         fontWeight: "bold",
                         marginBottom: "10px",
                       }}
                     >
-                      📈 多维趋势分析（过去7天）
+                      <AnalyticsIcon name="trend" size={16} />
+                      多维趋势分析（过去7天）
                     </div>
                     {pivot4DTrends.kind === "empty" ? (
-                      <div style={{ fontSize: "10px", color: "#888", fontStyle: "italic" }}>
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "var(--analytics-muted, #888)",
+                          fontStyle: "italic",
+                        }}
+                      >
                         {pivot4DTrends.message}
                       </div>
                     ) : (
@@ -1055,20 +1393,20 @@ export default function OverviewTab({
                         <div
                           style={{
                             fontSize: "10px",
-                            color: "#aaa",
+                            color: "var(--analytics-muted, #aaa)",
                             marginBottom: "10px",
                           }}
                         >
                           总组合: {pivot4DTrends.statistics.total_combinations ?? 0} | 上升:{" "}
-                          <span style={{ color: "#f44336" }}>
+                          <span style={{ color: "var(--analytics-state-warning, #fbbf24)" }}>
                             {pivot4DTrends.statistics.increasing ?? 0}
                           </span>{" "}
                           | 平稳:{" "}
-                          <span style={{ color: "#FF9800" }}>
+                          <span style={{ color: "var(--analytics-state-warning, #fbbf24)" }}>
                             {pivot4DTrends.statistics.stable ?? 0}
                           </span>{" "}
                           | 下降:{" "}
-                          <span style={{ color: "#4CAF50" }}>
+                          <span style={{ color: "var(--analytics-state-normal, #67e8f9)" }}>
                             {pivot4DTrends.statistics.decreasing ?? 0}
                           </span>
                         </div>
@@ -1083,16 +1421,18 @@ export default function OverviewTab({
                                   key={idx}
                                   style={{
                                     padding: "8px 12px",
-                                    backgroundColor: "#0a0a0a",
+                                    backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                                     borderRadius: "6px",
                                     fontSize: "10px",
-                                    border: "1px solid #f44336",
+                                    border: "1px solid var(--analytics-border-soft, #333)",
                                   }}
                                 >
-                                  <span style={{ color: "#888" }}>
+                                  <span style={{ color: "var(--analytics-muted, #888)" }}>
                                     {region} - {type}:
                                   </span>{" "}
-                                  <span style={{ color: "#f44336" }}>
+                                  <span
+                                    style={{ color: "var(--analytics-state-warning, #fbbf24)" }}
+                                  >
                                     ↗ 斜率 {slope.toFixed(2)}
                                   </span>
                                 </div>
@@ -1111,23 +1451,30 @@ export default function OverviewTab({
                     style={{
                       marginTop: "15px",
                       padding: "15px",
-                      backgroundColor: "#1a1a1a",
+                      backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                       borderRadius: "8px",
-                      border: "1px solid #f44336",
+                      border: "1px solid var(--analytics-border-soft, #333)",
                     }}
                   >
                     <div
                       style={{
-                        color: "#f44336",
+                        color: "var(--analytics-state-warning, #fbbf24)",
                         fontSize: "12px",
                         fontWeight: "bold",
                         marginBottom: "10px",
                       }}
                     >
-                      🔥 多维风险评分（Top 8）
+                      <AnalyticsIcon name="warning" size={16} />
+                      多维风险评分（Top 8）
                     </div>
                     {pivot4DRiskScores.kind === "empty" ? (
-                      <div style={{ fontSize: "10px", color: "#888", fontStyle: "italic" }}>
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          color: "var(--analytics-muted, #888)",
+                          fontStyle: "italic",
+                        }}
+                      >
                         {pivot4DRiskScores.message}
                       </div>
                     ) : (
@@ -1144,10 +1491,10 @@ export default function OverviewTab({
                             const riskLevel = score > 2 ? "high" : score > 1 ? "medium" : "low";
                             const color =
                               riskLevel === "high"
-                                ? "#f44336"
+                                ? "var(--analytics-state-warning, #fbbf24)"
                                 : riskLevel === "medium"
-                                  ? "#FF9800"
-                                  : "#4CAF50";
+                                  ? "var(--analytics-chart-2)"
+                                  : "var(--analytics-state-normal, #67e8f9)";
                             const region = readPivotString(item, "region") ?? "未知";
                             const type = readPivotString(item, "type") ?? "未知";
                             const totalEvents = readPivotNumber(item, "total_events") ?? 0;
@@ -1158,7 +1505,7 @@ export default function OverviewTab({
                                 key={idx}
                                 style={{
                                   padding: "10px",
-                                  backgroundColor: "#0a0a0a",
+                                  backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                                   borderRadius: "6px",
                                   border: `2px solid ${color}`,
                                   textAlign: "center",
@@ -1167,7 +1514,7 @@ export default function OverviewTab({
                                 <div
                                   style={{
                                     fontSize: "9px",
-                                    color: "#888",
+                                    color: "var(--analytics-muted, #888)",
                                     marginBottom: "5px",
                                   }}
                                 >
@@ -1179,7 +1526,7 @@ export default function OverviewTab({
                                 <div
                                   style={{
                                     fontSize: "8px",
-                                    color: "#666",
+                                    color: "var(--analytics-muted, #666)",
                                     marginTop: "3px",
                                   }}
                                 >
@@ -1193,13 +1540,20 @@ export default function OverviewTab({
                           style={{
                             marginTop: "10px",
                             padding: "10px",
-                            backgroundColor: "#0a0a0a",
+                            backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                             borderRadius: "6px",
                             fontSize: "10px",
                           }}
                         >
-                          <span style={{ color: "#f44336", fontWeight: "bold" }}>⚠️ 统计:</span>{" "}
-                          <span style={{ color: "#aaa" }}>
+                          <span
+                            style={{
+                              color: "var(--analytics-state-warning, #fbbf24)",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            <AnalyticsIcon name="warning" size={14} /> 统计:
+                          </span>{" "}
+                          <span style={{ color: "var(--analytics-muted, #aaa)" }}>
                             最高风险 {(pivot4DRiskScores.statistics.max_risk_score ?? 0).toFixed(2)}{" "}
                             | 平均风险{" "}
                             {(pivot4DRiskScores.statistics.avg_risk_score ?? 0).toFixed(2)}
@@ -1218,27 +1572,31 @@ export default function OverviewTab({
       {/* 因素关联度分析 - 帮助用户发现哪些因素相互影响 */}
       {statistics.data.correlationAnalysis && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>🔗 影响因素关联分析</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="analysis" />
+            影响因素关联分析
+          </h4>
           <div
             style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
               padding: "20px",
               borderRadius: "8px",
-              border: "1px solid #2196F3",
+              border: "1px solid var(--analytics-border-soft, #333)",
             }}
           >
             <div
               style={{
                 marginBottom: "15px",
                 padding: "10px",
-                backgroundColor: "#0a0a0a",
+                backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                 borderRadius: "6px",
                 fontSize: "12px",
-                color: "#aaa",
+                color: "var(--analytics-muted, #aaa)",
                 lineHeight: "1.6",
               }}
             >
-              💡 分析不同因素之间的关联程度，数值越接近1表示关联越强，越接近0表示关联越弱
+              <AnalyticsIcon name="info" size={14} />{" "}
+              分析不同因素之间的关联程度，数值越接近1表示关联越强，越接近0表示关联越弱
             </div>
 
             {/* 直接关联性分析 */}
@@ -1246,25 +1604,44 @@ export default function OverviewTab({
               <div style={{ marginBottom: "20px" }}>
                 <div
                   style={{
-                    color: "#2196F3",
+                    color: "var(--analytics-chart-2)",
                     fontSize: "14px",
                     fontWeight: "bold",
                     marginBottom: "10px",
                   }}
                 >
-                  📊 线性关联（直接关系）
+                  <AnalyticsIcon name="chart" size={16} />
+                  线性关联（直接关系）
                 </div>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                     <thead>
-                      <tr style={{ backgroundColor: "#0a0a0a" }}>
-                        <th style={{ padding: "8px", textAlign: "left", color: "#888" }}>
+                      <tr style={{ backgroundColor: "var(--analytics-surface-inset, #0a0a0a)" }}>
+                        <th
+                          style={{
+                            padding: "8px",
+                            textAlign: "left",
+                            color: "var(--analytics-muted, #888)",
+                          }}
+                        >
                           数据指标
                         </th>
-                        <th style={{ padding: "8px", textAlign: "center", color: "#888" }}>
+                        <th
+                          style={{
+                            padding: "8px",
+                            textAlign: "center",
+                            color: "var(--analytics-muted, #888)",
+                          }}
+                        >
                           与灾害强度
                         </th>
-                        <th style={{ padding: "8px", textAlign: "center", color: "#888" }}>
+                        <th
+                          style={{
+                            padding: "8px",
+                            textAlign: "center",
+                            color: "var(--analytics-muted, #888)",
+                          }}
+                        >
                           与影响人口
                         </th>
                       </tr>
@@ -1284,7 +1661,12 @@ export default function OverviewTab({
                             };
 
                             return (
-                              <tr key={key} style={{ borderTop: "1px solid #333" }}>
+                              <tr
+                                key={key}
+                                style={{
+                                  borderTop: "1px solid var(--analytics-border-soft, #333)",
+                                }}
+                              >
                                 <td style={{ padding: "8px", color: "#fff" }}>
                                   {getChineseLabel(key)}
                                 </td>
@@ -1292,7 +1674,9 @@ export default function OverviewTab({
                                   style={{
                                     padding: "8px",
                                     textAlign: "center",
-                                    color: values.magnitude ? "#4CAF50" : "#666",
+                                    color: values.magnitude
+                                      ? "var(--analytics-state-normal, #67e8f9)"
+                                      : "#666",
                                   }}
                                 >
                                   {values.magnitude ? (
@@ -1305,7 +1689,9 @@ export default function OverviewTab({
                                   style={{
                                     padding: "8px",
                                     textAlign: "center",
-                                    color: values.populationExposed ? "#4CAF50" : "#666",
+                                    color: values.populationExposed
+                                      ? "var(--analytics-state-normal, #67e8f9)"
+                                      : "#666",
                                   }}
                                 >
                                   {values.populationExposed ? (
@@ -1322,7 +1708,11 @@ export default function OverviewTab({
                         <tr>
                           <td
                             colSpan={3}
-                            style={{ padding: "15px", textAlign: "center", color: "#666" }}
+                            style={{
+                              padding: "15px",
+                              textAlign: "center",
+                              color: "var(--analytics-muted, #666)",
+                            }}
                           >
                             暂无关联数据
                           </td>
@@ -1339,25 +1729,44 @@ export default function OverviewTab({
               <div>
                 <div
                   style={{
-                    color: "#9C27B0",
+                    color: "var(--analytics-chart-4)",
                     fontSize: "14px",
                     fontWeight: "bold",
                     marginBottom: "10px",
                   }}
                 >
-                  📉 排序关联（趋势关系）
+                  <AnalyticsIcon name="trend" size={16} />
+                  排序关联（趋势关系）
                 </div>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                     <thead>
-                      <tr style={{ backgroundColor: "#0a0a0a" }}>
-                        <th style={{ padding: "8px", textAlign: "left", color: "#888" }}>
+                      <tr style={{ backgroundColor: "var(--analytics-surface-inset, #0a0a0a)" }}>
+                        <th
+                          style={{
+                            padding: "8px",
+                            textAlign: "left",
+                            color: "var(--analytics-muted, #888)",
+                          }}
+                        >
                           数据指标
                         </th>
-                        <th style={{ padding: "8px", textAlign: "center", color: "#888" }}>
+                        <th
+                          style={{
+                            padding: "8px",
+                            textAlign: "center",
+                            color: "var(--analytics-muted, #888)",
+                          }}
+                        >
                           与灾害强度
                         </th>
-                        <th style={{ padding: "8px", textAlign: "center", color: "#888" }}>
+                        <th
+                          style={{
+                            padding: "8px",
+                            textAlign: "center",
+                            color: "var(--analytics-muted, #888)",
+                          }}
+                        >
                           与影响人口
                         </th>
                       </tr>
@@ -1377,7 +1786,12 @@ export default function OverviewTab({
                             };
 
                             return (
-                              <tr key={key} style={{ borderTop: "1px solid #333" }}>
+                              <tr
+                                key={key}
+                                style={{
+                                  borderTop: "1px solid var(--analytics-border-soft, #333)",
+                                }}
+                              >
                                 <td style={{ padding: "8px", color: "#fff" }}>
                                   {getChineseLabel(key)}
                                 </td>
@@ -1385,7 +1799,7 @@ export default function OverviewTab({
                                   style={{
                                     padding: "8px",
                                     textAlign: "center",
-                                    color: values.magnitude ? "#9C27B0" : "#666",
+                                    color: values.magnitude ? "var(--analytics-chart-4)" : "#666",
                                   }}
                                 >
                                   {values.magnitude ? (
@@ -1398,7 +1812,9 @@ export default function OverviewTab({
                                   style={{
                                     padding: "8px",
                                     textAlign: "center",
-                                    color: values.populationExposed ? "#9C27B0" : "#666",
+                                    color: values.populationExposed
+                                      ? "var(--analytics-chart-4)"
+                                      : "#666",
                                   }}
                                 >
                                   {values.populationExposed ? (
@@ -1415,7 +1831,11 @@ export default function OverviewTab({
                         <tr>
                           <td
                             colSpan={3}
-                            style={{ padding: "15px", textAlign: "center", color: "#666" }}
+                            style={{
+                              padding: "15px",
+                              textAlign: "center",
+                              color: "var(--analytics-muted, #666)",
+                            }}
                           >
                             暂无关联数据
                           </td>
@@ -1434,15 +1854,18 @@ export default function OverviewTab({
       {statistics.data.timeSeriesAnalysis?.trendAnalysis &&
         Object.keys(statistics.data.timeSeriesAnalysis.trendAnalysis).length > 0 && (
           <div style={{ marginBottom: "30px" }}>
-            <h4 style={{ color: "#fff", marginBottom: "15px" }}>📈 发展趋势预测</h4>
+            <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+              <AnalyticsIcon name="trend" />
+              发展趋势预测
+            </h4>
 
             {/* 趋势指标 */}
             <div
               style={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "var(--analytics-surface-raised, #1a1a1a)",
                 padding: "20px",
                 borderRadius: "8px",
-                border: "1px solid #333",
+                border: "1px solid var(--analytics-border-soft, #333)",
                 marginBottom: "20px",
               }}
             >
@@ -1454,13 +1877,23 @@ export default function OverviewTab({
                 }}
               >
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>趋势方向</div>
-                  <div style={{ color: "#4CAF50", fontSize: "16px", marginTop: "5px" }}>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    趋势方向
+                  </div>
+                  <div
+                    style={{
+                      color: "var(--analytics-state-normal, #67e8f9)",
+                      fontSize: "16px",
+                      marginTop: "5px",
+                    }}
+                  >
                     {statistics.data.timeSeriesAnalysis.trendAnalysis.trend || "暂无"}
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>变化速度</div>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    变化速度
+                  </div>
                   <div style={{ color: "#fff", fontSize: "16px", marginTop: "5px" }}>
                     {formatAnalyticsNumber(
                       statistics.data.timeSeriesAnalysis.trendAnalysis.slope,
@@ -1469,10 +1902,12 @@ export default function OverviewTab({
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>预测准确度</div>
+                  <div style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+                    预测准确度
+                  </div>
                   <div
                     style={{
-                      color: "#4CAF50",
+                      color: "var(--analytics-state-normal, #67e8f9)",
                       fontSize: "16px",
                       marginTop: "5px",
                       fontWeight: "bold",
@@ -1489,13 +1924,14 @@ export default function OverviewTab({
                 style={{
                   marginTop: "15px",
                   padding: "10px",
-                  backgroundColor: "#0a0a0a",
+                  backgroundColor: "var(--analytics-surface-inset, #0a0a0a)",
                   borderRadius: "6px",
                   fontSize: "11px",
-                  color: "#666",
+                  color: "var(--analytics-muted, #666)",
                 }}
               >
-                💡 说明: 根据历史数据预测未来趋势，准确度越高说明预测越可靠
+                <AnalyticsIcon name="info" size={14} /> 说明:
+                根据历史数据预测未来趋势，准确度越高说明预测越可靠
               </div>
             </div>
 
@@ -1516,13 +1952,13 @@ export default function OverviewTab({
               return (
                 <LineChart
                   data={chartData}
-                  title="📉 灾害发生趋势图 (30天)"
+                  title="灾害发生趋势图 (30天)"
                   color={
                     trendData.trend === "increasing"
-                      ? "#f44336"
+                      ? "var(--analytics-state-danger, #fb7185)"
                       : trendData.trend === "decreasing"
-                        ? "#4CAF50"
-                        : "#ff9800"
+                        ? "var(--analytics-state-normal, #67e8f9)"
+                        : "var(--analytics-state-warning, #fbbf24)"
                   }
                   xLabel="时间 (天)"
                   yLabel="灾害数量"
@@ -1537,14 +1973,17 @@ export default function OverviewTab({
       {/* 如果时间趋势数据不存在，显示示例折线图 */}
       {!statistics.data.timeSeriesAnalysis?.trendAnalysis && (
         <div style={{ marginBottom: "30px" }}>
-          <h4 style={{ color: "#fff", marginBottom: "15px" }}>📈 灾害趋势可视化（示例）</h4>
+          <h4 className="analytics-heading" style={{ marginBottom: "15px" }}>
+            <AnalyticsIcon name="chart" />
+            灾害趋势可视化（示例）
+          </h4>
           <LineChart
             data={hazards.slice(0, 20).map((_, i) => ({
               x: `T${i + 1}`,
               y: Math.random() * 10 + 5,
             }))}
-            title="📊 灾害频率趋势"
-            color="#4CAF50"
+            title="灾害频率趋势"
+            color="var(--analytics-accent, #67e8f9)"
             xLabel="时间序列"
             yLabel="频率"
             showDots={true}

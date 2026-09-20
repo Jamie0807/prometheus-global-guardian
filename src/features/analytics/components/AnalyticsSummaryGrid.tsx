@@ -3,6 +3,7 @@
  */
 import { MetricCard, ProgressBar } from "../../../components/DataVisualization";
 import type { ServiceStatus } from "../types";
+import AnalyticsIcon from "./AnalyticsIcon";
 
 interface AnalyticsSummaryGridProps {
   hazardCount: number;
@@ -25,48 +26,57 @@ export default function AnalyticsSummaryGrid({
           marginBottom: "30px",
         }}
       >
-        <MetricCard label="灾害总数" value={hazardCount} color="#4CAF50" trend="up" />
+        <MetricCard
+          label="灾害总数"
+          value={hazardCount}
+          color="var(--analytics-accent, #67e8f9)"
+          trend="up"
+        />
         <MetricCard
           label="灾害类型"
           value={Object.keys(hazardsByType).length}
           unit="种"
-          color="#2196F3"
+          color="var(--analytics-accent, #67e8f9)"
           trend="stable"
         />
         <MetricCard
           label="数据完整度"
           value={hazardCount > 0 ? 99.8 : 0}
           unit="%"
-          color="#4CAF50"
+          color="var(--analytics-state-normal)"
           trend="up"
         />
         <MetricCard
           label="分析状态"
           value={serviceStatus === "online" ? "就绪" : "离线"}
-          color={serviceStatus === "online" ? "#4CAF50" : "#f44336"}
+          color={
+            serviceStatus === "online"
+              ? "var(--analytics-state-normal)"
+              : serviceStatus === "checking"
+                ? "var(--analytics-state-warning)"
+                : "var(--analytics-state-danger)"
+          }
         />
       </div>
 
       <div
+        className="analytics-surface"
         style={{
-          background: "linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%)",
           padding: "30px",
           borderRadius: "16px",
           marginBottom: "30px",
-          border: "1px solid rgba(76, 175, 80, 0.2)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
         }}
       >
         <h2
+          className="analytics-heading"
           style={{
-            color: "#4CAF50",
             marginBottom: "24px",
-            textShadow: "0 0 10px rgba(76, 175, 80, 0.3)",
             fontSize: "20px",
             fontWeight: "bold",
           }}
         >
-          📊 灾害类型分布
+          <AnalyticsIcon name="analysis" size={20} />
+          灾害类型分布
         </h2>
         {Object.entries(hazardsByType).map(([type, count]) => (
           <ProgressBar
@@ -74,7 +84,7 @@ export default function AnalyticsSummaryGrid({
             label={type}
             value={count}
             max={hazardCount}
-            color="#4CAF50"
+            color="var(--analytics-accent, #67e8f9)"
             showPercentage={true}
           />
         ))}

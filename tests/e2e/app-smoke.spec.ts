@@ -7,7 +7,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
     await route.fulfill({ json: { authorized: true } });
   });
 
-  await page.route("**/api/hazards/**", async (route) => {
+  await page.route("**/api/hazards**", async (route) => {
     if (new URL(route.request().url()).pathname.endsWith("/types")) {
       await route.fulfill({
         json: [
@@ -19,41 +19,32 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
     }
 
     await route.fulfill({
-      json: [
-        {
-          app_ID: 1,
-          app_IDs: "1",
-          autoexpire: "false",
-          category_ID: "EVENT",
-          charter_Uri: "",
-          comment_Text: "",
-          create_Date: "2026-09-03T00:00:00.000Z",
-          creator: "Playwright",
-          end_Date: "",
-          glide_Uri: "",
-          hazard_ID: 101,
-          hazard_Name: "Mock Flood",
-          last_Update: "2026-09-03T00:00:00.000Z",
-          latitude: 31.23,
-          longitude: 121.47,
-          master_Incident_ID: "mock-101",
-          message_ID: "mock-message-101",
-          org_ID: 1,
-          severity_ID: "HIGH",
-          snc_url: "",
-          start_Date: "2026-09-03T00:00:00.000Z",
-          status: "ACTIVE",
-          type_ID: "FLOOD",
-          update_Date: "2026-09-03T00:00:00.000Z",
-          update_User: null,
-          product_total: "0",
-          uuid: "mock-101",
-          in_Dashboard: "true",
-          areabrief_url: null,
-          description: "Mocked hazard for browser smoke testing",
-          roles: [],
+      json: {
+        hazards: [
+          {
+            id: "mock-101",
+            title: "Mock Flood",
+            type: "FLOOD",
+            geometry: { type: "Point", coordinates: [121.47, 31.23] },
+            description: "Mocked hazard for browser smoke testing",
+            source: "DisasterAWARE",
+            severity: "HIGH",
+            timestamp: "2026-09-03T00:00:00.000Z",
+          },
+        ],
+        meta: {
+          primary: "disasteraware",
+          fallbackUsed: false,
+          stale: false,
+          generatedAt: "2026-09-03T00:00:00.000Z",
+          sources: [
+            { id: "disasteraware", status: "success", count: 1 },
+            { id: "usgs", status: "empty", count: 0 },
+            { id: "nasa-eonet", status: "empty", count: 0 },
+            { id: "gdacs", status: "empty", count: 0 },
+          ],
         },
-      ],
+      },
     });
   });
 
@@ -70,6 +61,108 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
 
   await page.route("**/health", async (route) => {
     await route.fulfill({ json: { status: "ok" } });
+  });
+  await page.route("**/api/v1/statistics", async (route) => {
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          basicStats: {
+            count: 1,
+            mean: { magnitude: 5 },
+            std: { magnitude: 0 },
+            min: { magnitude: 5 },
+            max: { magnitude: 5 },
+          },
+          centralTendency: {},
+          variabilityMeasures: {},
+          distributionMetrics: {},
+          typeDistribution: { counts: { FLOOD: 1 }, percentages: { FLOOD: 100 } },
+        },
+      },
+    });
+  });
+  const unavailableModel = {
+    status: "insufficient_data",
+    reason: "not_enough_data",
+    dataPoints: 1,
+    minimumDataPoints: 3,
+    confidence: null,
+  };
+  await page.route("**/api/v1/predictions", async (route) => {
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          earthquakePrediction: unavailableModel,
+          volcanoPrediction: unavailableModel,
+          stormPrediction: unavailableModel,
+          floodPrediction: unavailableModel,
+          wildfirePrediction: unavailableModel,
+          overallRiskAssessment: {
+            status: "failed",
+            reason: "model_error",
+            overallRiskScore: null,
+            riskLevel: "UNKNOWN",
+            averageAccuracy: null,
+            confidence: null,
+            modelWeights: {},
+            recommendation: "",
+          },
+        },
+      },
+    });
+  });
+  await page.route("**/api/v1/risk-assessment", async (route) => {
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          overallRiskScore: { score: 20, level: "LOW" },
+          typeRisks: {},
+          geographicRisks: [],
+          temporalRisks: {},
+          recommendations: [],
+          recommendationDetails: [],
+        },
+      },
+    });
+  });
+  await page.route("**/api/v1/quality/thresholds", async (route) => {
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          completeness: 0.9,
+          accuracy: 0.95,
+          consistency: 0.98,
+          timeliness: 0.85,
+          validity: 0.95,
+        },
+      },
+    });
+  });
+  await page.route("**/api/v1/quality/assess", async (route) => {
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          overallScore: 92.4,
+          targetScore: 95,
+          status: "PASS",
+          detailChecks: {
+            completeness: 0.96,
+            accuracy: 0.98,
+            consistency: 0.99,
+            timeliness: 0.92,
+            validity: 0.97,
+          },
+          totalRecords: 1,
+          issues: [],
+          recommendations: [],
+        },
+      },
+    });
   });
 
   await page.goto("/");
@@ -194,6 +287,98 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
       mobileStatusBox!.y + mobileStatusBox!.height <= mobileLegendBox!.y ||
       mobileLegendBox!.y + mobileLegendBox!.height <= mobileStatusBox!.y,
   ).toBe(true);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "打开数据分析面板" }).click();
+  const analyticsPage = page.locator(".analytics-page");
+  await expect(analyticsPage).toBeVisible();
+  const floodProgress = analyticsPage.getByRole("progressbar", { name: "FLOOD" });
+  await expect(floodProgress).toHaveAttribute("aria-valuenow", "1");
+  await expect(floodProgress.locator(":scope > div")).toHaveCSS(
+    "background-color",
+    "rgb(103, 232, 249)",
+  );
+  expect(
+    await analyticsPage.evaluate((element) =>
+      getComputedStyle(element).getPropertyValue("--analytics-accent").trim(),
+    ),
+  ).toBe("#67e8f9");
+
+  const analyticsTabs: Array<{
+    name: RegExp;
+    heading?: RegExp;
+    surfaceSelector?: string;
+    surfaceBackground?: string;
+    surfaceGradient?: boolean;
+  }> = [
+    {
+      name: /统计概览/,
+      heading: /描述性统计分析/,
+      surfaceSelector: ".analytics-surface--inset",
+      surfaceBackground: "rgba(3, 12, 28, 0.82)",
+    },
+    {
+      name: /图表可视化/,
+      heading: /4类交互式分析图表/,
+      surfaceSelector: ".analytics-chart-summary-card",
+      surfaceBackground: "rgba(3, 12, 28, 0.82)",
+    },
+    {
+      name: /预测结果/,
+      heading: /预测模型结果/,
+      surfaceSelector: ".analytics-prediction-summary",
+      surfaceGradient: true,
+    },
+    {
+      name: /风险评估/,
+      heading: /风险评估报告/,
+      surfaceSelector: ".analytics-risk-summary",
+      surfaceBackground: "rgba(3, 12, 28, 0.82)",
+    },
+    {
+      name: /数据质量/,
+      heading: /数据质量综合评分/,
+    },
+  ];
+  for (const tab of analyticsTabs) {
+    const tabButton = page.getByRole("button", { name: tab.name });
+    await tabButton.click();
+    await expect(tabButton).toHaveClass(/is-active/);
+    await expect(tabButton).toHaveCSS("border-bottom-color", "rgb(103, 232, 249)");
+    const tabPanel = analyticsPage.locator(".analytics-tab-panel");
+    await expect(tabPanel).toBeVisible();
+    await expect(tabPanel).toHaveCSS("border-top-color", "rgba(125, 211, 252, 0.3)");
+    if (tab.heading) {
+      await expect(tabPanel.getByRole("heading", { name: tab.heading })).toHaveClass(
+        /analytics-heading/,
+      );
+    }
+    if (tab.surfaceSelector) {
+      const themedSurface = tabPanel.locator(tab.surfaceSelector).first();
+      await expect(themedSurface).toBeVisible();
+      if (tab.surfaceBackground) {
+        await expect(themedSurface).toHaveCSS("background-color", tab.surfaceBackground);
+      }
+      if (tab.surfaceGradient) {
+        expect(
+          await themedSurface.evaluate((element) => getComputedStyle(element).backgroundImage),
+        ).toContain("linear-gradient");
+      }
+    }
+    if (tab.name.source === "数据质量") {
+      const overallScore = tabPanel.locator(".analytics-quality-overall-score");
+      await expect(overallScore).toBeVisible();
+      expect(
+        await overallScore.evaluate((element) => getComputedStyle(element).backgroundImage),
+      ).toContain("linear-gradient");
+      const dimensions = tabPanel.locator(".analytics-quality-dimension");
+      await expect(dimensions).toHaveCount(5);
+      await expect(tabPanel.getByText("阈值: 95%", { exact: true })).toHaveCount(2);
+      await expect(dimensions.first()).toHaveCSS("background-color", "rgba(3, 12, 28, 0.82)");
+      await expect(dimensions.first()).toHaveCSS("border-top-color", "rgba(148, 193, 225, 0.13)");
+    }
+  }
+  await page.getByRole("button", { name: /关闭/ }).click();
 
   await page.getByRole("button", { name: "打开 AI 灾害分析助手" }).click();
   await expect(page.getByRole("heading", { name: "AI 灾害分析助手", exact: true })).toBeVisible();

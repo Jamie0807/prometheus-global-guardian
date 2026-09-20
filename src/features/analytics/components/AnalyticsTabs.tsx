@@ -7,6 +7,7 @@ import type {
   RiskAssessmentResponse,
   AnalyticsTab,
 } from "../types";
+import AnalyticsIcon, { type AnalyticsIconName } from "./AnalyticsIcon";
 
 interface AnalyticsTabsProps {
   activeTab: AnalyticsTab;
@@ -16,14 +17,6 @@ interface AnalyticsTabsProps {
   onChange: (tab: AnalyticsTab) => void;
 }
 
-const TAB_STYLES: Record<AnalyticsTab, { color: string }> = {
-  overview: { color: "#4CAF50" },
-  charts: { color: "#FF9800" },
-  predictions: { color: "#4CAF50" },
-  risk: { color: "#4CAF50" },
-  quality: { color: "#2196F3" },
-};
-
 export default function AnalyticsTabs({
   activeTab,
   statistics,
@@ -31,12 +24,17 @@ export default function AnalyticsTabs({
   riskAssessment,
   onChange,
 }: AnalyticsTabsProps) {
-  const tabs: Array<{ id: AnalyticsTab; label: string; visible: boolean }> = [
-    { id: "overview", label: "📊 统计概览", visible: statistics !== null },
-    { id: "charts", label: "📈 图表可视化", visible: true },
-    { id: "predictions", label: "🔮 预测结果", visible: predictions !== null },
-    { id: "risk", label: "⚠️ 风险评估", visible: riskAssessment !== null },
-    { id: "quality", label: "✓ 数据质量", visible: true },
+  const tabs: Array<{
+    id: AnalyticsTab;
+    label: string;
+    icon: AnalyticsIconName;
+    visible: boolean;
+  }> = [
+    { id: "overview", label: "统计概览", icon: "analysis", visible: statistics !== null },
+    { id: "charts", label: "图表可视化", icon: "chart", visible: true },
+    { id: "predictions", label: "预测结果", icon: "forecast", visible: predictions !== null },
+    { id: "risk", label: "风险评估", icon: "warning", visible: riskAssessment !== null },
+    { id: "quality", label: "数据质量", icon: "check", visible: true },
   ];
 
   return (
@@ -46,34 +44,32 @@ export default function AnalyticsTabs({
         gap: "10px",
         marginTop: "30px",
         marginBottom: "20px",
-        borderBottom: "2px solid rgba(51, 51, 51, 0.5)",
+        borderBottom: "2px solid var(--analytics-border-soft)",
       }}
     >
       {tabs
         .filter((tab) => tab.visible)
         .map((tab) => {
-          const color = TAB_STYLES[tab.id].color;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
+              className={`analytics-tab${isActive ? " is-active" : ""}`}
               onClick={() => onChange(tab.id)}
               style={{
                 padding: "12px 24px",
-                background: isActive
-                  ? "linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)"
-                  : "transparent",
-                color: isActive ? color : "#888",
+                background: "transparent",
                 border: "none",
-                borderBottom: isActive ? `2px solid ${color}` : "2px solid transparent",
+                borderBottom: "2px solid transparent",
                 cursor: "pointer",
                 fontSize: "14px",
                 fontWeight: "bold",
                 borderRadius: "8px 8px 0 0",
                 transition: "all 0.3s ease",
-                boxShadow: isActive ? `0 -4px 12px ${color}33` : "none",
+                boxShadow: "none",
               }}
             >
+              <AnalyticsIcon name={tab.icon} />
               {tab.label}
             </button>
           );

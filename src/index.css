@@ -221,6 +221,211 @@ body {
 
 .notification-center {
   position: relative;
+  --notification-surface: rgba(7, 19, 37, 0.97);
+  --notification-border: rgba(125, 211, 252, 0.3);
+  --notification-border-soft: rgba(148, 193, 225, 0.13);
+  --notification-text: #e8f3ff;
+  --notification-muted: #91b8d1;
+  --notification-muted-soft: #7193ac;
+  --notification-accent: #67e8f9;
+  --notification-normal: #67e8f9;
+  --notification-info: #38bdf8;
+  --notification-warning: #fbbf24;
+  --notification-danger: #fb7185;
+}
+
+.notification-panel {
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.notification-panel-title {
+  margin: 0;
+  color: var(--notification-accent);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.notification-panel-action,
+.notification-panel-remove {
+  border: 0;
+  color: var(--notification-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.notification-panel-action:hover,
+.notification-panel-action:focus-visible {
+  color: var(--notification-accent) !important;
+}
+
+.notification-panel-action--clear:hover,
+.notification-panel-action--clear:focus-visible {
+  color: var(--notification-danger) !important;
+}
+
+.notification-panel-remove {
+  border-radius: 5px;
+}
+
+.notification-panel-remove:hover,
+.notification-panel-remove:focus-visible {
+  color: var(--notification-text) !important;
+  background: rgba(148, 193, 225, 0.12);
+}
+
+.notification-panel-item {
+  border-bottom: 1px solid var(--notification-border-soft);
+  transition: background-color 160ms ease;
+}
+
+.notification-panel-item:hover {
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+
+.notification-panel-item.is-unread {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.chart-drilldown-overlay {
+  --drilldown-surface: rgba(7, 19, 37, 0.98);
+  --drilldown-card: rgba(13, 37, 61, 0.88);
+  --drilldown-inset: rgba(3, 12, 28, 0.92);
+  --drilldown-border: rgba(125, 211, 252, 0.3);
+  --drilldown-border-soft: rgba(148, 193, 225, 0.14);
+  --drilldown-text: #e8f3ff;
+  --drilldown-secondary: #b7c9dc;
+  --drilldown-muted: #91b8d1;
+  --drilldown-accent: #67e8f9;
+  --drilldown-warning: #fbbf24;
+  --drilldown-danger: #fb7185;
+  color: var(--drilldown-text);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.chart-drilldown-panel {
+  overflow: hidden;
+  border: 1px solid var(--drilldown-border);
+  color: var(--drilldown-text);
+  box-shadow:
+    0 24px 64px rgba(0, 5, 18, 0.66),
+    inset 0 1px 0 rgba(224, 242, 254, 0.08);
+}
+
+.chart-drilldown-title {
+  margin: 0;
+  color: var(--drilldown-accent);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.chart-drilldown-subtitle,
+.chart-drilldown-muted {
+  color: var(--drilldown-muted);
+  font-size: 0.86rem;
+}
+
+.chart-drilldown-subtitle {
+  margin: 8px 0 0;
+}
+
+.chart-drilldown-close {
+  border: 1px solid transparent !important;
+  color: var(--drilldown-muted) !important;
+}
+
+.chart-drilldown-close:hover,
+.chart-drilldown-close:focus-visible {
+  border-color: var(--drilldown-border) !important;
+  color: var(--drilldown-text) !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+
+.chart-drilldown-close:focus-visible,
+.chart-drilldown-footer-button:focus-visible {
+  outline: 2px solid var(--drilldown-accent);
+  outline-offset: 2px;
+}
+
+.chart-drilldown-filter-value {
+  color: var(--drilldown-accent);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.chart-drilldown-empty {
+  padding: 40px;
+  color: var(--drilldown-muted);
+  text-align: center;
+}
+
+.chart-drilldown-card {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.chart-drilldown-card:hover {
+  border-color: var(--drilldown-border) !important;
+  background: rgba(56, 189, 248, 0.1) !important;
+}
+
+.chart-drilldown-card-title {
+  margin: 0;
+  color: var(--drilldown-text);
+  font-size: 1rem;
+}
+
+.chart-drilldown-field-label {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--drilldown-muted);
+}
+
+.chart-drilldown-field-value {
+  color: var(--drilldown-text);
+}
+
+.chart-drilldown-stat-value {
+  color: var(--drilldown-accent);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.chart-drilldown-footer-button:hover {
+  border-color: var(--drilldown-accent) !important;
+  background: rgba(56, 189, 248, 0.16) !important;
+}
+
+@media (max-width: 640px) {
+  .notification-panel {
+    width: min(400px, calc(100vw - 32px)) !important;
+  }
+
+  .chart-drilldown-overlay {
+    padding: 12px !important;
+  }
+
+  .chart-drilldown-panel {
+    max-height: 92vh !important;
+  }
+
+  .chart-drilldown-fields {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .chart-drilldown-panel > div:first-child,
+  .chart-drilldown-panel > div:last-child {
+    padding-right: 16px !important;
+    padding-left: 16px !important;
+  }
 }
 
 .notification-badge {
@@ -4006,4 +4211,131 @@ textarea.form-input {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Analytics page theme: tokens are scoped so map overlays keep their own palette. */
+.analytics-page {
+  --analytics-page-bg: linear-gradient(145deg, rgba(7, 19, 37, 0.98), rgba(10, 29, 49, 0.94));
+  --analytics-surface: linear-gradient(145deg, rgba(7, 19, 37, 0.94), rgba(10, 29, 49, 0.88));
+  --analytics-surface-raised: rgba(13, 37, 61, 0.9);
+  --analytics-surface-inset: rgba(3, 12, 28, 0.82);
+  --analytics-border: rgba(125, 211, 252, 0.3);
+  --analytics-border-soft: rgba(148, 193, 225, 0.13);
+  --analytics-text: #e8f3ff;
+  --analytics-muted: #91b8d1;
+  --analytics-accent: #67e8f9;
+  --analytics-accent-glow: rgba(56, 189, 248, 0.18);
+  --analytics-chart-1: #67e8f9;
+  --analytics-chart-2: #38bdf8;
+  --analytics-chart-3: #0ea5e9;
+  --analytics-chart-4: #60a5fa;
+  --analytics-chart-5: #3b82f6;
+  --analytics-chart-6: #22d3ee;
+  --analytics-chart-7: #7dd3fc;
+  --analytics-state-normal: #67e8f9;
+  --analytics-state-warning: #fbbf24;
+  --analytics-state-danger: #fb7185;
+}
+
+.analytics-page .analytics-surface,
+.analytics-page .analytics-surface--inset {
+  color: var(--analytics-text);
+  border: 1px solid var(--analytics-border);
+  box-shadow:
+    0 16px 40px rgba(0, 5, 18, 0.42),
+    inset 0 1px 0 rgba(224, 242, 254, 0.08);
+}
+
+.analytics-page .analytics-surface {
+  background: var(--analytics-surface);
+}
+
+.analytics-page .analytics-surface--inset {
+  background: var(--analytics-surface-inset);
+  border-color: var(--analytics-border-soft);
+}
+
+.analytics-page .analytics-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--analytics-accent);
+  text-shadow: 0 0 12px var(--analytics-accent-glow);
+}
+
+.analytics-page .analytics-icon-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-page .analytics-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+.analytics-page .analytics-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--analytics-text);
+  border: 1px solid var(--analytics-border);
+  background: var(--analytics-surface-raised);
+  box-shadow: inset 0 1px 0 rgba(224, 242, 254, 0.08);
+}
+
+.analytics-page .analytics-action:hover {
+  border-color: var(--analytics-accent);
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.analytics-page .analytics-action:focus-visible,
+.analytics-page .analytics-tab:focus-visible {
+  outline: 2px solid var(--analytics-accent);
+  outline-offset: 2px;
+}
+
+.analytics-page .analytics-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--analytics-muted);
+}
+
+.analytics-page .analytics-tab:hover,
+.analytics-page .analytics-tab.is-active {
+  color: var(--analytics-text);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.analytics-page .analytics-tab.is-active {
+  border-bottom-color: var(--analytics-accent) !important;
+  box-shadow: 0 -4px 12px var(--analytics-accent-glow) !important;
+}
+
+.analytics-page .analytics-chart-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: inset 0 1px 0 rgba(224, 242, 254, 0.06);
+}
+
+.analytics-page .analytics-chart-control:hover,
+.analytics-page .analytics-chart-control:focus-visible {
+  border-color: var(--analytics-accent) !important;
+}
+
+.analytics-page .analytics-chart-control:focus-visible {
+  outline: 2px solid var(--analytics-accent);
+  outline-offset: 2px;
+}
+
+.analytics-page .analytics-chart-summary-card {
+  border-color: var(--analytics-border-soft) !important;
+}
+
+.analytics-page .analytics-chart-summary-value {
+  color: var(--analytics-accent);
 }

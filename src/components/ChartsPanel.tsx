@@ -32,6 +32,7 @@ import {
   getHazardSeverity,
 } from "../features/analytics/utils/analyticsTransforms";
 import { readChartEvent } from "../features/analytics/utils/chartEventAdapter";
+import AnalyticsIcon from "../features/analytics/components/AnalyticsIcon";
 
 const logger = createClientLogger("charts-panel");
 
@@ -75,7 +76,15 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
   // 严重性分布数据
   const severityData = React.useMemo(() => buildSeverityDistribution(hazards), [hazards]);
 
-  const COLORS = ["#4CAF50", "#FF9800", "#2196F3", "#F44336", "#9C27B0", "#00BCD4", "#FFEB3B"];
+  const COLORS = [
+    "var(--analytics-chart-1)",
+    "var(--analytics-chart-2)",
+    "var(--analytics-chart-3)",
+    "var(--analytics-chart-4)",
+    "var(--analytics-chart-5)",
+    "var(--analytics-chart-6)",
+    "var(--analytics-chart-7)",
+  ];
 
   // 处理图表点击事件（钻取功能）
   const handleChartClick = (
@@ -166,7 +175,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
   }, [autoRefresh, hazards.length, loadPythonStats]);
 
   return (
-    <div style={{ backgroundColor: "#1a1a1a", padding: "20px", borderRadius: "8px" }}>
+    <div className="analytics-surface--inset" style={{ padding: "20px", borderRadius: "8px" }}>
       <div
         style={{
           display: "flex",
@@ -175,11 +184,20 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
           marginBottom: "16px",
         }}
       >
-        <h3 style={{ color: "#4CAF50", margin: 0 }}>📊 4类交互式分析图表</h3>
+        <h3 className="analytics-heading" style={{ margin: 0 }}>
+          <AnalyticsIcon name="analysis" size={20} />
+          4类交互式分析图表
+        </h3>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {loading && <span style={{ color: "#888", fontSize: "12px" }}>加载中...</span>}
+          {loading && (
+            <span style={{ color: "var(--analytics-muted, #888)", fontSize: "12px" }}>
+              加载中...
+            </span>
+          )}
           {chartError && (
-            <span style={{ color: "#ff6b6b", fontSize: "12px" }}>⚠️ {chartError}</span>
+            <span style={{ color: "var(--analytics-state-danger)", fontSize: "12px" }}>
+              <AnalyticsIcon name="warning" size={14} /> {chartError}
+            </span>
           )}
           <label
             style={{
@@ -187,7 +205,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
               alignItems: "center",
               gap: "5px",
               fontSize: "12px",
-              color: "#888",
+              color: "var(--analytics-muted, #888)",
               cursor: "pointer",
             }}
           >
@@ -213,12 +231,19 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
         }}
       >
         <button
+          className={`analytics-chart-control${activeChart === "pie" ? " is-active" : ""}`}
           onClick={() => setActiveChart("pie")}
           style={{
             padding: "8px 16px",
-            backgroundColor: activeChart === "pie" ? "#4CAF50" : "#333",
-            color: "#fff",
-            border: "none",
+            backgroundColor:
+              activeChart === "pie"
+                ? "rgba(56, 189, 248, 0.16)"
+                : "var(--analytics-surface-inset, #0a0a0a)",
+            color:
+              activeChart === "pie"
+                ? "var(--analytics-text, #e8f3ff)"
+                : "var(--analytics-muted, #91b8d1)",
+            border: `1px solid ${activeChart === "pie" ? "var(--analytics-accent, #67e8f9)" : "var(--analytics-border-soft, rgba(148, 193, 225, 0.13))"}`,
             borderRadius: "6px",
             cursor: "pointer",
             fontSize: "13px",
@@ -226,15 +251,23 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             transition: "all 0.3s",
           }}
         >
-          🥧 饼图
+          <AnalyticsIcon name="chart" size={16} />
+          饼图
         </button>
         <button
+          className={`analytics-chart-control${activeChart === "bar" ? " is-active" : ""}`}
           onClick={() => setActiveChart("bar")}
           style={{
             padding: "8px 16px",
-            backgroundColor: activeChart === "bar" ? "#FF9800" : "#333",
-            color: "#fff",
-            border: "none",
+            backgroundColor:
+              activeChart === "bar"
+                ? "rgba(56, 189, 248, 0.16)"
+                : "var(--analytics-surface-inset, #0a0a0a)",
+            color:
+              activeChart === "bar"
+                ? "var(--analytics-text, #e8f3ff)"
+                : "var(--analytics-muted, #91b8d1)",
+            border: `1px solid ${activeChart === "bar" ? "var(--analytics-accent, #67e8f9)" : "var(--analytics-border-soft, rgba(148, 193, 225, 0.13))"}`,
             borderRadius: "6px",
             cursor: "pointer",
             fontSize: "13px",
@@ -242,15 +275,23 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             transition: "all 0.3s",
           }}
         >
-          📊 柱状图
+          <AnalyticsIcon name="analysis" size={16} />
+          柱状图
         </button>
         <button
+          className={`analytics-chart-control${activeChart === "line" ? " is-active" : ""}`}
           onClick={() => setActiveChart("line")}
           style={{
             padding: "8px 16px",
-            backgroundColor: activeChart === "line" ? "#2196F3" : "#333",
-            color: "#fff",
-            border: "none",
+            backgroundColor:
+              activeChart === "line"
+                ? "rgba(56, 189, 248, 0.16)"
+                : "var(--analytics-surface-inset, #0a0a0a)",
+            color:
+              activeChart === "line"
+                ? "var(--analytics-text, #e8f3ff)"
+                : "var(--analytics-muted, #91b8d1)",
+            border: `1px solid ${activeChart === "line" ? "var(--analytics-accent, #67e8f9)" : "var(--analytics-border-soft, rgba(148, 193, 225, 0.13))"}`,
             borderRadius: "6px",
             cursor: "pointer",
             fontSize: "13px",
@@ -258,15 +299,23 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             transition: "all 0.3s",
           }}
         >
-          📈 时间线
+          <AnalyticsIcon name="trend" size={16} />
+          时间线
         </button>
         <button
+          className={`analytics-chart-control${activeChart === "area" ? " is-active" : ""}`}
           onClick={() => setActiveChart("area")}
           style={{
             padding: "8px 16px",
-            backgroundColor: activeChart === "area" ? "#9C27B0" : "#333",
-            color: "#fff",
-            border: "none",
+            backgroundColor:
+              activeChart === "area"
+                ? "rgba(56, 189, 248, 0.16)"
+                : "var(--analytics-surface-inset, #0a0a0a)",
+            color:
+              activeChart === "area"
+                ? "var(--analytics-text, #e8f3ff)"
+                : "var(--analytics-muted, #91b8d1)",
+            border: `1px solid ${activeChart === "area" ? "var(--analytics-accent, #67e8f9)" : "var(--analytics-border-soft, rgba(148, 193, 225, 0.13))"}`,
             borderRadius: "6px",
             cursor: "pointer",
             fontSize: "13px",
@@ -274,7 +323,8 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
             transition: "all 0.3s",
           }}
         >
-          📉 分布图
+          <AnalyticsIcon name="chart" size={16} />
+          分布图
         </button>
       </div>
 
@@ -282,10 +332,17 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
       <div style={{ height: "400px", marginBottom: "20px" }}>
         {activeChart === "pie" && (
           <div>
-            <h4 style={{ color: "#4CAF50", fontSize: "14px", marginBottom: "10px" }}>
-              🥧 灾害类型分布（饼图）
-              <span style={{ color: "#888", fontSize: "12px", marginLeft: "10px" }}>
-                💡 点击扇区查看详情
+            <h4 className="analytics-heading" style={{ fontSize: "14px", marginBottom: "10px" }}>
+              <AnalyticsIcon name="chart" size={16} />
+              灾害类型分布（饼图）
+              <span
+                style={{
+                  color: "var(--analytics-muted, #888)",
+                  fontSize: "12px",
+                  marginLeft: "10px",
+                }}
+              >
+                <AnalyticsIcon name="info" size={14} /> 点击扇区查看详情
               </span>
             </h4>
             <ResponsiveContainer width="100%" height={350}>
@@ -303,7 +360,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                     `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`
                   }
                   outerRadius={120}
-                  fill="#8884d8"
+                  fill="var(--analytics-chart-1)"
                   dataKey="value"
                   onClick={(data, index) => {
                     logger.debug("pie_segment_clicked", { index });
@@ -317,8 +374,8 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#2a2a2a",
-                    border: "1px solid #444",
+                    backgroundColor: "var(--analytics-surface-inset, #2a2a2a)",
+                    border: "1px solid var(--analytics-border-soft, #444)",
                     borderRadius: "6px",
                   }}
                   itemStyle={{ color: "#fff" }}
@@ -331,21 +388,34 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
 
         {activeChart === "bar" && (
           <div>
-            <h4 style={{ color: "#FF9800", fontSize: "14px", marginBottom: "10px" }}>
-              📊 灾害类型统计（柱状图）
-              <span style={{ color: "#888", fontSize: "12px", marginLeft: "10px" }}>
-                💡 点击柱形查看详情
+            <h4 className="analytics-heading" style={{ fontSize: "14px", marginBottom: "10px" }}>
+              <AnalyticsIcon name="analysis" size={16} />
+              灾害类型统计（柱状图）
+              <span
+                style={{
+                  color: "var(--analytics-muted, #888)",
+                  fontSize: "12px",
+                  marginLeft: "10px",
+                }}
+              >
+                <AnalyticsIcon name="info" size={14} /> 点击柱形查看详情
               </span>
             </h4>
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="name" stroke="#888" angle={-45} textAnchor="end" height={100} />
-                <YAxis stroke="#888" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--analytics-border-soft, #444)" />
+                <XAxis
+                  dataKey="name"
+                  stroke="var(--analytics-muted, #91b8d1)"
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                />
+                <YAxis stroke="var(--analytics-muted, #91b8d1)" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#2a2a2a",
-                    border: "1px solid #444",
+                    backgroundColor: "var(--analytics-surface-inset, #2a2a2a)",
+                    border: "1px solid var(--analytics-border-soft, #444)",
                     borderRadius: "6px",
                   }}
                   itemStyle={{ color: "#fff" }}
@@ -354,7 +424,7 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                 <Legend wrapperStyle={{ color: "#fff" }} />
                 <Bar
                   dataKey="value"
-                  fill="#FF9800"
+                  fill="var(--analytics-accent, #67e8f9)"
                   name="数量"
                   onClick={(data, index) => {
                     logger.debug("bar_clicked", { index });
@@ -369,18 +439,25 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
 
         {activeChart === "line" && (
           <div>
-            <h4 style={{ color: "#2196F3", fontSize: "14px", marginBottom: "10px" }}>
-              📈 灾害时间趋势（时间线图）
+            <h4 className="analytics-heading" style={{ fontSize: "14px", marginBottom: "10px" }}>
+              <AnalyticsIcon name="trend" size={16} />
+              灾害时间趋势（时间线图）
             </h4>
             <ResponsiveContainer width="100%" height={350}>
               <LineChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="date" stroke="#888" angle={-45} textAnchor="end" height={100} />
-                <YAxis stroke="#888" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--analytics-border-soft, #444)" />
+                <XAxis
+                  dataKey="date"
+                  stroke="var(--analytics-muted, #91b8d1)"
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                />
+                <YAxis stroke="var(--analytics-muted, #91b8d1)" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#2a2a2a",
-                    border: "1px solid #444",
+                    backgroundColor: "var(--analytics-surface-inset, #2a2a2a)",
+                    border: "1px solid var(--analytics-border-soft, #444)",
                     borderRadius: "6px",
                   }}
                   itemStyle={{ color: "#fff" }}
@@ -389,9 +466,9 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="#2196F3"
+                  stroke="var(--analytics-accent, #67e8f9)"
                   strokeWidth={3}
-                  dot={{ fill: "#2196F3", r: 5 }}
+                  dot={{ fill: "var(--analytics-accent, #67e8f9)", r: 5 }}
                   activeDot={{ r: 8 }}
                   name="灾害数量"
                 />
@@ -402,21 +479,28 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
 
         {activeChart === "area" && (
           <div>
-            <h4 style={{ color: "#9C27B0", fontSize: "14px", marginBottom: "10px" }}>
-              📉 严重性分布（面积图）
-              <span style={{ color: "#888", fontSize: "12px", marginLeft: "10px" }}>
-                💡 点击区域查看详情
+            <h4 className="analytics-heading" style={{ fontSize: "14px", marginBottom: "10px" }}>
+              <AnalyticsIcon name="chart" size={16} />
+              严重性分布（面积图）
+              <span
+                style={{
+                  color: "var(--analytics-muted, #888)",
+                  fontSize: "12px",
+                  marginLeft: "10px",
+                }}
+              >
+                <AnalyticsIcon name="info" size={14} /> 点击区域查看详情
               </span>
             </h4>
             <ResponsiveContainer width="100%" height={350}>
               <AreaChart data={severityData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="name" stroke="#888" />
-                <YAxis stroke="#888" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--analytics-border-soft, #444)" />
+                <XAxis dataKey="name" stroke="var(--analytics-muted, #91b8d1)" />
+                <YAxis stroke="var(--analytics-muted, #91b8d1)" />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#2a2a2a",
-                    border: "1px solid #444",
+                    backgroundColor: "var(--analytics-surface-inset, #2a2a2a)",
+                    border: "1px solid var(--analytics-border-soft, #444)",
                     borderRadius: "6px",
                   }}
                   itemStyle={{ color: "#fff" }}
@@ -425,8 +509,8 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#9C27B0"
-                  fill="#9C27B0"
+                  stroke="var(--analytics-accent, #67e8f9)"
+                  fill="var(--analytics-accent, #67e8f9)"
                   fillOpacity={0.6}
                   name="数量"
                   onClick={(data, index) => {
@@ -442,9 +526,16 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
       </div>
 
       {/* 数据统计摘要 */}
-      <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #333" }}>
-        <h4 style={{ color: "#4CAF50", fontSize: "14px", marginBottom: "12px" }}>
-          📈 数据统计摘要
+      <div
+        style={{
+          marginTop: "20px",
+          paddingTop: "20px",
+          borderTop: "1px solid var(--analytics-border-soft, #333)",
+        }}
+      >
+        <h4 className="analytics-heading" style={{ fontSize: "14px", marginBottom: "12px" }}>
+          <AnalyticsIcon name="analysis" size={16} />
+          数据统计摘要
         </h4>
         <div
           style={{
@@ -455,54 +546,64 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
           }}
         >
           <div
+            className="analytics-chart-summary-card analytics-surface--inset"
             style={{
               padding: "12px",
-              backgroundColor: "#2a2a2a",
               borderRadius: "6px",
-              border: "1px solid #4CAF50",
             }}
           >
-            <div style={{ color: "#888", fontSize: "11px" }}>总灾害数</div>
-            <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "20px" }}>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>总灾害数</div>
+            <div
+              className="analytics-chart-summary-value"
+              style={{ fontWeight: "bold", fontSize: "20px" }}
+            >
               {hazards.length}
             </div>
           </div>
           <div
+            className="analytics-chart-summary-card analytics-surface--inset"
             style={{
               padding: "12px",
-              backgroundColor: "#2a2a2a",
               borderRadius: "6px",
-              border: "1px solid #FF9800",
             }}
           >
-            <div style={{ color: "#888", fontSize: "11px" }}>灾害类型</div>
-            <div style={{ color: "#FF9800", fontWeight: "bold", fontSize: "20px" }}>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>灾害类型</div>
+            <div
+              className="analytics-chart-summary-value"
+              style={{ fontWeight: "bold", fontSize: "20px" }}
+            >
               {Object.keys(hazardsByType).length}
             </div>
           </div>
           <div
+            className="analytics-chart-summary-card analytics-surface--inset"
             style={{
               padding: "12px",
-              backgroundColor: "#2a2a2a",
               borderRadius: "6px",
-              border: "1px solid #2196F3",
             }}
           >
-            <div style={{ color: "#888", fontSize: "11px" }}>时间跨度</div>
-            <div style={{ color: "#2196F3", fontWeight: "bold", fontSize: "20px" }}>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>时间跨度</div>
+            <div
+              className="analytics-chart-summary-value"
+              style={{ fontWeight: "bold", fontSize: "20px" }}
+            >
               {timelineData.length}天
             </div>
           </div>
           <div
+            className="analytics-chart-summary-card analytics-surface--inset"
             style={{
               padding: "12px",
-              backgroundColor: "#2a2a2a",
               borderRadius: "6px",
-              border: "1px solid #9C27B0",
             }}
           >
-            <div style={{ color: "#888", fontSize: "11px" }}>严重性级别</div>
-            <div style={{ color: "#9C27B0", fontWeight: "bold", fontSize: "20px" }}>
+            <div style={{ color: "var(--analytics-muted, #888)", fontSize: "11px" }}>
+              严重性级别
+            </div>
+            <div
+              className="analytics-chart-summary-value"
+              style={{ fontWeight: "bold", fontSize: "20px" }}
+            >
               {severityData.length}
             </div>
           </div>
@@ -510,9 +611,16 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
       </div>
 
       {pythonStats && (
-        <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #333" }}>
-          <h4 style={{ color: "#4CAF50", fontSize: "14px", marginBottom: "12px" }}>
-            🐍 Python 高级统计
+        <div
+          style={{
+            marginTop: "20px",
+            paddingTop: "20px",
+            borderTop: "1px solid var(--analytics-border-soft, #333)",
+          }}
+        >
+          <h4 className="analytics-heading" style={{ fontSize: "14px", marginBottom: "12px" }}>
+            <AnalyticsIcon name="analysis" size={16} />
+            Python 高级统计
           </h4>
           <div
             style={{
@@ -524,8 +632,14 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
           >
             {pythonStats.descriptiveStatistics.basicStats && (
               <>
-                <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
-                  <div style={{ color: "#888" }}>强度平均值（震级）</div>
+                <div
+                  style={{
+                    padding: "8px",
+                    backgroundColor: "var(--analytics-surface-inset, #2a2a2a)",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <div style={{ color: "var(--analytics-muted, #888)" }}>强度平均值（震级）</div>
                   <div style={{ color: "#fff", fontWeight: "bold" }}>
                     {formatAnalyticsNumber(
                       pythonStats.descriptiveStatistics.basicStats.mean.magnitude,
@@ -533,8 +647,14 @@ const ChartsPanel: React.FC<{ hazards: ChartHazard[] }> = ({ hazards }) => {
                     )}
                   </div>
                 </div>
-                <div style={{ padding: "8px", backgroundColor: "#2a2a2a", borderRadius: "4px" }}>
-                  <div style={{ color: "#888" }}>强度标准差（震级）</div>
+                <div
+                  style={{
+                    padding: "8px",
+                    backgroundColor: "var(--analytics-surface-inset, #2a2a2a)",
+                    borderRadius: "4px",
+                  }}
+                >
+                  <div style={{ color: "var(--analytics-muted, #888)" }}>强度标准差（震级）</div>
                   <div style={{ color: "#fff", fontWeight: "bold" }}>
                     {formatAnalyticsNumber(
                       pythonStats.descriptiveStatistics.basicStats.std.magnitude,

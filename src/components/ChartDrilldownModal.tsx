@@ -46,27 +46,28 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
   const getSeverityColor = (severity: string) => {
     switch (severity.toLowerCase()) {
       case "extreme":
-        return "#dc2626";
+        return "var(--drilldown-danger)";
       case "severe":
-        return "#f97316";
+        return "var(--drilldown-danger)";
       case "moderate":
-        return "#f59e0b";
+        return "var(--drilldown-warning)";
       case "minor":
-        return "#eab308";
+        return "var(--drilldown-accent)";
       default:
-        return "#6b7280";
+        return "var(--drilldown-muted)";
     }
   };
 
   const modalContent = (
     <div
+      className="chart-drilldown-overlay"
       style={{
         position: "fixed",
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.85)",
+        backgroundColor: "rgba(1, 8, 20, 0.82)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -77,8 +78,9 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
       onClick={onClose}
     >
       <div
+        className="chart-drilldown-panel"
         style={{
-          backgroundColor: "#1a1a1a",
+          backgroundColor: "var(--drilldown-surface)",
           borderRadius: "12px",
           maxWidth: "900px",
           width: "100%",
@@ -97,22 +99,21 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
             justifyContent: "space-between",
             alignItems: "flex-start",
             padding: "24px",
-            borderBottom: "1px solid #333",
+            borderBottom: "1px solid var(--drilldown-border-soft)",
           }}
         >
           <div>
-            <h3 style={{ margin: 0, color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>
-              {title}
-            </h3>
-            <p style={{ margin: "8px 0 0 0", color: "#888", fontSize: "14px" }}>
+            <h3 className="chart-drilldown-title">{title}</h3>
+            <p className="chart-drilldown-subtitle">
               {filteredHazards.length} {filteredHazards.length === 1 ? "条灾害" : "条灾害"}
             </p>
           </div>
           <button
+            className="chart-drilldown-close"
             style={{
               background: "transparent",
               border: "none",
-              color: "#888",
+              color: "var(--drilldown-muted)",
               cursor: "pointer",
               padding: "4px",
               display: "flex",
@@ -123,14 +124,6 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
             }}
             onClick={onClose}
             aria-label="关闭灾害详情"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#333";
-              e.currentTarget.style.color = "#fff";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = "#888";
-            }}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -146,17 +139,15 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
         <div
           style={{
             padding: "16px 24px",
-            backgroundColor: "#222",
-            borderBottom: "1px solid #333",
+            backgroundColor: "var(--drilldown-inset)",
+            borderBottom: "1px solid var(--drilldown-border-soft)",
             display: "flex",
             gap: "12px",
             alignItems: "center",
           }}
         >
-          <span style={{ color: "#888", fontSize: "14px" }}>筛选条件:</span>
-          <span style={{ color: "#4CAF50", fontSize: "14px", fontWeight: "bold" }}>
-            {drilldownValue.replace(/_/g, " ")}
-          </span>
+          <span className="chart-drilldown-muted">筛选条件:</span>
+          <span className="chart-drilldown-filter-value">{drilldownValue.replace(/_/g, " ")}</span>
         </div>
 
         <div
@@ -167,7 +158,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
           }}
         >
           {filteredHazards.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
+            <div className="chart-drilldown-empty">
               <p>未找到匹配的灾害数据</p>
             </div>
           ) : (
@@ -175,23 +166,17 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
               {filteredHazards.map((hazard, index) => (
                 <div
                   key={`${hazard.id}-${index}`}
+                  className="chart-drilldown-card"
                   style={{
-                    backgroundColor: "#222",
+                    backgroundColor: "var(--drilldown-card)",
                     borderRadius: "8px",
                     padding: "16px",
-                    border: "1px solid #333",
+                    border: "1px solid var(--drilldown-border-soft)",
                     transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#2a2a2a";
-                    e.currentTarget.style.borderColor = "#444";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#222";
-                    e.currentTarget.style.borderColor = "#333";
                   }}
                 >
                   <div
+                    className="chart-drilldown-fields"
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
@@ -199,13 +184,11 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                       marginBottom: "12px",
                     }}
                   >
-                    <h4 style={{ margin: 0, color: "#fff", fontSize: "16px" }}>
-                      {hazard.title || "未知灾害"}
-                    </h4>
+                    <h4 className="chart-drilldown-card-title">{hazard.title || "未知灾害"}</h4>
                     <span
                       style={{
                         backgroundColor: getSeverityColor(hazard.severity || "unknown"),
-                        color: "#fff",
+                        color: "#07172b",
                         padding: "4px 12px",
                         borderRadius: "12px",
                         fontSize: "12px",
@@ -226,9 +209,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span
-                        style={{ color: "#888", display: "flex", alignItems: "center", gap: "4px" }}
-                      >
+                      <span className="chart-drilldown-field-label">
                         <svg
                           width="16"
                           height="16"
@@ -245,13 +226,13 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                         </svg>
                         类型:
                       </span>
-                      <span style={{ color: "#fff" }}>{hazard.type.replace(/_/g, " ")}</span>
+                      <span className="chart-drilldown-field-value">
+                        {hazard.type.replace(/_/g, " ")}
+                      </span>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span
-                        style={{ color: "#888", display: "flex", alignItems: "center", gap: "4px" }}
-                      >
+                      <span className="chart-drilldown-field-label">
                         <svg
                           width="16"
                           height="16"
@@ -274,13 +255,11 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                         </svg>
                         位置:
                       </span>
-                      <span style={{ color: "#fff" }}>{formatLocation(hazard)}</span>
+                      <span className="chart-drilldown-field-value">{formatLocation(hazard)}</span>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span
-                        style={{ color: "#888", display: "flex", alignItems: "center", gap: "4px" }}
-                      >
+                      <span className="chart-drilldown-field-label">
                         <svg
                           width="16"
                           height="16"
@@ -297,13 +276,13 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                         </svg>
                         时间:
                       </span>
-                      <span style={{ color: "#fff" }}>{formatDate(hazard.timestamp || "")}</span>
+                      <span className="chart-drilldown-field-value">
+                        {formatDate(hazard.timestamp || "")}
+                      </span>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span
-                        style={{ color: "#888", display: "flex", alignItems: "center", gap: "4px" }}
-                      >
+                      <span className="chart-drilldown-field-label">
                         <svg
                           width="16"
                           height="16"
@@ -320,7 +299,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                         </svg>
                         来源:
                       </span>
-                      <span style={{ color: "#fff" }}>{hazard.source || "未知"}</span>
+                      <span className="chart-drilldown-field-value">{hazard.source || "未知"}</span>
                     </div>
 
                     {hazard.description && (
@@ -332,15 +311,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                           marginTop: "8px",
                         }}
                       >
-                        <span
-                          style={{
-                            color: "#888",
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "4px",
-                            flexShrink: 0,
-                          }}
-                        >
+                        <span className="chart-drilldown-field-label">
                           <svg
                             width="16"
                             height="16"
@@ -357,7 +328,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                           </svg>
                           详情:
                         </span>
-                        <span style={{ color: "#ccc", lineHeight: "1.5" }}>
+                        <span style={{ color: "var(--drilldown-secondary)", lineHeight: "1.5" }}>
                           {hazard.description}
                         </span>
                       </div>
@@ -367,7 +338,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span
                           style={{
-                            color: "#888",
+                            color: "var(--drilldown-muted)",
                             display: "flex",
                             alignItems: "center",
                             gap: "4px",
@@ -389,7 +360,7 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
                           </svg>
                           震级:
                         </span>
-                        <span style={{ color: "#FF9800", fontWeight: "bold" }}>
+                        <span style={{ color: "var(--drilldown-accent)", fontWeight: "bold" }}>
                           {hazard.magnitude.toFixed(1)}
                         </span>
                       </div>
@@ -404,23 +375,21 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
         <div
           style={{
             padding: "20px 24px",
-            borderTop: "1px solid #333",
+            borderTop: "1px solid var(--drilldown-border-soft)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            backgroundColor: "#1a1a1a",
+            backgroundColor: "var(--drilldown-surface)",
           }}
         >
           <div style={{ display: "flex", gap: "32px", fontSize: "14px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <span style={{ color: "#888" }}>总灾害数:</span>
-              <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "18px" }}>
-                {filteredHazards.length}
-              </span>
+              <span className="chart-drilldown-muted">总灾害数:</span>
+              <span className="chart-drilldown-stat-value">{filteredHazards.length}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <span style={{ color: "#888" }}>平均严重性:</span>
-              <span style={{ color: "#FF9800", fontWeight: "bold", fontSize: "18px" }}>
+              <span className="chart-drilldown-muted">平均严重性:</span>
+              <span className="chart-drilldown-stat-value">
                 {filteredHazards.length > 0
                   ? (
                       filteredHazards.reduce((acc, h) => {
@@ -437,11 +406,12 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
             </div>
           </div>
           <button
+            className="chart-drilldown-footer-button"
             style={{
               padding: "10px 24px",
-              backgroundColor: "#4CAF50",
-              color: "#fff",
-              border: "none",
+              backgroundColor: "var(--drilldown-card)",
+              color: "var(--drilldown-text)",
+              border: "1px solid var(--drilldown-border)",
               borderRadius: "6px",
               cursor: "pointer",
               fontSize: "14px",
@@ -449,12 +419,6 @@ const ChartDrilldownModal: React.FC<ChartDrilldownModalProps> = ({
               transition: "all 0.2s",
             }}
             onClick={onClose}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#45a049";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#4CAF50";
-            }}
           >
             关闭
           </button>

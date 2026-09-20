@@ -165,4 +165,11 @@ describe("中文下载与通知输出", () => {
 
     expect(screen.getByRole("button", { name: "删除通知" })).toBeInTheDocument();
   });
+
+  it("通知入口使用与系统线性图标一致的铃铛 SVG", () => {
+    render(<NotificationCenter />);
+
+    const trigger = screen.getByRole("button", { name: /通知/ });
+    expect(trigger.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+  });
 });
