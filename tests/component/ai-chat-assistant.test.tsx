@@ -11,10 +11,24 @@ const serviceMocks = vi.hoisted(() => ({
   streamChatMessage: vi.fn(),
 }));
 
+const conversationMocks = vi.hoisted(() => ({
+  listAIConversations: vi.fn(async () => []),
+  createAIConversation: vi.fn(async () => ({
+    id: "conversation-1",
+    title: "新对话",
+    updatedAt: "2026-09-21T00:00:00.000Z",
+    lastMessageAt: null,
+  })),
+  getAIConversation: vi.fn(),
+  deleteAIConversation: vi.fn(async () => undefined),
+}));
+
 vi.mock("../../src/services/ai/aiAssistantService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/services/ai/aiAssistantService")>()),
   streamChatMessage: serviceMocks.streamChatMessage,
 }));
+
+vi.mock("../../src/services/ai/conversationService", () => conversationMocks);
 
 vi.mock("../../src/features/map/state/MapStateContext", () => ({
   useMapState: () => ({ hazards: [] }),
@@ -52,6 +66,13 @@ function renderWithAppState() {
 describe("AIChatAssistant", () => {
   beforeEach(() => {
     serviceMocks.streamChatMessage.mockReset();
+    conversationMocks.listAIConversations.mockReset().mockResolvedValue([]);
+    conversationMocks.createAIConversation.mockReset().mockResolvedValue({
+      id: "conversation-1",
+      title: "新对话",
+      updatedAt: "2026-09-21T00:00:00.000Z",
+      lastMessageAt: null,
+    });
   });
 
   it("展示中文品牌、状态和键盘操作提示", async () => {

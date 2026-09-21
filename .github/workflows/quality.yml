@@ -12,6 +12,23 @@ jobs:
   frontend-bff:
     name: Frontend and BFF baseline
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pgg_auth_test
+          POSTGRES_USER: pgg_auth_test
+          POSTGRES_PASSWORD: pgg_auth_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pgg_auth_test -d pgg_auth_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://pgg_auth_test:pgg_auth_test@127.0.0.1:5432/pgg_auth_test?schema=public
+      AUTH_CSRF_SECRET: ci-test-csrf-secret-with-at-least-32-characters
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,6 +39,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run db:migrate:deploy
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:baseline
       - if: failure()

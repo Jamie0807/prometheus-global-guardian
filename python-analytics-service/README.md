@@ -5,13 +5,14 @@ Prometheus Global Guardian 的 Python 数据分析服务。服务基于 FastAPI�
 ## 服务边界
 
 - 默认地址：`http://localhost:8001`。
-- 浏览器通过 `VITE_PYTHON_API_URL` 直接访问 `/api/v1/*`；Express BFF 不代理分析请求。
-- `/health` 保持公开；`/metrics` 与 `/cache/clear` 是管理接口。
-- 服务不会读取前端模型 Key、DisasterAware 凭据或浏览器访问令牌。
+- 浏览器通过同源 `/api/analytics` 调用 Express BFF；BFF 将 allowlist 内的分析请求转发到本服务。
+- `/api/v1/*` 业务接口要求 `X-Analytics-Service-Token`；`/health` 保持公开，`/metrics` 与 `/cache/clear` 使用独立管理令牌。
+- 服务不会读取前端模型 Key、DisasterAware 凭据或终端用户 Cookie；身份校验和用户授权由 Express BFF 完成。
 - 当前仓库不包含部署实施；Docker 说明仅用于本地完整栈运行。
 
 ```text
-React browser -- VITE_PYTHON_API_URL /api/v1/* --> FastAPI :8001
+React browser -- /api/analytics --> authenticated Express BFF
+Express BFF -- X-Analytics-Service-Token /api/v1/* --> FastAPI :8001
 Express BFF -- authorization, hazards, AI --> external providers
 ```
 
@@ -43,14 +44,14 @@ python main.py
 ## 配置与管理边界
 
 ```dotenv
-VITE_PYTHON_API_URL=http://localhost:8001
+ANALYTICS_SERVICE_TOKEN=replace_with_a_random_service_secret
 ANALYTICS_ADMIN_TOKEN=replace-with-a-long-random-secret
 ANALYTICS_CORS_ORIGINS=https://app.example
 APP_ENV=production
 LOG_LEVEL=info
 ```
 
-`ANALYTICS_ADMIN_TOKEN` 仅作为服务端变量，不能使用 `VITE_` 前缀，也不能写入日志、前端或响应。未配置时，`GET /metrics` 和 `POST /cache/clear` 返回 `404`；配置后请求必须携带 `X-Analytics-Admin-Token`。
+`ANALYTICS_SERVICE_TOKEN` 和 `ANALYTICS_ADMIN_TOKEN` 仅作为服务端变量，不能使用 `VITE_` 前缀，也不能写入日志、前端或响应。BFF 与 FastAPI 必须配置同一服务令牌；未配置或无效时 `/api/v1/*` 返回 `404`。使用 `openssl rand -base64 48` 生成随机服务令牌。未配置管理令牌时，`GET /metrics` 和 `POST /cache/clear` 返回 `404`；配置后请求必须携带 `X-Analytics-Admin-Token`。
 
 默认 CORS 只允许本地 Vite、Express 和 Docker Web 来源，不允许 Cookie 凭据。额外来源用逗号分隔的 `ANALYTICS_CORS_ORIGINS` 显式配置。日志等级支持 `debug`、`info`、`warn`、`error`、`silent`；生产默认 `info`，其他环境默认 `debug`。
 
@@ -112,7 +113,7 @@ pnpm run test:python
 docker compose up --build
 ```
 
-分析服务端口映射为 `127.0.0.1:8001:8001`，不对局域网开放。
+Compose 不把分析服务映射到宿主机端口；Web BFF 通过 Compose 私有网络访问它。直接本地运行时，可在宿主机 `localhost:8001` 调试。
 
 ## 目录结构
 

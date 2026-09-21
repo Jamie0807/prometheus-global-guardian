@@ -25,12 +25,15 @@ export type AISessionLookupResult =
 export interface AIStreamSession {
   readonly requestId: string;
   readonly fingerprint: string;
+  readonly ownerId?: string;
   readonly status: AIStreamSessionStatus;
+  readonly wasCancelled: boolean;
   readonly nextEventId: number;
   attach(lastEventId: number, subscriber: AISessionSubscriber): AISessionAttachResult;
   publish(payload: string): void;
   complete(): void;
   fail(payload: string): void;
+  cancel(): boolean;
   dispose(): void;
 }
 
@@ -42,8 +45,14 @@ export interface AIStreamSessionRegistryOptions {
 }
 
 export interface AIStreamSessionRegistry {
-  create(requestId: string, fingerprint: string, onExpire: () => void): AIStreamSession;
+  create(
+    requestId: string,
+    fingerprint: string,
+    onExpire: () => void,
+    ownerId?: string,
+  ): AIStreamSession;
   get(requestId: string, fingerprint: string): AISessionLookupResult;
+  cancel(requestId: string, ownerId: string): boolean;
 }
 
 const DEFAULT_TTL_MS = 30_000;
@@ -79,6 +88,7 @@ function createSession(
   fingerprint: string,
   options: Required<AIStreamSessionRegistryOptions>,
   onExpire: () => void,
+  ownerId?: string,
 ): AIStreamSession {
   let currentStatus: AIStreamSessionStatus = "active";
   let nextEventId = 1;
@@ -86,6 +96,7 @@ function createSession(
   let eventBytes = 0;
   let lastEvictedEventId = 0;
   let disposed = false;
+  let wasCancelled = false;
   const subscribers = new Set<AISessionSubscriber>();
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -117,8 +128,12 @@ function createSession(
   const session: AIStreamSession = {
     requestId,
     fingerprint,
+    ...(ownerId ? { ownerId } : {}),
     get status() {
       return currentStatus;
+    },
+    get wasCancelled() {
+      return wasCancelled;
     },
     get nextEventId() {
       return nextEventId;
@@ -170,6 +185,18 @@ function createSession(
       subscribers.clear();
       scheduleExpiry();
     },
+    cancel() {
+      if (disposed || currentStatus !== "active") return false;
+      wasCancelled = true;
+      session.fail(
+        `event: error\ndata: ${JSON.stringify({
+          code: "AI_GENERATION_CANCELLED",
+          message: "AI generation was cancelled.",
+        })}\n\n`,
+      );
+      session.dispose();
+      return true;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -194,19 +221,37 @@ export function createAIStreamSessionRegistry(
     maxSessions: boundedPositiveInteger(input.maxSessions, DEFAULT_MAX_SESSIONS, MAX_SESSION_LIMIT),
   };
   const sessions = new Map<string, AIStreamSession>();
+  const pendingCancellations = new Map<string, { ownerId: string; expiresAt: number }>();
+
+  const prunePendingCancellations = (now: number): void => {
+    for (const [requestId, cancellation] of pendingCancellations) {
+      if (cancellation.expiresAt <= now) pendingCancellations.delete(requestId);
+    }
+  };
 
   return {
-    create(requestId, fingerprint, onExpire) {
+    create(requestId, fingerprint, onExpire, ownerId) {
       while (sessions.size >= options.maxSessions) {
         const oldest = sessions.entries().next().value as [string, AIStreamSession] | undefined;
         if (!oldest) break;
         oldest[1].dispose();
       }
-      const session = createSession(requestId, fingerprint, options, () => {
-        sessions.delete(requestId);
-        onExpire();
-      });
+      const session = createSession(
+        requestId,
+        fingerprint,
+        options,
+        () => {
+          sessions.delete(requestId);
+          onExpire();
+        },
+        ownerId,
+      );
       sessions.set(requestId, session);
+      const pending = pendingCancellations.get(requestId);
+      if (pending) {
+        pendingCancellations.delete(requestId);
+        if (pending.ownerId === ownerId && pending.expiresAt > Date.now()) session.cancel();
+      }
       return session;
     },
     get(requestId, fingerprint) {
@@ -214,6 +259,23 @@ export function createAIStreamSessionRegistry(
       if (!session) return { kind: "missing" };
       if (session.fingerprint !== fingerprint) return { kind: "fingerprint_mismatch" };
       return { kind: "found", session };
+    },
+    cancel(requestId, ownerId) {
+      const session = sessions.get(requestId);
+      if (session) return session.ownerId === ownerId ? session.cancel() : false;
+
+      const now = Date.now();
+      prunePendingCancellations(now);
+      while (pendingCancellations.size >= options.maxSessions) {
+        const oldest = pendingCancellations.keys().next().value as string | undefined;
+        if (!oldest) break;
+        pendingCancellations.delete(oldest);
+      }
+      pendingCancellations.set(requestId, {
+        ownerId,
+        expiresAt: now + Math.max(options.ttlMs, DEFAULT_TTL_MS),
+      });
+      return true;
     },
   };
 }

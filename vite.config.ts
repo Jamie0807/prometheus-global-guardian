@@ -11,12 +11,12 @@ export default defineConfig({
     proxy: {
       "/api/ai": {
         target: "http://localhost:8080",
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
       },
       "/api": {
         target: "http://localhost:8080",
-        changeOrigin: true,
+        changeOrigin: false,
         secure: false,
       },
     },

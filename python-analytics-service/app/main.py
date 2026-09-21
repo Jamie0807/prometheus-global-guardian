@@ -28,7 +28,12 @@ def create_app() -> FastAPI:
         allow_origins=get_cors_origins(),
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Analytics-Admin-Token", "X-Request-Id"],
+        allow_headers=[
+            "Content-Type",
+            "X-Analytics-Admin-Token",
+            "X-Analytics-Service-Token",
+            "X-Request-Id",
+        ],
         expose_headers=["X-Request-Id"],
     )
     application.add_exception_handler(RequestValidationError, validation_error_response)

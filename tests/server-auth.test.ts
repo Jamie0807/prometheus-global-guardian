@@ -1,5 +1,6 @@
 /** 验证 BFF 认证、灾害代理、缓存回退和请求安全边界。 */
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 import test from "node:test";
@@ -7,6 +8,7 @@ import test from "node:test";
 import { Headers, Response, type HeadersInit } from "node-fetch";
 
 import { createApp, type UpstreamFetch } from "../server.js";
+import { prisma } from "../server/db/prisma.js";
 import { fetchAllHazards } from "../server/hazards/hazard-source.js";
 import {
   createForwardHeaders,
@@ -19,9 +21,35 @@ import {
 } from "../server/security/request-boundaries.js";
 
 const serverEnv = {
+  AUTH_CSRF_SECRET: "server-auth-test-csrf-secret-at-least-32-bytes",
   DISASTERAWARE_USERNAME: "server-user",
   DISASTERAWARE_PASSWORD: "server-password",
+  NODE_ENV: "test",
 } satisfies NodeJS.ProcessEnv;
+
+const rawFetch = globalThis.fetch.bind(globalThis);
+const TEST_PASSWORD = "LocalTest-Password-2026!";
+const authenticatedOrigins = new Map<string, { cookie: string; csrfToken: string }>();
+
+async function fetch(
+  input: string | URL | Request,
+  init?: RequestInit,
+): Promise<globalThis.Response> {
+  const inputUrl = input instanceof Request ? input.url : String(input);
+  const origin = new URL(inputUrl).origin;
+  const auth = authenticatedOrigins.get(origin);
+  if (!auth) return rawFetch(input, init);
+
+  const headers = new globalThis.Headers(input instanceof Request ? input.headers : init?.headers);
+  headers.set("cookie", auth.cookie);
+  headers.set("origin", origin);
+  if (init?.body !== undefined && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("x-csrf-token", auth.csrfToken);
+  return rawFetch(input, { ...init, headers });
+}
 
 function readForwardedHeader(headers: HeadersInit | undefined, name: string): string | undefined {
   return headers ? (new Headers(headers).get(name) ?? undefined) : undefined;
@@ -66,14 +94,48 @@ async function startTestApp(
   });
 
   const address = server.address() as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const email = `server-auth-${randomUUID()}@example.test`;
+  const registration = await rawFetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: JSON.stringify({ email, password: TEST_PASSWORD }),
+  });
+  if (registration.status !== 201) {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error(`Could not register BFF test user (${registration.status}).`);
+  }
+  const cookieHeader = registration.headers.get("set-cookie");
+  const registrationPayload: unknown = await registration.json();
+  if (
+    !cookieHeader ||
+    !isRecord(registrationPayload) ||
+    typeof registrationPayload.csrfToken !== "string"
+  ) {
+    throw new Error("BFF test registration did not return session credentials.");
+  }
+  authenticatedOrigins.set(baseUrl, {
+    cookie: cookieHeader.split(";", 1)[0] ?? "",
+    csrfToken: registrationPayload.csrfToken,
+  });
+  const conversationId = randomUUID();
   return {
     app,
-    baseUrl: `http://127.0.0.1:${address.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
+    baseUrl,
+    conversationId,
+    close: async () => {
+      authenticatedOrigins.delete(baseUrl);
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
-      }),
+      });
+    },
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 test("POST /api/authorize uses server credentials without exposing the upstream token", async (t) => {
@@ -930,11 +992,14 @@ test("proxy rejects oversized request bodies before the AI route consumes them",
   });
   t.after(testApp.close);
 
-  const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: "x".repeat(65 * 1024) }),
-  });
+  const response = await fetch(
+    `${testApp.baseUrl}/api/ai/conversations/${testApp.conversationId}/messages`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "x".repeat(65 * 1024) }),
+    },
+  );
 
   assert.equal(response.status, 413);
   assert.deepEqual(await response.json(), {
@@ -1013,9 +1078,13 @@ test("JSON routes reject non-JSON content types while empty authorize remains va
   });
   t.after(testApp.close);
 
-  for (const route of ["authorize", "ai/chat"]) {
+  const jsonRoutes = [
+    `${testApp.baseUrl}/api/authorize`,
+    `${testApp.baseUrl}/api/ai/conversations/${testApp.conversationId}/messages`,
+  ];
+  for (const routeUrl of jsonRoutes) {
     for (const contentType of ["text/plain", "application/x-www-form-urlencoded"]) {
-      const response = await fetch(`${testApp.baseUrl}/api/${route}`, {
+      const response = await fetch(routeUrl, {
         method: "POST",
         headers: { "content-type": contentType },
         body: "{",
@@ -1025,11 +1094,14 @@ test("JSON routes reject non-JSON content types while empty authorize remains va
     }
   }
   assert.equal(upstreamCalls, 0);
-  const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
-    method: "POST",
-    headers: { "content-type": "application/json; charset=utf-8" },
-    body: "{",
-  });
+  const response = await fetch(
+    `${testApp.baseUrl}/api/ai/conversations/${testApp.conversationId}/messages`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: "{",
+    },
+  );
   assert.equal(response.status, 400);
   assert.equal(await readErrorCode(response), "INVALID_JSON");
 });
@@ -1044,11 +1116,14 @@ test("AI requests use an independent limit and cannot bypass it using forwarded 
   t.after(testApp.close);
 
   for (const [index, expectedStatus] of [400, 429].entries()) {
-    const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": `192.0.2.${index + 1}` },
-      body: "{",
-    });
+    const response = await fetch(
+      `${testApp.baseUrl}/api/ai/conversations/${testApp.conversationId}/messages`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": `192.0.2.${index + 1}` },
+        body: "{",
+      },
+    );
     assert.equal(response.status, expectedStatus);
     assert.equal(await readErrorCode(response), index === 0 ? "INVALID_JSON" : "RATE_LIMITED");
   }
@@ -1064,7 +1139,7 @@ test("API route gate handles local methods, HEAD, OPTIONS and unknown descendant
 
   for (const [route, method, status] of [
     ["authorize", "GET", 405],
-    ["ai/chat", "GET", 405],
+    [`ai/conversations/${testApp.conversationId}/messages`, "GET", 405],
     ["hazards", "POST", 405],
     ["hazards/types", "HEAD", 405],
     ["hazards/active", "OPTIONS", 405],
@@ -1284,6 +1359,10 @@ test("validateQuery rejects a query value longer than 256 characters", () => {
       message: "Query parameters exceed the allowed limits.",
     },
   });
+});
+
+test.after(async () => {
+  await prisma.$disconnect();
 });
 
 test("createRawBodyMiddleware rejects a body larger than 64 KiB", async () => {

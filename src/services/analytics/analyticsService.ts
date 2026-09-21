@@ -53,7 +53,7 @@ import {
 import { parsePivotQuery, type PivotQueryData } from "./contracts/pivotQuery";
 import { parsePivotSummary, type PivotSummaryData } from "./contracts/pivotSummary";
 
-const API_BASE_URL = import.meta.env.VITE_PYTHON_API_URL ?? "http://localhost:8001";
+const API_BASE_URL = "/api/analytics";
 const REQUEST_TIMEOUT = 30000; // 30秒超时
 const MAX_RETRIES = 3;
 const logger = createClientLogger("analytics-service");

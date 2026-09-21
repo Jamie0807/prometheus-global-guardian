@@ -34,3 +34,19 @@ def require_admin_access(
 
 
 AdminAccess = Annotated[None, Depends(require_admin_access)]
+
+
+def require_service_access(
+    service_token: Annotated[
+        str | None, Header(alias="X-Analytics-Service-Token")
+    ] = None,
+) -> None:
+    expected_token = os.environ.get("ANALYTICS_SERVICE_TOKEN", "")
+    if not expected_token or not service_token:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    if not secrets.compare_digest(service_token, expected_token):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
+ServiceAccess = Annotated[None, Depends(require_service_access)]

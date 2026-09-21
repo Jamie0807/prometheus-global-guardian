@@ -5,19 +5,27 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN:-}
-        VITE_PYTHON_API_URL: ${VITE_PYTHON_API_URL:-http://localhost:8001}
         VITE_3D_TILES_URL: ${VITE_3D_TILES_URL:-}
         VITE_CESIUM_ION_TOKEN: ${VITE_CESIUM_ION_TOKEN:-}
         VITE_LOG_LEVEL: ${VITE_LOG_LEVEL:-warn}
     environment:
       PORT: 8080
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://prometheus:prometheus@db:5432/prometheus?schema=public}
+      ANALYTICS_SERVICE_URL: ${ANALYTICS_SERVICE_URL:-http://analytics:8001}
+      ANALYTICS_SERVICE_TOKEN: ${ANALYTICS_SERVICE_TOKEN:-}
       DISASTERAWARE_USERNAME: ${DISASTERAWARE_USERNAME:-}
       DISASTERAWARE_PASSWORD: ${DISASTERAWARE_PASSWORD:-}
       BFF_AI_STREAM_RESUME_TTL_MS: ${BFF_AI_STREAM_RESUME_TTL_MS:-30000}
       BFF_AI_STREAM_RESUME_MAX_EVENTS: ${BFF_AI_STREAM_RESUME_MAX_EVENTS:-256}
       BFF_AI_STREAM_RESUME_MAX_BYTES: ${BFF_AI_STREAM_RESUME_MAX_BYTES:-524288}
       BFF_AI_STREAM_RESUME_MAX_SESSIONS: ${BFF_AI_STREAM_RESUME_MAX_SESSIONS:-100}
+      AUTH_CSRF_SECRET: ${AUTH_CSRF_SECRET:-}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      AUTH_SESSION_IDLE_TTL_MS: ${AUTH_SESSION_IDLE_TTL_MS:-1800000}
+      AUTH_SESSION_ABSOLUTE_TTL_MS: ${AUTH_SESSION_ABSOLUTE_TTL_MS:-604800000}
+      BFF_REGISTER_RATE_LIMIT_MAX: ${BFF_REGISTER_RATE_LIMIT_MAX:-5}
+      BFF_LOGIN_RATE_LIMIT_MAX: ${BFF_LOGIN_RATE_LIMIT_MAX:-10}
       AI_PROVIDER: ${AI_PROVIDER:-router}
       VOLCENGINE_WORKFLOW_API_URL: ${VOLCENGINE_WORKFLOW_API_URL:-}
       VOLCENGINE_WORKFLOW_API_KEY: ${VOLCENGINE_WORKFLOW_API_KEY:-}
@@ -28,17 +36,32 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      db:
+        condition: service_healthy
       analytics:
         condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-prometheus}
+      POSTGRES_USER: ${POSTGRES_USER:-prometheus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prometheus}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   analytics:
     build:
       context: ./python-analytics-service
       dockerfile: Dockerfile
-    ports:
-      - "127.0.0.1:8001:8001"
     environment:
       ANALYTICS_ADMIN_TOKEN: ${ANALYTICS_ADMIN_TOKEN:-}
+      ANALYTICS_SERVICE_TOKEN: ${ANALYTICS_SERVICE_TOKEN:-}
       ANALYTICS_CORS_ORIGINS: ${ANALYTICS_CORS_ORIGINS:-}
       APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -54,3 +77,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+volumes:
+  postgres-data:

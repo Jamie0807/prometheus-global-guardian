@@ -22,6 +22,19 @@ vi.mock("../../src/services/auth/authService", () => ({
   authorize: appMocks.authorize,
 }));
 
+vi.mock("../../src/state/AuthContext", () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  useAuth: () => ({
+    status: "authenticated",
+    user: { id: "test-user", email: "test@example.com" },
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    deleteAccount: vi.fn(),
+    refreshSession: vi.fn(),
+  }),
+}));
+
 vi.mock("../../src/features/map/hooks/useHazardData", () => ({
   useHazardData: () => ({
     disasters: appMocks.hazards,

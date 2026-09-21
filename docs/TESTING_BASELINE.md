@@ -2,7 +2,7 @@
 
 ## 目的
 
-本文档记录项目当前可重复执行的自动化测试入口、测试边界和基线数量，供本地开发及现有 CI 质量工作流参考；它不代表已经覆盖所有生产风险。
+本文档记录项目当前可重复执行的自动化测试入口、测试边界和最近一次基线数量，供本地开发及现有 CI 质量工作流参考；它不代表已经覆盖所有生产风险。
 
 ## 命令分层
 
@@ -17,27 +17,31 @@
 | `pnpm run test:python`    | Python API 测试  | 运行分析服务 `tests/test_*.py` 的 unittest 测试集                            |
 | `pnpm run test:baseline`  | 完整 Node 基线   | 依次执行 lint、格式、客户端/服务端/契约类型检查、unit、component、E2E 和构建 |
 
-`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`，但不包含 Python 测试。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
+`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`，但不包含 Python 测试。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
 
 ## 当前数量
 
-本次在当前工作区重跑了独立 Node 与 Python 测试入口。下表的“本次结果”只记录实际工具输出；Node 数量只指 `test:baseline` 覆盖的 BFF、Service、组件和 E2E 测试，不计独立 Python job。
+2026-09-21 在账号与 AI 持久化分支重跑自动化验证。Node 数量只指 `test:baseline` 覆盖的 BFF、Service、组件和 E2E 测试，不计独立 Python job。
 
 | 范围             | 已配置的测试文件或用例 | 本次结果     |
 | ---------------- | ---------------------- | ------------ |
-| BFF 单元测试     | 6 个 Node 原生测试文件 | 92/92 通过   |
+| BFF 单元测试     | 7 个 Node 原生测试文件 | 95/95 通过   |
 | Service 单元测试 | 20 个 Vitest 文件      | 245/245 通过 |
-| React 组件测试   | 19 个 Vitest 文件      | 105/105 通过 |
+| React 组件测试   | 19 个 Vitest 文件      | 108/108 通过 |
 | Playwright E2E   | 1 个 `*.spec.ts` 文件  | 1/1 通过     |
-| Python unittest  | 7 个 `test_*.py` 模块  | 56/56 通过   |
+| Python unittest  | 7 个 `test_*.py` 模块  | 57/57 通过   |
 
-2026-09-20 Orbital 地图升级后完整验证通过：BFF 92/92、Service 245/245、组件 105/105、E2E 1/1、Python 56/56；lint、格式、客户端/服务端/契约类型检查及生产构建均通过。Node 24.16.0 会根据项目声明输出 engine warning，功能验证结果不受影响。
+`pnpm run test:baseline` 的 lint、格式、客户端/服务端/契约类型检查及生产构建均通过。FastAPI 服务路由已要求 BFF 服务令牌，API 测试使用测试专用 token，同时断言缺失或错误 token 返回 404。AI 持久化集成测试使用独立 Compose PostgreSQL；第二次 `db:migrate:deploy` 输出 `No pending migrations to apply.`
+
+2026-09-20 Orbital 地图升级的历史基线为：BFF 92/92、Service 245/245、组件 105/105、E2E 1/1、Python 56/56。
 
 ## 测试边界
 
 单元测试验证 BFF provider、AI 路由和流式转换、DisasterAware 代理边界，以及前端 HTTP、灾害数据适配、地图 GeoJSON/LOD、灾害强度字段读取、Analytics 结果展示适配和 AI Service。BFF 边界覆盖路由白名单、编码路径绕过、请求体、query、请求头、限流、超时、token 缓存和错误脱敏。组件测试覆盖状态面板与图例折叠、默认 2D/3D 切换、DEM 生命周期及失败降级、外部 Tiles 回退、地图标签和 Mapbox/Worker mock 下的热力图切换。E2E 验证生产构建首页、灾害筛选、AI 助手、2D/3D 控件状态，以及桌面和 390px 窄屏的浮层视口与重叠边界。
 
-E2E 通过 Playwright route mock 隔离 DisasterAware、公开灾害源、Mapbox 和 AI provider，不访问真实第三方服务，也不要求本地配置真实账号或模型 Key。失败时保留截图，重试时保留 trace。
+E2E 通过 Playwright route mock 隔离认证会话、DisasterAware、分析端点、公开灾害源、Mapbox 和 AI provider，检查已登录导航及 AI 会话请求，不访问真实第三方服务，也不要求本地配置真实账号或模型 Key。失败时保留截图，重试时保留 trace。
+
+本地可使用 `docker-compose.test.yml` 启动独立测试数据库，避免触碰开发 Compose 项目的数据卷。测试结束后可用同一组 Compose 文件执行 `down -v` 删除该临时数据库。
 
 Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。`test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。
 
@@ -45,11 +49,12 @@ Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 
 
 ## 本次环境限制
 
-本轮未发现阻断测试的环境限制；浏览器测试能够启动生产服务并通过关键流程。
+主机 Python 为 3.9，缺少项目依赖，不能直接运行面向 Python 3.13 的依赖集。Python CI 测试已在临时 Python 3.13 容器中安装 `python-analytics-service/requirements.txt` 并完成 57/57 测试；容器不保存进仓库的虚拟环境或依赖变更。前端/BFF 浏览器测试使用本地隔离 PostgreSQL 并通过关键流程。
 
 ## 已知非阻塞提示
 
-- 若当前终端不是 Node.js 20.19.x，pnpm 可能先输出 engine warning；项目脚本会通过 nvm 自动切换到 `.nvmrc` 版本。
+- 当前 pnpm 启动进程为 Node 24.16.0 时会先输出 engine warning；项目脚本会通过 nvm 自动切换到 `.nvmrc` 指定的 Node 20.19.x。
+- lint 对 Prisma 生成文件报告 7 条 unused-disable warning；这些文件由生成命令产出。
 - Vite 构建会提示 Mapbox vendor chunk 较大，这是包体积治理待办，不影响当前测试通过。
 - 依赖安装可能提示弃用包或被 pnpm 忽略的构建脚本；应在依赖治理任务中单独处理。
 

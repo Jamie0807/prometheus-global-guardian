@@ -26,6 +26,10 @@ import {
   type AIStreamSession,
 } from "./ai-stream-session.js";
 import { createServerLogger } from "../logging.js";
+import * as conversationRepository from "./conversation-repository.js";
+import { prepareAIContext } from "./context-manager.js";
+import type { AIMessageStatus } from "../generated/prisma/enums.js";
+import { summarizeTrimmedConversation } from "./memory-generation.js";
 
 interface ProviderFailure {
   provider: ProviderName;
@@ -44,6 +48,9 @@ const DEFAULT_RESUME_MAX_EVENTS = 256;
 const DEFAULT_RESUME_MAX_BYTES = 512 * 1024;
 const DEFAULT_RESUME_MAX_SESSIONS = 100;
 const MAX_SSE_FRAME_BYTES = 64 * 1024;
+const CONVERSATION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CLIENT_MESSAGE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 function readBoundedPositiveInteger(
   env: NodeJS.ProcessEnv,
@@ -77,8 +84,12 @@ function destroyStream(stream: unknown): void {
   if (typeof destroy === "function") destroy.call(stream);
 }
 
-function requestFingerprint(req: Request, body: Record<string, unknown>): string {
+function requestFingerprint(req: Request, body: Record<string, unknown>, userId: string): string {
   return createHash("sha256")
+    .update(userId)
+    .update("\n")
+    .update(req.originalUrl)
+    .update("\n")
     .update(req.rawBody ?? Buffer.from(JSON.stringify(body)))
     .digest("hex");
 }
@@ -147,13 +158,40 @@ function attachSessionResponse(
   return true;
 }
 
-function createSessionEventPump(session: AIStreamSession): {
+function extractDeltaText(event: string): string {
+  const data = event
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n");
+  if (!data || data === "[DONE]") return "";
+  try {
+    const payload: unknown = JSON.parse(data);
+    if (!payload || typeof payload !== "object") return "";
+    const choices = (payload as Record<string, unknown>).choices;
+    const choice = Array.isArray(choices) ? choices[0] : undefined;
+    if (!choice || typeof choice !== "object") return "";
+    const delta = (choice as Record<string, unknown>).delta;
+    if (!delta || typeof delta !== "object") return "";
+    const content = (delta as Record<string, unknown>).content;
+    return typeof content === "string" ? content : "";
+  } catch {
+    return "";
+  }
+}
+
+function createSessionEventPump(
+  session: AIStreamSession,
+  onText?: (text: string) => void,
+): {
   push: (chunk: string | Buffer) => boolean;
   flush: () => void;
   terminal: () => boolean;
+  terminalPayload: () => string | undefined;
 } {
   let buffer = "";
   let isTerminal = false;
+  let pendingTerminalPayload: string | undefined;
   const decoder = new StringDecoder("utf8");
 
   const publish = (event: string): void => {
@@ -164,11 +202,15 @@ function createSessionEventPump(session: AIStreamSession): {
       isTerminal = true;
       return;
     }
-    session.publish(payload);
     if (isDoneEvent(payload)) {
-      session.complete();
+      // 先持久化完整回复，再向客户端确认流已完成。
+      pendingTerminalPayload = payload;
       isTerminal = true;
+      return;
     }
+    const delta = extractDeltaText(event);
+    if (delta) onText?.(delta);
+    session.publish(payload);
   };
 
   const failForOversizedFrame = (): void => {
@@ -207,6 +249,7 @@ function createSessionEventPump(session: AIStreamSession): {
       buffer = "";
     },
     terminal: () => isTerminal,
+    terminalPayload: () => pendingTerminalPayload,
   };
 }
 
@@ -342,7 +385,31 @@ export function registerAIChatRoute(
     ),
   });
 
-  app.post("/api/ai/chat", ...middlewares, async (req, res) => {
+  app.post("/api/ai/cancel", ...middlewares, (req, res) => {
+    if (!req.user) {
+      res.status(401).json({ code: "AUTH_REQUIRED", message: "Sign in to continue." });
+      return;
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = parseJsonBody(req);
+    } catch {
+      res.status(400).json({ code: "INVALID_JSON", message: "Request data is invalid." });
+      return;
+    }
+    const requestId = body.requestId;
+    if (typeof requestId !== "string" || !REQUEST_ID_PATTERN.test(requestId)) {
+      res
+        .status(400)
+        .json({ code: "INVALID_AI_STREAM_SESSION", message: "Request ID is invalid." });
+      return;
+    }
+
+    streamSessions.cancel(requestId, req.user.userId);
+    res.status(204).end();
+  });
+
+  app.post("/api/ai/conversations/:conversationId/messages", ...middlewares, async (req, res) => {
     const startedAt = Date.now();
     const mode = resolveAIProviderMode(serverEnv);
     let decision =
@@ -385,7 +452,28 @@ export function registerAIChatRoute(
       return;
     }
 
-    if (!isValidAIRequest(body)) {
+    const conversationId = req.params.conversationId;
+    const clientMessageId = body.clientMessageId;
+    const content = body.content;
+    if (!req.user) {
+      res
+        .status(401)
+        .json({ success: false, code: "AUTH_REQUIRED", message: "Sign in to continue." });
+      return;
+    }
+    if (
+      typeof conversationId !== "string" ||
+      !CONVERSATION_ID_PATTERN.test(conversationId) ||
+      typeof clientMessageId !== "string" ||
+      !CLIENT_MESSAGE_ID_PATTERN.test(clientMessageId) ||
+      typeof content !== "string" ||
+      !isValidAIRequest({
+        messages: [{ role: "user", content }],
+        disasterContext: body.disasterContext,
+        location: body.location,
+        language: body.language,
+      })
+    ) {
       res.status(400).json({
         success: false,
         code: "INVALID_AI_REQUEST",
@@ -393,6 +481,7 @@ export function registerAIChatRoute(
       });
       return;
     }
+    const userId = req.user.userId;
 
     const requestInfo = readRequestId(req);
     const lastEventId = readLastEventId(req);
@@ -406,7 +495,7 @@ export function registerAIChatRoute(
     }
 
     const requestId = requestInfo.requestId;
-    const fingerprint = requestFingerprint(req, body);
+    const fingerprint = requestFingerprint(req, body, userId);
     const existing = streamSessions.get(requestId, fingerprint);
     if (existing.kind === "fingerprint_mismatch") {
       res.status(409).json({
@@ -437,16 +526,153 @@ export function registerAIChatRoute(
       return;
     }
 
+    let storedUserMessage: Awaited<ReturnType<typeof conversationRepository.appendUserMessageOnce>>;
+    let conversation: Awaited<ReturnType<typeof conversationRepository.getForUser>>;
+    try {
+      storedUserMessage = await conversationRepository.appendUserMessageOnce(
+        userId,
+        conversationId,
+        clientMessageId,
+        content,
+      );
+      if (!storedUserMessage) {
+        res.status(404).json({
+          success: false,
+          code: "CONVERSATION_NOT_FOUND",
+          message: "Conversation was not found.",
+        });
+        return;
+      }
+      conversation = await conversationRepository.getForUser(userId, conversationId);
+      if (!conversation) {
+        res.status(404).json({
+          success: false,
+          code: "CONVERSATION_NOT_FOUND",
+          message: "Conversation was not found.",
+        });
+        return;
+      }
+    } catch {
+      res.status(503).json({
+        success: false,
+        code: "AI_CONVERSATION_UNAVAILABLE",
+        message: "Could not save this message.",
+      });
+      return;
+    }
+
+    const persistedUserMessage = storedUserMessage.message;
+    let assistantClaim: Awaited<ReturnType<typeof conversationRepository.claimAssistantMessage>>;
+    try {
+      assistantClaim = await conversationRepository.claimAssistantMessage(
+        userId,
+        conversationId,
+        persistedUserMessage.id,
+      );
+    } catch {
+      res.status(503).json({
+        success: false,
+        code: "AI_CONVERSATION_UNAVAILABLE",
+        message: "Could not save the assistant response.",
+      });
+      return;
+    }
+    if (!assistantClaim) {
+      res.status(404).json({
+        success: false,
+        code: "CONVERSATION_NOT_FOUND",
+        message: "Conversation was not found.",
+      });
+      return;
+    }
+    if (assistantClaim.kind === "in_progress") {
+      res.status(409).json({
+        success: false,
+        code: "AI_GENERATION_IN_PROGRESS",
+        message: "An assistant response is already being generated for this message.",
+      });
+      return;
+    }
+    if (assistantClaim.kind === "complete") {
+      const cachedSession = streamSessions.create(requestId, fingerprint, () => undefined);
+      const cachedPump = createSessionEventPump(cachedSession);
+      cachedPump.push(workflowResultToChatCompletionsSSE(assistantClaim.content));
+      cachedPump.flush();
+      const terminalPayload = cachedPump.terminalPayload();
+      if (terminalPayload) {
+        cachedSession.publish(terminalPayload);
+        cachedSession.complete();
+      } else {
+        cachedSession.fail(safeStreamFailureEvent());
+      }
+      attachSessionResponse(res, cachedSession, requestId, 0);
+      return;
+    }
+
+    const assistantMessageId = assistantClaim.id;
+    let assistantContent = "";
+    let persistenceQueue: Promise<void> = Promise.resolve();
+    let lastCheckpointAt = 0;
+    const persistAssistant = (status: AIMessageStatus): Promise<void> => {
+      const operation = persistenceQueue
+        .catch(() => undefined)
+        .then(() =>
+          conversationRepository.appendAssistantResult(
+            userId,
+            conversationId,
+            assistantMessageId,
+            assistantContent,
+            status,
+          ),
+        );
+      persistenceQueue = operation;
+      return operation;
+    };
+
+    let preparedContext: Awaited<ReturnType<typeof prepareAIContext>>;
+    try {
+      preparedContext = await prepareAIContext(
+        userId,
+        conversation,
+        persistedUserMessage.id,
+        content,
+      );
+    } catch {
+      await persistAssistant("FAILED").catch(() => undefined);
+      res.status(503).json({
+        success: false,
+        code: "AI_CONTEXT_UNAVAILABLE",
+        message: "Could not prepare conversation context.",
+      });
+      return;
+    }
+    const disasterContext = {
+      ...(getDisasterContext(body) ?? {}),
+      persistentNotes: preparedContext.persistentNotes,
+    };
+
     let selectedController: AbortController | undefined;
     let sessionDisposed = false;
-    const session = streamSessions.create(requestId, fingerprint, () => {
-      sessionDisposed = true;
-      selectedController?.abort();
-    });
+    const session = streamSessions.create(
+      requestId,
+      fingerprint,
+      () => {
+        sessionDisposed = true;
+        selectedController?.abort();
+      },
+      userId,
+    );
+    const failureStatus = (): AIMessageStatus => (session.wasCancelled ? "CANCELLED" : "FAILED");
+    const captureAssistantText = (text: string): void => {
+      assistantContent += text;
+      const now = Date.now();
+      if (now - lastCheckpointAt < 1_000) return;
+      lastCheckpointAt = now;
+      void persistAssistant("STREAMING").catch(() => undefined);
+    };
 
-    const disasterContext = getDisasterContext(body);
     if (mode === "router") {
-      decision = routeAIRequest(body.messages, disasterContext);
+      decision = routeAIRequest(preparedContext.messages, disasterContext);
     }
 
     const providers = buildProviderOrder(mode, decision);
@@ -456,6 +682,16 @@ export function registerAIChatRoute(
     let upstream: Awaited<ReturnType<UpstreamFetch>> | undefined;
     let selectedCleanup: (() => void) | undefined;
     let selectedClientCloseAbort: (() => void) | undefined;
+
+    if (sessionDisposed) {
+      await persistAssistant(failureStatus()).catch(() => undefined);
+      res.status(410).json({
+        success: false,
+        code: "AI_STREAM_SESSION_EXPIRED",
+        message: "AI stream session has expired.",
+      });
+      return;
+    }
 
     for (const provider of providers) {
       const config = resolveServerAIProviderConfig(serverEnv, provider);
@@ -468,7 +704,7 @@ export function registerAIChatRoute(
 
       const request = buildAIProviderRequest({
         config,
-        messages: body.messages,
+        messages: preparedContext.messages,
         disasterContext,
         location: body.location,
         language: body.language,
@@ -486,6 +722,7 @@ export function registerAIChatRoute(
               );
 
       if (!hasUserInput) {
+        await persistAssistant("FAILED").catch(() => undefined);
         session.dispose();
         res.status(400).json({
           success: false,
@@ -514,6 +751,20 @@ export function registerAIChatRoute(
       };
       selectedController = controller;
       res.once("close", abortOnClose);
+      if (sessionDisposed) {
+        cleanupAttempt();
+        controller.abort();
+        selectedController = undefined;
+        await persistAssistant(failureStatus()).catch(() => undefined);
+        if (!res.headersSent) {
+          res.status(410).json({
+            success: false,
+            code: "AI_STREAM_SESSION_EXPIRED",
+            message: "AI stream session has expired.",
+          });
+        }
+        return;
+      }
 
       try {
         const response = await upstreamFetch(request.apiUrl, {
@@ -531,6 +782,7 @@ export function registerAIChatRoute(
           selectedController = undefined;
           destroyStream(response.body);
           if (clientClosed) session.dispose();
+          await persistAssistant(failureStatus()).catch(() => undefined);
           if (sessionDisposed && !clientClosed && !res.headersSent) {
             res.status(410).json({
               success: false,
@@ -556,6 +808,7 @@ export function registerAIChatRoute(
             cleanupAttempt();
             selectedController = undefined;
             if (clientClosed) session.dispose();
+            await persistAssistant(failureStatus()).catch(() => undefined);
             if (sessionDisposed && !clientClosed && !res.headersSent) {
               res.status(410).json({
                 success: false,
@@ -590,11 +843,13 @@ export function registerAIChatRoute(
 
         if (clientClosed) {
           session.dispose();
+          await persistAssistant(failureStatus()).catch(() => undefined);
           selectedController = undefined;
           return;
         }
 
         if (sessionDisposed) {
+          await persistAssistant(failureStatus()).catch(() => undefined);
           selectedController = undefined;
           if (!res.headersSent) {
             res.status(410).json({
@@ -614,6 +869,7 @@ export function registerAIChatRoute(
     }
 
     if (!upstream || !selectedConfig || !providerRequest || !selectedController) {
+      await persistAssistant(failureStatus()).catch(() => undefined);
       session.dispose();
       // 所有候选提供商都不可用时，按最终失败类型向客户端返回配置、超时或上游错误。
       const primaryConfig = resolveServerAIProviderConfig(serverEnv, providers[0]);
@@ -642,6 +898,52 @@ export function registerAIChatRoute(
       return;
     }
 
+    if (sessionDisposed) {
+      selectedController.abort();
+      destroyStream(upstream.body);
+      selectedCleanup?.();
+      await persistAssistant(failureStatus()).catch(() => undefined);
+      if (!res.headersSent) {
+        res.status(410).json({
+          success: false,
+          code: "AI_STREAM_SESSION_EXPIRED",
+          message: "AI stream session has expired.",
+        });
+      }
+      return;
+    }
+
+    if (sessionDisposed) {
+      selectedController.abort();
+      destroyStream(upstream.body);
+      selectedCleanup?.();
+      await persistAssistant(failureStatus()).catch(() => undefined);
+      if (!res.headersSent) {
+        res.status(410).json({
+          success: false,
+          code: "AI_STREAM_SESSION_EXPIRED",
+          message: "AI stream session has expired.",
+        });
+      }
+      return;
+    }
+
+    const updateConversationSummary = (): void => {
+      const summaryInput = preparedContext.summaryInput;
+      const throughMessageId = preparedContext.summaryThroughMessageId;
+      if (!summaryInput || !throughMessageId) return;
+      void summarizeTrimmedConversation(summaryInput, upstreamFetch, serverEnv)
+        .then((summary) =>
+          conversationRepository.updateSummaryForUser(
+            userId,
+            conversationId,
+            summary,
+            throughMessageId,
+          ),
+        )
+        .catch(() => undefined);
+    };
+
     const finishSelectedRequest = (): void => {
       selectedCleanup?.();
       selectedCleanup = undefined;
@@ -665,16 +967,35 @@ export function registerAIChatRoute(
       finishSelectedRequest();
     };
 
-    const finishSessionStream = (
+    const finishSessionStream = async (
       pump: ReturnType<typeof createSessionEventPump>,
       finalized: { value: boolean },
-    ): void => {
+    ): Promise<void> => {
       if (finalized.value) return;
       finalized.value = true;
       pump.flush();
-      if (!pump.terminal() && session.status === "active") {
-        session.fail(safeStreamFailureEvent());
+      const terminalPayload = pump.terminalPayload();
+      if (terminalPayload && session.status === "active") {
+        try {
+          await persistAssistant("COMPLETE");
+          if (session.wasCancelled || session.status !== "active") {
+            await persistAssistant(failureStatus()).catch(() => undefined);
+            finishSelectedRequest();
+            return;
+          }
+          session.publish(terminalPayload);
+          session.complete();
+        } catch {
+          session.fail(safeStreamFailureEvent());
+          await persistAssistant(failureStatus()).catch(() => undefined);
+        }
+      } else {
+        if (!pump.terminal() && session.status === "active") {
+          session.fail(safeStreamFailureEvent());
+        }
+        await persistAssistant(failureStatus()).catch(() => undefined);
       }
+      if (session.status === "completed") updateConversationSummary();
       finishSelectedRequest();
     };
 
@@ -682,6 +1003,7 @@ export function registerAIChatRoute(
       const contentType = upstream.headers.get("content-type") ?? "";
       if (contentType.includes("text/event-stream")) {
         if (!upstream.body) {
+          void persistAssistant(failureStatus()).catch(() => undefined);
           session.dispose();
           finishSelectedRequest();
           res.status(502).json({
@@ -693,10 +1015,11 @@ export function registerAIChatRoute(
         }
 
         if (!attachNewSessionResponse(0)) {
+          void persistAssistant(failureStatus()).catch(() => undefined);
           session.dispose();
           return;
         }
-        const pump = createSessionEventPump(session);
+        const pump = createSessionEventPump(session, captureAssistantText);
         const finalized = { value: false };
         const transformed = createWorkflowToChatCompletionsStream();
         transformed.on("data", (chunk: Buffer | string) => {
@@ -704,18 +1027,19 @@ export function registerAIChatRoute(
           finalized.value = true;
           stopUpstream();
           transformed.destroy();
+          void persistAssistant(failureStatus()).catch(() => undefined);
         });
         transformed.on("error", () => {
           if (finalized.value) return;
           stopUpstream();
-          finishSessionStream(pump, finalized);
+          void finishSessionStream(pump, finalized);
         });
-        transformed.on("end", () => finishSessionStream(pump, finalized));
+        transformed.on("end", () => void finishSessionStream(pump, finalized));
         upstream.body.on("error", () => {
           if (finalized.value) return;
           stopUpstream();
           transformed.destroy();
-          finishSessionStream(pump, finalized);
+          void finishSessionStream(pump, finalized);
         });
         upstream.body.pipe(transformed);
         return;
@@ -725,6 +1049,7 @@ export function registerAIChatRoute(
       try {
         workflowResponse = await upstream.json();
       } catch {
+        void persistAssistant(failureStatus()).catch(() => undefined);
         if (sessionDisposed) {
           finishSelectedRequest();
           if (!res.headersSent) {
@@ -748,6 +1073,7 @@ export function registerAIChatRoute(
 
       const workflowResult = extractWorkflowResult(workflowResponse);
       if (!workflowResult) {
+        void persistAssistant(failureStatus()).catch(() => undefined);
         session.dispose();
         finishSelectedRequest();
         res.status(502).json({
@@ -759,10 +1085,26 @@ export function registerAIChatRoute(
       }
 
       if (!attachNewSessionResponse(0)) {
+        void persistAssistant(failureStatus()).catch(() => undefined);
         session.dispose();
         finishSelectedRequest();
         return;
       }
+      assistantContent = workflowResult;
+      try {
+        await persistAssistant("COMPLETE");
+      } catch {
+        session.fail(safeStreamFailureEvent());
+        await persistAssistant(failureStatus()).catch(() => undefined);
+        finishSelectedRequest();
+        return;
+      }
+      if (session.wasCancelled || session.status !== "active") {
+        await persistAssistant(failureStatus()).catch(() => undefined);
+        finishSelectedRequest();
+        return;
+      }
+      updateConversationSummary();
       session.publish(workflowResultToChatCompletionsSSE(workflowResult));
       session.complete();
       finishSelectedRequest();
@@ -770,16 +1112,18 @@ export function registerAIChatRoute(
     }
 
     if (!upstream.body) {
+      void persistAssistant(failureStatus()).catch(() => undefined);
       session.fail(safeStreamFailureEvent());
       finishSelectedRequest();
       return;
     }
 
     if (!attachNewSessionResponse(0)) {
+      void persistAssistant(failureStatus()).catch(() => undefined);
       session.dispose();
       return;
     }
-    const pump = createSessionEventPump(session);
+    const pump = createSessionEventPump(session, captureAssistantText);
     const finalized = { value: false };
     const transformed =
       providerRequest.protocol === "responses"
@@ -791,20 +1135,21 @@ export function registerAIChatRoute(
       finalized.value = true;
       stopUpstream();
       transformed?.destroy();
+      void persistAssistant(failureStatus()).catch(() => undefined);
     });
     source.on("error", () => {
       if (finalized.value) return;
       stopUpstream();
       transformed?.destroy();
-      finishSessionStream(pump, finalized);
+      void finishSessionStream(pump, finalized);
     });
-    source.on("end", () => finishSessionStream(pump, finalized));
+    source.on("end", () => void finishSessionStream(pump, finalized));
     if (transformed) {
       upstream.body.on("error", () => {
         if (finalized.value) return;
         stopUpstream();
         transformed.destroy();
-        finishSessionStream(pump, finalized);
+        void finishSessionStream(pump, finalized);
       });
     }
 

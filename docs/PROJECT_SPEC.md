@@ -15,7 +15,7 @@
 
 ## 2. 项目定位、当前状态与非目标
 
-Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展示、分析和 AI 辅助事件研判的本地开发项目。仓库包含 React 客户端、Express BFF、FastAPI 分析服务，以及灾害数据源和 AI Provider 集成。
+Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展示、分析和 AI 辅助事件研判的本地开发项目。仓库包含 React 客户端、Express BFF、FastAPI 分析服务、PostgreSQL 账号与 AI 持久化，以及灾害数据源和 AI Provider 集成。
 
 当前代码已实现以下能力：
 
@@ -23,6 +23,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 在 Mapbox 地图和分析界面中消费同一灾害状态；
 - 通过 FastAPI 提供统计、预测、风险、ETL、质量、统一模型和透视分析；
 - 通过 Express BFF 完成 DisasterAware 服务端授权、受限代理、多源灾害聚合和 AI 流式代理；
+- 通过 PostgreSQL/Prisma 提供账号注册、服务端会话、全站 API 登录门禁、账号隔离的 AI 对话/消息以及用户控制的长期记忆；Analytics 浏览器请求经 BFF allowlist 代理并使用服务间令牌访问 FastAPI；
 - 通过 BFF 的 `meta.sources[]` 为 DisasterAware、USGS、NASA EONET 和 GDACS 输出固定五分钟窗口的进程内来源健康快照；
 - 通过前端 Service 运行时解析、Python Pydantic 模型和共享 JSON 样本维护 Analytics 输入边界；
 - 通过 `shared/hazards/` 与 `contracts/hazard-event.json` 维护统一事件/图层注册表，向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
@@ -30,10 +31,10 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 
 当前仓库没有部署工作流，Docker Compose 只定义本地完整栈启动方式。以下能力不属于当前已实现范围：
 
-- 面向公网部署的身份系统、角色授权、网关、共享限流和集中告警；
-- AI 会话服务端持久化、跨刷新恢复、用户级隔离、成本配额和熔断；
+- 面向公网部署的邮箱验证、密码找回、OAuth、角色授权、网关、共享限流和集中告警；
+- AI 跨实例 SSE 恢复、成本配额和熔断；
 - Analytics 4D `data` 内部字段的完整跨语言共享契约、复杂几何与历史回放；
-- 数据库/PostGIS 技术设计、历史快照和审计存储；
+- 灾害历史快照、PostGIS 空间索引和审计存储；账号/AI 持久化数据库不用于这些灾害历史能力；
 - 完整视觉回归、真实第三方服务集成测试和自动发布。
 
 ## 3. 术语
@@ -41,8 +42,8 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 | 术语             | 含义                                                                                                                                               |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Browser / 浏览器 | Vite 构建的 React 客户端运行环境。`VITE_*` 值会进入浏览器构建产物，只能承载公开配置。                                                              |
-| BFF              | Express 服务。负责静态客户端、DisasterAware 授权与受限代理、灾害聚合和 AI Provider 路由。                                                          |
-| Analytics        | 独立 FastAPI 服务及其分析算法。浏览器通过 `VITE_PYTHON_API_URL` 直接访问。                                                                         |
+| BFF              | Express 服务。负责静态客户端、用户会话、API 登录门禁、DisasterAware 受限代理、灾害聚合、Analytics 代理和 AI Provider 路由/持久化。                 |
+| Analytics        | 独立 FastAPI 服务及其分析算法。浏览器经同源 `/api/analytics` 访问 BFF，再由 BFF 以服务间令牌代理。                                                 |
 | Hazard           | 地图、分析、AI 上下文和报告流程共同消费的灾害领域记录。                                                                                            |
 | Service 边界     | `src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                                                                   |
 | Provider         | BFF 调用的 AI 上游；当前实现支持 ai-workflow 与 Volcengine Ark。                                                                                   |
@@ -63,6 +64,8 @@ flowchart LR
     BFF[Express BFF\n默认 8080]
   end
 
+  DB[(PostgreSQL)]
+
   subgraph Python[Python 运行单元]
     API[FastAPI Analytics\n8001]
   end
@@ -71,17 +74,15 @@ flowchart LR
   Workflow[ai-workflow]
   Ark[Volcengine Ark]
 
-  Services -->|同源 /api/authorize\n/api/hazards/*\n/api/ai/chat| BFF
-  Services -->|VITE_PYTHON_API_URL\n/api/v1/*| API
+  Services -->|同源 /api/auth/*\n/api/authorize\n/api/hazards/*\n/api/analytics/*\n/api/ai/*| BFF
+  BFF -->|服务间令牌| API
+  BFF --> DB
   BFF --> Sources
   BFF --> Workflow
   BFF --> Ark
 ```
 
-系统存在两条浏览器业务请求路径：
-
-1. 授权、灾害和 AI 请求经同源 `/api/*` 进入 Express BFF；
-2. Analytics 请求通过 `VITE_PYTHON_API_URL` 直接进入 FastAPI，不经过 Express BFF。
+浏览器的业务 API 统一经同源 `/api/*` 进入 Express BFF。BFF 校验用户会话并执行资源授权；Analytics 请求再由 BFF 通过 allowlist 和服务间令牌转发至 FastAPI。BFF 将用户、会话、AI 对话和记忆写入 PostgreSQL。
 
 浏览器不得接收 DisasterAware 用户名、密码或 access token，不得接收 AI Provider key，也不得接收 Python 管理令牌。上述值只能由相应服务端运行时读取。前端所需公开配置使用 `VITE_*`，并在客户端构建时写入产物。
 
@@ -99,17 +100,21 @@ flowchart LR
 
 | 路径                                  | 责任                                                                         |
 | ------------------------------------- | ---------------------------------------------------------------------------- |
-| `src/App.tsx`                         | 客户端组合根、初始授权、Provider 装配、视图选择和组件懒加载。                |
+| `src/App.tsx`                         | 客户端组合根、Provider 装配、视图选择和组件懒加载。                          |
 | `src/features/`                       | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。  |
 | `src/components/`                     | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。          |
 | `src/hooks/`                          | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                         |
 | `src/config/`、`src/utils/`           | 浏览器公开配置、日志、通知和无业务归属的纯工具。                             |
 | `src/state/`                          | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                    |
+| `src/state/AuthContext.tsx`           | 恢复服务端用户会话、CSRF token 和认证操作。                                  |
 | `src/services/`                       | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。     |
 | `src/types/`                          | 客户端共享领域类型。                                                         |
 | `src/workers/`                        | 浏览器 Worker 数据处理。                                                     |
 | `server.ts`                           | Express 应用装配、授权、灾害 API、静态资源和监听入口。                       |
 | `server/ai/`                          | AI Provider 配置、路由判定、请求处理和流协议转换。                           |
+| `server/auth/`                        | 密码哈希、服务端会话、CSRF 校验和用户认证路由。                              |
+| `server/db/`                          | Prisma/PostgreSQL 客户端初始化。                                             |
+| `server/analytics/`                   | 认证后的 Analytics allowlist BFF 代理。                                      |
 | `server/hazards/`                     | 公共灾害源获取、适配、缓存和聚合。                                           |
 | `server/security/`                    | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                       |
 | `shared/hazards/`                     | 浏览器与 Node 共用的 canonical 灾害事件类型、来源/图层注册表和事件 ID 规则。 |
@@ -125,7 +130,7 @@ flowchart LR
 
 ### 7.1 React 客户端
 
-`App` 负责调用 `authorize()`、装配 `UIStateProvider` 与 `MapStateProvider`、选择地图或分析视图，以及懒加载分析、报告、设置和 AI 功能。跨功能状态按领域归属：
+`AuthProvider` 在挂载受保护界面前恢复 `/api/auth/session`。未登录时显示登录/注册界面；登录后装配 `UIStateProvider` 与 `MapStateProvider`、选择地图或分析视图，以及懒加载分析、报告、设置和 AI 功能。跨功能状态按领域归属：
 
 - `UIStateProvider` 持有 `activeView` 和 `activeModal`，公开视图和弹窗动作；
 - `MapStateProvider` 持有 hazards、类型筛选、地图样式、来源元数据和刷新动作；
@@ -147,11 +152,17 @@ BFF 的公开应用职责包括：
 | 路径                               | 方法   | 责任                                                                                      |
 | ---------------------------------- | ------ | ----------------------------------------------------------------------------------------- |
 | `/api/authorize`                   | `POST` | 使用服务端 DisasterAware 凭据获取上游 token，仅向浏览器返回授权状态。                     |
+| `/api/auth/register`、`/login`     | `POST` | 注册和登录；仅这些认证入口不要求已有用户会话。                                            |
+| `/api/auth/session`                | `GET`  | 校验 HttpOnly Cookie 并恢复当前用户会话。                                                 |
+| `/api/auth/logout`、`/account`     | 多种   | 撤销会话、修改账号偏好或验证密码后删除账号。                                              |
 | `/api/hazards`                     | `GET`  | 优先使用 DisasterAware，失败时聚合 USGS、NASA EONET 和 GDACS；返回 hazards 与来源元数据。 |
 | `/api/hazards/types`               | `GET`  | 代理允许的 DisasterAware 类型端点。                                                       |
 | `/api/hazards/active`              | `GET`  | 代理允许的活动灾害端点。                                                                  |
 | `/api/hazards/active/category/:id` | `GET`  | 代理允许的灾害类别端点。                                                                  |
-| `/api/ai/chat`                     | `POST` | 校验请求、选择 AI Provider、转换并输出 SSE。                                              |
+| `/api/analytics/*`                 | 多种   | 限定路径与方法，将业务请求代理到私有 FastAPI。                                            |
+| `/api/ai/conversations*`           | 多种   | 用户隔离的会话和消息读取、创建、删除与流式生成。                                          |
+| `/api/ai/cancel`                   | `POST` | 取消当前用户正在进行的 AI 生成，并将助手消息标记为失败/取消终态。                         |
+| `/api/ai/memories*`                | 多种   | 用户记忆与待确认记忆建议管理。                                                            |
 
 其他 `/api/*` 路径或不允许的方法返回稳定的 404 或 405，不构成任意上游代理。
 
@@ -163,11 +174,12 @@ BFF 执行以下请求边界：
 - DisasterAware 转发只保留 `accept` 与 `accept-language`，`Authorization` 由服务端 token 生成；
 - DisasterAware 和公共灾害源请求通过受限 helper 执行超时、禁止重定向和 8 MiB 响应体限制；
 - 授权、AI、hazard 接口分别使用单进程内存固定窗口限流；
+- 注册和登录使用独立单进程固定窗口限流；密钥由 `AUTH_CSRF_SECRET` 提供，生产模式拒绝空值、短密钥和仓库示例占位值；
 - 日志上下文只保留字符串、数字、布尔值，并按敏感字段名过滤值。
 
 `/api/hazards` 在既有 `meta.sources[]` 的来源状态旁可返回健康快照。快照固定聚合当前 BFF 进程最近五分钟的真实 `load()` 尝试，包含尝试/成功/失败数、成功率、平均和最近延迟、最近尝试与成功时间、连续失败数及稳定错误码。一次 `load()` 最多记录一次，现有一次重试最多形成两条记录；DisasterAware 认证不单独计数。空数组是成功，缓存命中、`stale` 和 fallback 占位状态只读取快照而不新增尝试。错误码仅为 `TIMEOUT`、`HTTP_ERROR`、`INVALID_RESPONSE` 或 `UPSTREAM_ERROR`，不暴露上游异常细节。该统计不持久化，BFF 重启后窗口为空。
 
-当前 BFF 没有浏览器用户身份认证、会话鉴权、角色授权或 CSRF 机制，也没有注册 CORS 中间件。`/api/authorize` 只代表 BFF 获取上游服务 token，不代表浏览器用户通过身份认证。
+除注册、登录和会话恢复外，`/api/*` 均通过数据库会话门禁；状态变更要求同源 Origin 和会话绑定的 CSRF token。系统没有角色体系、邮箱验证、密码找回或 OAuth；`/api/authorize` 仍只代表 BFF 检查 DisasterAware 上游连接。
 
 AI Provider 请求具有独立边界：请求有超时、响应开始前的 Provider 降级和流中断处理，但当前不复用公共灾害源的统一重定向禁止与 8 MiB 响应体上限。新增 AI Provider 时需要单独评估这两项边界。
 
@@ -185,7 +197,7 @@ flowchart TD
   Services --> Algorithms[analytics\n算法实现]
 ```
 
-- `app/main.py:create_app()` 配置日志、应用状态、CORS、request-id middleware，并注册 health、analytics、quality 和 pivot router；
+- `app/main.py:create_app()` 配置日志、应用状态、CORS、request-id middleware、BFF 服务令牌校验依赖，并注册 health、analytics、quality 和 pivot router；
 - `app/routes/` 接收 Pydantic 请求并注入应用服务，不直接持有算法对象；
 - `app/schemas/requests.py` 定义请求门禁；主要请求模型拒绝未声明字段；
 - `app/services/` 负责编排、缓存、指标和模型到 DataFrame 的转换；
@@ -193,9 +205,9 @@ flowchart TD
 
 每个请求会设置并回传 `X-Request-Id`。所有 `/api/v1` 业务接口通过统一 helper 返回版本化成功信封和稳定错误信封；成功响应包含 `schemaVersion`、`requestId`、`generatedAt`、`modelVersion`、`inputSnapshotId`、`warnings`，错误响应使用 `ANALYTICS_VALIDATION_ERROR` 或 `ANALYTICS_INTERNAL_ERROR`。日志过滤异常文本和敏感字段。
 
-`/health` 公开。`/metrics` 和 `/cache/clear` 依赖 `ANALYTICS_ADMIN_TOKEN` 与 `X-Analytics-Admin-Token`；配置缺失、header 缺失或值不匹配均返回 404。该令牌只保护这两个管理接口，不构成公开 Analytics 业务接口的用户身份系统。
+`/health` 公开。所有 `/api/v1/*` 业务路由要求 `X-Analytics-Service-Token`，该值只由 BFF 转发且以常量时间比较；未配置或不匹配时返回 404。`/metrics` 和 `/cache/clear` 依赖独立的 `ANALYTICS_ADMIN_TOKEN` 与 `X-Analytics-Admin-Token`；该令牌只保护两个管理接口。
 
-FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `ANALYTICS_CORS_ORIGINS` 覆盖；允许 GET、POST、OPTIONS，允许 `Content-Type`、管理令牌和 `X-Request-Id` header，并暴露 `X-Request-Id`，不允许 Cookie 凭据。
+FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `ANALYTICS_CORS_ORIGINS` 覆盖；允许 GET、POST、OPTIONS，允许 `Content-Type`、管理/服务令牌和 `X-Request-Id` header，并暴露 `X-Request-Id`，不允许 Cookie 凭据。生产浏览器不直连该服务。
 
 ### 7.5 分层与依赖规则
 
@@ -268,17 +280,17 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 
 ### 8.2 Analytics
 
-前端先用 `formatHazards` 统一 Hazard 字段，再通过 `parseAnalyticsHazardData` 检查待发送数据。浏览器直接向 FastAPI `/api/v1/*` 发送请求；响应先读为 `unknown`，再由端点对应 parser 构造成类型化成功结果。
+前端先用 `formatHazards` 统一 Hazard 字段，再通过 `parseAnalyticsHazardData` 检查待发送数据。浏览器通过 `/api/analytics` 向 BFF 发送请求；BFF allowlist 校验后向 FastAPI `/api/v1/*` 转发并附加服务间令牌。响应先读为 `unknown`，再由端点对应 parser 构造成类型化成功结果。
 
 共同输入保留旧版 `id`、`timestamp` 和 `source` 兼容字段，并优先使用 `eventId`、`sourceEventId`、`sourceId`、`layerId`、`observedAt`、`updatedAt` 和 `confidence` 等 canonical 字段；`type`、`title`、`coordinates`、`magnitude`、`severity` 和可选 `populationExposed` 继续受原有边界约束。坐标顺序为 `[longitude, latitude]`，置信度必须在 `[0, 1]`。Python Pydantic 是服务端最终请求门禁。成功响应和错误响应分别使用 `contracts/analytics-response-envelope.json`、`contracts/analytics-error-envelope.json`，事件输入使用 `contracts/hazard-event.json` 作为双端共享样本；输入摘要只返回 SHA-256，不保存原始请求。
 
 ### 8.3 AI 流式会话
 
-浏览器向 `POST /api/ai/chat` 发送消息与灾害上下文，BFF 校验形状和大小后选择 Provider。路由模式根据知识库、灾害领域和实时上下文信号选择优先 Provider；强制模式固定使用 workflow 或 Ark。首选 Provider 在响应开始前失败时，BFF 才尝试另一个 Provider。
+浏览器向 `POST /api/ai/conversations/:conversationId/messages` 发送单条新消息和灾害上下文。BFF 按当前 `userId` 读取会话与历史消息，执行上下文预算、摘要和已确认长期记忆注入，然后选择 Provider；助手流和最终结果均写入 PostgreSQL。路由模式根据知识库、灾害领域和实时上下文信号选择优先 Provider；强制模式固定使用 workflow 或 Ark。首选 Provider 在响应开始前失败时，BFF 才尝试另一个 Provider。
 
-前端会话只存在 React state 中：同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；Hook 的本地请求序号防止迟到 chunk 写入新请求，Service 为每次 SSE 逻辑请求生成随机请求 ID 并在自动重连中复用。手动重试会先清除失败的半截助手回复，不重复追加用户消息。历史超过 50 条消息或序列化请求超过 64 KiB 时，从最早的一对 user/assistant 消息开始裁剪。单条用户输入上限为 8,000 字符。
+前端只在 React state 中维护当前呈现状态；用户拥有的对话和消息保存在 PostgreSQL，刷新后可重新加载，用户之间通过所有权查询隔离。同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；Hook 的本地请求序号防止迟到 chunk 写入新请求，Service 为每次 SSE 逻辑请求生成随机请求 ID 并在自动重连中复用。手动重试使用同一客户端消息 ID，不重复追加用户消息。服务端模型上下文限制为 48 KiB，保留当前输入和近期完整轮次，并为被裁剪的较早轮次更新摘要；原始消息仍保存。单条用户输入上限为 8,000 字符。
 
-客户端 SSE parser 支持 CRLF、注释心跳、多行 `data` 和任意 UTF-8 字节分割，以 `[DONE]` 作为完成标记。网络异常、读取异常或没有 `[DONE]` 的 EOF 会在有限次数内使用相同请求 ID 和 `Last-Event-ID` 自动恢复，并按事件 ID 去重；显式 provider 错误和 HTTP 错误不自动重试。BFF 在单实例短时有界内存会话中缓存已转换事件，恢复窗口结束后返回稳定过期错误。Provider 配置缺失的特定 503 错误触发浏览器本地 Demo 流；其他上游正文不会直接展示给用户。
+客户端 SSE parser 支持 CRLF、注释心跳、多行 `data` 和任意 UTF-8 字节分割，以 `[DONE]` 作为完成标记。网络异常、读取异常或没有 `[DONE]` 的 EOF 会在有限次数内使用相同请求 ID 和 `Last-Event-ID` 自动恢复，并按事件 ID 去重；显式 provider 错误和 HTTP 错误不自动重试。BFF 在单实例短时有界内存会话中缓存已转换事件，恢复窗口结束后返回稳定过期错误。Provider 配置缺失的特定 503 错误触发浏览器本地 Demo 流；provider-backed 回复按流检查点和终态写入数据库，其他上游正文不会直接展示给用户。长期记忆仅在用户显式生成并逐条接受后进入上下文。
 
 ## 9. 跨语言契约与测试责任
 
@@ -291,12 +303,12 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 
 ## 10. 配置与秘密边界
 
-| 范围           | 变量或配置                                                                                                                                           | 边界                                                                                                                              |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 浏览器构建     | `VITE_MAPBOX_TOKEN`、`VITE_PYTHON_API_URL`、`VITE_3D_TILES_URL`、`VITE_CESIUM_ION_TOKEN`、`VITE_LOG_LEVEL`                                           | 会进入客户端产物，只能放公开配置。                                                                                                |
-| Express 运行时 | DisasterAware 凭据、`AI_PROVIDER`、`AI_WORKFLOW_*`、`ARK_*`、`VOLCENGINE_AI_PROVIDER` 兼容别名、`BFF_AI_STREAM_RESUME_*`、`PORT` 与日志级别          | 只在服务端读取；不得改用 `VITE_` 前缀。`PORT` 缺失时为 8080；SSE 恢复配置只控制单实例短时会话的 TTL、事件数、字节数和会话数上限。 |
-| BFF 上游与限流 | `DISASTERAWARE_REQUEST_TIMEOUT_MS`、`HAZARD_SOURCE_TIMEOUT_MS`、`BFF_AUTHORIZE_RATE_LIMIT_MAX`、`BFF_AI_RATE_LIMIT_MAX`、`BFF_HAZARD_RATE_LIMIT_MAX` | 缺失时依次使用 10,000 ms、8,000 ms、10、30、120；代码会限制其最大值。当前 Compose 未显式传递这些值。                              |
-| FastAPI 运行时 | `ANALYTICS_ADMIN_TOKEN`、`ANALYTICS_CORS_ORIGINS`、`APP_ENV`、`LOG_LEVEL`                                                                            | 管理令牌只在服务端使用；CORS 来源由部署配置确定。                                                                                 |
+| 范围           | 变量或配置                                                                                                                                                          | 边界                                                                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 浏览器构建     | `VITE_MAPBOX_TOKEN`、`VITE_3D_TILES_URL`、`VITE_CESIUM_ION_TOKEN`、`VITE_LOG_LEVEL`                                                                                 | 会进入客户端产物，只能放公开配置。                                                                                                                                     |
+| Express 运行时 | `DATABASE_URL`、`AUTH_CSRF_SECRET`、`PUBLIC_ORIGIN`、Analytics 服务 URL/令牌、DisasterAware 凭据、`AI_PROVIDER`、AI Provider 凭据、`BFF_AI_STREAM_RESUME_*`、`PORT` | 只在服务端读取；不得改用 `VITE_` 前缀。生产环境要求有效非占位 CSRF 密钥。`PUBLIC_ORIGIN` 用于 TLS 终止反向代理下的精确来源校验和 Secure Cookie；`PORT` 缺失时为 8080。 |
+| BFF 上游与限流 | `DISASTERAWARE_REQUEST_TIMEOUT_MS`、`HAZARD_SOURCE_TIMEOUT_MS`、`BFF_AUTHORIZE_RATE_LIMIT_MAX`、`BFF_AI_RATE_LIMIT_MAX`、`BFF_HAZARD_RATE_LIMIT_MAX`                | 缺失时依次使用 10,000 ms、8,000 ms、10、30、120；代码会限制其最大值。当前 Compose 未显式传递这些值。                                                                   |
+| FastAPI 运行时 | `ANALYTICS_ADMIN_TOKEN`、`ANALYTICS_CORS_ORIGINS`、`APP_ENV`、`LOG_LEVEL`                                                                                           | 管理令牌只在服务端使用；CORS 来源由部署配置确定。                                                                                                                      |
 
 日志不得记录凭据、token、Cookie、完整 header、请求/响应 body、原始异常消息或堆栈。`ServiceError` 可保留 `responseBody` 和 `cause` 供调用层判断；新增调用方不得直接渲染或记录这些字段。现有 Analytics 4xx 展示路径是第 7.6 节记录的待收口例外。
 
@@ -307,7 +319,9 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 | 命令                                | 当前作用                                                                                              |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `pnpm dev`                          | 通过项目 Node 版本包装脚本启动 Vite。Vite 配置将 `/api/ai` 和 `/api` 转发到 `http://localhost:8080`。 |
-| `pnpm run build:server`             | 编译 Express BFF。                                                                                    |
+| `pnpm run db:generate`              | 从 Prisma schema 生成服务端 Prisma Client。                                                           |
+| `pnpm run db:migrate:deploy`        | 显式应用 PostgreSQL 版本化迁移；服务启动不会自动迁移。                                                |
+| `pnpm run build:server`             | 生成 Prisma Client 并编译 Express BFF。                                                               |
 | `pnpm start`                        | 运行 `dist-server/server.js`；BFF 默认监听 8080，并托管 `dist` 与 SPA 回退。                          |
 | `./scripts/start-python-service.sh` | 启动本地 Python Analytics 服务。                                                                      |
 | `pnpm build`                        | 顺序执行 Vite 客户端构建和 BFF TypeScript 编译。                                                      |
@@ -323,10 +337,11 @@ Python Dockerfile 基于 Python 3.13 slim，安装 requirements 并以 Uvicorn �
 
 Compose 中：
 
-- `web` 发布 `8080:8080`，并等待 Analytics healthcheck 成功；
-- `analytics` 发布 `127.0.0.1:8001:8001`，只绑定宿主机环回地址；
-- `VITE_PYTHON_API_URL` 的默认构建值是 `http://localhost:8001`，请求发起者是宿主机浏览器；
-- Compose 没有定义镜像发布或部署过程。
+- `web` 发布 `8080:8080`，并等待 PostgreSQL 和 Analytics healthcheck 成功；
+- `db` 使用具名卷保存用户和 AI 持久化数据，不发布数据库端口；
+- `analytics` 不发布主机端口，只在私有 Compose 网络中接受 BFF 服务令牌；
+- 迁移使用 `docker compose exec web pnpm run db:migrate:deploy` 显式执行，不会自动在生产启动时执行；
+- Compose 没有定义镜像发布或部署过程，示例口令仅供本地使用。
 
 ## 12. 质量基线与测试分层
 
@@ -407,22 +422,22 @@ Compose 中：
 ### 14.1 安全与运行
 
 - BFF 限流是按进程和直连 IP 计数的内存状态，没有跨实例一致性或持久化；`trust proxy=false`，代理部署需要单独设计可信代理边界；
-- BFF 没有浏览器用户身份体系、跨源策略声明或 CSRF 防护；
-- Python 公开业务 API 没有用户身份、角色或共享限流，管理令牌只覆盖两个管理路由；
+- 当前账号方案不含邮箱验证、密码找回、OAuth、角色和公网注册滥用防护；登录/注册限流为单进程内存计数；
+- Python 业务 API 不验证终端用户身份，但只接受 BFF 服务间令牌；管理令牌仍独立覆盖两个管理路由；
 - Python CORS 环境变量接受非空来源字符串，生产来源的正确性由部署配置负责；
 - token 与灾害源缓存都在进程内；DisasterAware token 没有持久化、显式过期解析或撤销机制。
 
 ### 14.2 AI 与会话
 
-- 会话只保存在组件生命周期和 BFF 进程内，没有跨刷新持久化、用户级隔离、跨实例共享或审计存储；BFF 会在短时有界窗口内缓存 SSE 事件供 `Last-Event-ID` 恢复；
+- 用户账号、登录会话、对话、消息、摘要和确认后的记忆保存在 PostgreSQL，并通过所有者 ID 查询；SSE 续传事件缓存仍是单实例短时内存状态，不支持跨实例恢复或审计存储；
 - Provider 降级只发生在单次请求响应开始前，没有健康探测、熔断、持久化失败计数或用户/模型配额；
 - 已建立的上游 SSE 若中途失败，BFF 发布安全 `event: error` 并结束会话；客户端不会把明确 provider 错误自动重试，传输异常则按有限次数自动恢复。
 
 ### 14.3 数据与产品
 
 - Analytics 请求侧 HazardData、顶层响应信封和灾害事件/图层注册表已有共享输入/输出样本；4D `data` 内部字段的完整跨语言模型仍未统一；
-- 数据源健康快照只保存在当前 BFF 进程的固定五分钟窗口，重启即清空；尚无跨实例聚合、历史趋势、持久化指标或告警。数据库/PostGIS、历史快照、复杂几何和审计存储仍需先完成技术设计并确认需求；
-- 当前没有 PostgreSQL/PostGIS 历史数据层，复杂几何、历史快照、回放和审计仍需先完成技术设计并确认需求；
+- 数据源健康快照只保存在当前 BFF 进程的固定五分钟窗口，重启即清空；尚无跨实例聚合、历史趋势、持久化指标或告警。PostGIS 历史快照、复杂几何和审计存储仍需先完成技术设计并确认需求；
+- PostgreSQL 当前保存账号和 AI 数据，不保存灾害历史；复杂几何、灾害历史快照、回放和审计仍需独立设计；
 - 多来源 severity 与 magnitude 不天然可比较，统一强度排序需要先定义业务换算规则；
 - 预测置信度、风险阈值、估算 magnitude 和质量规则仍需要真实业务样本校准；
 - 当前报告下载格式与界面文案的闭环仍在优化清单中；

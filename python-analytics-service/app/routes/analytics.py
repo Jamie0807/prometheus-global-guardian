@@ -10,9 +10,10 @@ from app.dependencies import get_analytics_service
 from app.schemas.requests import AnalysisRequest
 from app.schemas.responses import AnalyticsSuccessResponse
 from app.services.analytics_service import AnalyticsService
+from security import require_service_access
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_service_access)])
 AnalyticsServiceDependency = Annotated[AnalyticsService, Depends(get_analytics_service)]
 
 

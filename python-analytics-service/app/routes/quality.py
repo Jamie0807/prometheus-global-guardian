@@ -10,10 +10,11 @@ from app.core.responses import build_success_response
 from app.dependencies import get_quality_service
 from app.schemas.requests import QualityCheckRequest, UnifiedDataRequest
 from app.services.quality_service import QualityService
+from security import require_service_access
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_service_access)])
 QualityServiceDependency = Annotated[QualityService, Depends(get_quality_service)]
 
 

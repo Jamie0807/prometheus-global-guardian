@@ -6,6 +6,15 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
   await page.route("**/api/authorize", async (route) => {
     await route.fulfill({ json: { authorized: true } });
   });
+  await page.route("**/api/auth/session", async (route) => {
+    await route.fulfill({
+      json: {
+        authenticated: true,
+        user: { id: "e2e-user", email: "smoke@example.test" },
+        csrfToken: "e2e-csrf-token",
+      },
+    });
+  });
 
   await page.route("**/api/hazards**", async (route) => {
     if (new URL(route.request().url()).pathname.endsWith("/types")) {
@@ -48,11 +57,58 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
     });
   });
 
+  const conversationId = "8c211b2e-50c8-4df0-91d9-866452204c49";
+  const createdAt = "2026-09-21T00:00:00.000Z";
+  let conversationCreated = false;
   await page.route("**/api/ai/**", async (route) => {
-    await route.fulfill({
-      contentType: "text/event-stream",
-      body: 'data: {"choices":[{"delta":{"content":"Mocked AI analysis"}}]}\n\ndata: [DONE]\n\n',
-    });
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/ai/conversations" && request.method() === "GET") {
+      await route.fulfill({
+        json: {
+          conversations: conversationCreated
+            ? [{ id: conversationId, title: "新对话", updatedAt: createdAt, lastMessageAt: null }]
+            : [],
+        },
+      });
+      return;
+    }
+    if (path === "/api/ai/conversations" && request.method() === "POST") {
+      conversationCreated = true;
+      await route.fulfill({
+        json: {
+          conversation: {
+            id: conversationId,
+            title: "新对话",
+            updatedAt: createdAt,
+            lastMessageAt: null,
+          },
+        },
+      });
+      return;
+    }
+    if (path === `/api/ai/conversations/${conversationId}` && request.method() === "GET") {
+      await route.fulfill({
+        json: {
+          conversation: {
+            id: conversationId,
+            title: "新对话",
+            updatedAt: createdAt,
+            lastMessageAt: null,
+            messages: [],
+          },
+        },
+      });
+      return;
+    }
+    if (path.endsWith("/messages") && request.method() === "POST") {
+      await route.fulfill({
+        contentType: "text/event-stream",
+        body: 'data: {"choices":[{"delta":{"content":"Mocked AI analysis"}}]}\n\ndata: [DONE]\n\n',
+      });
+      return;
+    }
+    await route.fulfill({ json: {} });
   });
 
   await page.route("https://api.mapbox.com/**", async (route) => {
@@ -62,7 +118,57 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
   await page.route("**/health", async (route) => {
     await route.fulfill({ json: { status: "ok" } });
   });
-  await page.route("**/api/v1/statistics", async (route) => {
+  await page.route("**/api/analytics/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (
+      pathname === "/api/analytics" ||
+      pathname === "/api/analytics/" ||
+      pathname === "/api/analytics/health"
+    ) {
+      await route.fulfill({ json: { service: "analytics", status: "ok" } });
+      return;
+    }
+    if (pathname === "/api/analytics/api/v1/pivot/create") {
+      await route.fulfill({
+        json: {
+          success: true,
+          data: {
+            pivot_table: {},
+            summary: {
+              total_records: 0,
+              time_range: { start: "2026-09-21", end: "2026-09-21", days: 0 },
+              geographic_distribution: { regions: {}, continents: {} },
+              type_distribution: {},
+              severity_distribution: {},
+              dimensions: { time_unique: 0, geo_unique: 0, type_unique: 0, severity_unique: 0 },
+            },
+            dimensions: { rows: 0, columns: 0 },
+          },
+        },
+      });
+      return;
+    }
+    if (pathname === "/api/analytics/api/v1/pivot/trend-analysis") {
+      await route.fulfill({
+        json: {
+          success: true,
+          data: { trends: [], message: "时间窗口内数据不足", time_window: 7 },
+        },
+      });
+      return;
+    }
+    if (pathname === "/api/analytics/api/v1/pivot/risk-score") {
+      await route.fulfill({
+        json: {
+          success: true,
+          data: { risk_scores: [], message: "时间窗口内数据不足", time_window: 7 },
+        },
+      });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route("**/api/analytics/api/v1/statistics", async (route) => {
     await route.fulfill({
       json: {
         success: true,
@@ -89,7 +195,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
     minimumDataPoints: 3,
     confidence: null,
   };
-  await page.route("**/api/v1/predictions", async (route) => {
+  await page.route("**/api/analytics/api/v1/predictions", async (route) => {
     await route.fulfill({
       json: {
         success: true,
@@ -113,7 +219,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
       },
     });
   });
-  await page.route("**/api/v1/risk-assessment", async (route) => {
+  await page.route("**/api/analytics/api/v1/risk-assessment", async (route) => {
     await route.fulfill({
       json: {
         success: true,
@@ -128,7 +234,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
       },
     });
   });
-  await page.route("**/api/v1/quality/thresholds", async (route) => {
+  await page.route("**/api/analytics/api/v1/quality/thresholds", async (route) => {
     await route.fulfill({
       json: {
         success: true,
@@ -142,7 +248,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
       },
     });
   });
-  await page.route("**/api/v1/quality/assess", async (route) => {
+  await page.route("**/api/analytics/api/v1/quality/assess", async (route) => {
     await route.fulfill({
       json: {
         success: true,
@@ -166,6 +272,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
   });
 
   await page.goto("/");
+  await expect(page.getByRole("group", { name: "地图视图模式" })).toBeVisible();
 
   const popupPosition = await page.evaluate(() => {
     const popup = document.createElement("div");
@@ -210,7 +317,7 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
       }),
     };
   });
-  expect(toolbarStyle?.actions).toHaveLength(6);
+  expect(toolbarStyle?.actions).toHaveLength(7);
   for (const action of toolbarStyle?.actions ?? []) {
     expect(action).toEqual({
       height: toolbarStyle?.height,
@@ -233,6 +340,8 @@ test("loads the monitoring dashboard and opens the AI assistant", async ({ page 
   await expect(page.getByRole("button", { name: "打开数据分析面板" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开保存报告弹窗" })).toBeVisible();
   await expect(page.getByRole("button", { name: "打开设置弹窗" })).toBeVisible();
+  await expect(page.getByText("smoke@example.test")).toBeVisible();
+  await expect(page.getByRole("button", { name: "退出" })).toBeVisible();
   const twoDButton = page.getByRole("button", { name: "2D 视图" });
   const threeDButton = page.getByRole("button", { name: "3D 地形" });
   await expect(twoDButton).toHaveAttribute("aria-pressed", "true");

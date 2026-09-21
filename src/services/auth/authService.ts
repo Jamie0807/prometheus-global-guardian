@@ -38,13 +38,5 @@ export async function refreshAccessToken(): Promise<void> {
 }
 
 export async function authFetch(url: string): Promise<Response> {
-  try {
-    return await requestStream(url);
-  } catch (error: unknown) {
-    if (error instanceof ServiceError && (error.status === 401 || error.status === 403)) {
-      await refreshAccessToken();
-      return requestStream(url);
-    }
-    throw error;
-  }
+  return requestStream(url);
 }

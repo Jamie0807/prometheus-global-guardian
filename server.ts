@@ -21,6 +21,12 @@ import { createServerLogger } from "./server/logging.js";
 import { createHazardEventId } from "./shared/hazards/hazard-event.js";
 import { resolveHazardLayerId } from "./shared/hazards/hazard-layer-registry.js";
 import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
+import { createAuthRouter } from "./server/auth/auth-routes.js";
+import { createRequireUser } from "./server/auth/require-user.js";
+import { recoverInterruptedAssistantMessages } from "./server/ai/conversation-repository.js";
+import { createConversationRouter } from "./server/ai/conversation-routes.js";
+import { createMemoryRouter } from "./server/ai/memory-routes.js";
+import { registerAnalyticsRoute } from "./server/analytics/analytics-route.js";
 import {
   createForwardHeaders,
   createRateLimitMiddleware,
@@ -203,6 +209,7 @@ function readBoundedPositiveInteger(
 export function createApp(options: CreateAppOptions = {}): Application {
   const app = express();
   const serverEnv = options.env ?? process.env;
+  const requireAuthenticatedUser = createRequireUser(serverEnv);
   const logger = createServerLogger("bff", serverEnv);
   const upstreamFetch = options.fetchImpl ?? (fetch as unknown as UpstreamFetch);
   const fetchHazards = options.fetchHazards ?? fetchAllHazards;
@@ -380,17 +387,31 @@ export function createApp(options: CreateAppOptions = {}): Application {
 
   app.use(createRawBodyMiddleware());
 
+  app.get("/health", (_req: Request, res: Response) => {
+    res.status(200).json({ status: "ok" });
+  });
+
+  app.use("/api/auth", createAuthRouter(serverEnv));
+  app.use("/api", requireAuthenticatedUser);
+
+  registerAnalyticsRoute(app, [], { env: serverEnv, fetchImpl: upstreamFetch });
+  app.use("/api/ai", createMemoryRouter({ env: serverEnv, fetchImpl: upstreamFetch }));
+  app.use("/api/ai/conversations", createConversationRouter());
   registerAIChatRoute(app, [aiRateLimit], { env: serverEnv, fetchImpl: upstreamFetch });
 
   app.use("/api", (req: Request, res: Response, next: NextFunction) => {
     // 本地 API 各自限定一种 HTTP 方法；未列出的路径继续交给后续路由判断。
     const pathname = apiPath(req);
     const localMethods: Record<string, string> = {
-      "/ai/chat": "POST",
+      "/ai/conversations": "GET",
       "/authorize": "POST",
       "/hazards": "GET",
     };
-    const allowedMethod = localMethods[pathname];
+    const isAIMessageRoute =
+      /^\/ai\/conversations\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/messages$/i.test(
+        pathname,
+      );
+    const allowedMethod = isAIMessageRoute ? "POST" : localMethods[pathname];
 
     if (allowedMethod && req.method !== allowedMethod) {
       sendApiError(
@@ -578,5 +599,17 @@ if (isMainModule) {
   loadLocalEnv();
   const port = process.env.PORT || 8080;
   const logger = createServerLogger("bff");
-  createApp().listen(port, () => logger.info("server_started", { port: Number(port) }));
+  void recoverInterruptedAssistantMessages()
+    .then((recoveredCount) => {
+      if (recoveredCount > 0) {
+        logger.info("ai_interrupted_generations_recovered", { count: recoveredCount });
+      }
+      createApp().listen(port, () => logger.info("server_started", { port: Number(port) }));
+    })
+    .catch(() => {
+      logger.error("ai_interrupted_generation_recovery_failed", {
+        code: "DATABASE_UNAVAILABLE",
+      });
+      process.exitCode = 1;
+    });
 }

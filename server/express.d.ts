@@ -2,5 +2,7 @@
 declare namespace Express {
   interface Request {
     rawBody?: Buffer;
+    user?: { userId: string; email: string };
+    authSession?: { id: string; csrfToken: string };
   }
 }

@@ -1,17 +1,39 @@
 /**
  * 提供应用设置弹窗组件。
  */
-import React from "react";
+import React, { useState } from "react";
 import { useMapState } from "../features/map/state/MapStateContext";
 import { useUIState } from "../state/UIStateContext";
+import { useAuth } from "../state/AuthContext";
+import { AuthApiError } from "../services/auth/userAuthService";
 
 const SettingsModal: React.FC = () => {
   const { mapStyle, setMapStyle } = useMapState();
   const { activeModal, closeModal } = useUIState();
+  const { deleteAccount } = useAuth();
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
   if (activeModal !== "settings") return null;
 
   const handleStyleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setMapStyle(e.target.value);
+  };
+
+  const handleDeleteAccount = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!window.confirm("删除账号会永久清除该账号的对话和记忆，是否继续？")) return;
+    setDeletingAccount(true);
+    setAccountError("");
+    try {
+      await deleteAccount(accountPassword);
+    } catch (error: unknown) {
+      setAccountError(
+        error instanceof AuthApiError ? error.message : "删除失败，请检查网络后重试。",
+      );
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   return (
@@ -79,6 +101,34 @@ const SettingsModal: React.FC = () => {
             实时灾害监控。数据由 DisasterAWARE、NASA、ESA、EONET、USGS 和 GDACS 提供。
           </p>
         </div>
+
+        <form
+          className="account-delete-section"
+          onSubmit={(event) => void handleDeleteAccount(event)}
+        >
+          <h3>账号管理</h3>
+          <p>删除账号将清除关联的 AI 对话、摘要、记忆和登录会话。</p>
+          <label className="form-label" htmlFor="delete-account-password">
+            当前密码
+          </label>
+          <input
+            id="delete-account-password"
+            className="form-input"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={accountPassword}
+            onChange={(event) => setAccountPassword(event.target.value)}
+          />
+          {accountError && (
+            <p className="auth-error" role="alert">
+              {accountError}
+            </p>
+          )}
+          <button className="btn account-delete-button" type="submit" disabled={deletingAccount}>
+            {deletingAccount ? "正在删除…" : "永久删除账号"}
+          </button>
+        </form>
 
         <button
           className="btn btn-primary"

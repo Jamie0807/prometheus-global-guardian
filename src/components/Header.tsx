@@ -1,14 +1,17 @@
 /**
  * 提供应用顶部导航栏组件。
  */
-import React from "react";
+import React, { useState } from "react";
 import NotificationCenter from "./NotificationCenter";
 import { useUIState } from "../state/UIStateContext";
 import { useMapState } from "../features/map/state/MapStateContext";
+import { useAuth } from "../state/AuthContext";
 
 const Header: React.FC = () => {
   const { activeView, openModal, openView } = useUIState();
   const { showHeatmap, toggleHeatmap, viewMode, setViewMode } = useMapState();
+  const { user, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState("");
   return (
     <header className="header">
       <div className="header-content">
@@ -123,6 +126,22 @@ const Header: React.FC = () => {
           )}
 
           <NotificationCenter />
+          <div className="header-account">
+            <span className="header-account-email" title={user?.email}>
+              {user?.email}
+            </span>
+            <button
+              className="btn header-action header-logout"
+              type="button"
+              onClick={() => {
+                setLogoutError("");
+                void logout().catch(() => setLogoutError("退出失败，请重试。"));
+              }}
+            >
+              退出
+            </button>
+            {logoutError && <span className="header-auth-error">{logoutError}</span>}
+          </div>
         </div>
       </div>
     </header>

@@ -7,6 +7,18 @@ import { describe, expect, it, vi } from "vitest";
 import { UIStateProvider, useUIState } from "../../src/state/UIStateContext";
 import SettingsModal from "../../src/components/SettingsModal";
 
+vi.mock("../../src/state/AuthContext", () => ({
+  useAuth: () => ({
+    status: "authenticated",
+    user: { id: "test-user", email: "test@example.com" },
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    deleteAccount: vi.fn(),
+    refreshSession: vi.fn(),
+  }),
+}));
+
 const mapStateMocks = {
   mapStyle: "dark-v11",
   setMapStyle: () => undefined,

@@ -1,5 +1,6 @@
 /** 验证 BFF AI SSE 会话的断点续传和 provider 请求复用。 */
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { Readable, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -7,17 +8,42 @@ import test from "node:test";
 import { Response } from "node-fetch";
 
 import { createApp, type UpstreamFetch } from "../server.js";
+import { prisma } from "../server/db/prisma.js";
 import {
   createResponsesToChatCompletionsStream,
   createWorkflowToChatCompletionsStream,
 } from "../server/ai/ai-stream.js";
 
 const SSE_FRAME_LIMIT_BYTES = 64 * 1024;
+const TEST_PASSWORD = "LocalTest-Password-2026!";
+const rawFetch = globalThis.fetch.bind(globalThis);
+const authenticatedOrigins = new Map<string, { cookie: string; csrfToken: string }>();
+
+async function fetch(
+  input: string | URL | Request,
+  init?: RequestInit,
+): Promise<globalThis.Response> {
+  const inputUrl = input instanceof Request ? input.url : String(input);
+  const origin = new URL(inputUrl).origin;
+  const auth = authenticatedOrigins.get(origin);
+  if (!auth) return rawFetch(input, init);
+  const headers = new Headers(input instanceof Request ? input.headers : init?.headers);
+  headers.set("cookie", auth.cookie);
+  headers.set("origin", origin);
+  if (init?.body !== undefined && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("x-csrf-token", auth.csrfToken);
+  return rawFetch(input, { ...init, headers });
+}
 
 async function startTestApp(fetchImpl: UpstreamFetch, env: NodeJS.ProcessEnv = {}) {
   const app = createApp({
     env: {
+      AUTH_CSRF_SECRET: "server-ai-stream-test-csrf-secret-32-bytes",
       AI_PROVIDER: "workflow",
+      NODE_ENV: "test",
       VOLCENGINE_WORKFLOW_API_URL: "https://workflow.test/run",
       ...env,
     },
@@ -29,19 +55,67 @@ async function startTestApp(fetchImpl: UpstreamFetch, env: NodeJS.ProcessEnv = {
     server.once("error", reject);
   });
   const address = server.address() as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const email = `server-ai-stream-${randomUUID()}@example.test`;
+  const registration = await rawFetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: baseUrl },
+    body: JSON.stringify({ email, password: TEST_PASSWORD }),
+  });
+  assert.equal(registration.status, 201);
+  const cookieHeader = registration.headers.get("set-cookie");
+  const registrationPayload: unknown = await registration.json();
+  assert.ok(registrationPayload && typeof registrationPayload === "object");
+  assert.ok(
+    "csrfToken" in registrationPayload && typeof registrationPayload.csrfToken === "string",
+  );
+  assert.ok(cookieHeader);
+  authenticatedOrigins.set(baseUrl, {
+    cookie: cookieHeader.split(";", 1)[0] ?? "",
+    csrfToken: registrationPayload.csrfToken,
+  });
+  const conversationResponse = await fetch(`${baseUrl}/api/ai/conversations`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  assert.equal(conversationResponse.status, 201);
+  const conversationPayload: unknown = await conversationResponse.json();
+  assert.ok(
+    conversationPayload &&
+      typeof conversationPayload === "object" &&
+      "conversation" in conversationPayload &&
+      conversationPayload.conversation &&
+      typeof conversationPayload.conversation === "object" &&
+      "id" in conversationPayload.conversation &&
+      typeof conversationPayload.conversation.id === "string",
+  );
+  const conversationId = conversationPayload.conversation.id;
   return {
-    baseUrl: `http://127.0.0.1:${address.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
+    baseUrl,
+    conversationId,
+    close: async () => {
+      authenticatedOrigins.delete(baseUrl);
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()));
-      }),
+      });
+    },
   };
 }
 
+function chatUrl(testApp: { baseUrl: string; conversationId: string }): string {
+  return `${testApp.baseUrl}/api/ai/conversations/${testApp.conversationId}/messages`;
+}
+
 const body = JSON.stringify({
-  messages: [{ role: "user", content: "分析当前灾害" }],
+  clientMessageId: "server-ai-stream-user-message",
+  content: "分析当前灾害",
   disasterContext: null,
 });
+
+function messageBody(clientMessageId: string, content: string): string {
+  return JSON.stringify({ clientMessageId, content, disasterContext: null });
+}
 
 test("unknown resumed AI session returns a stable expiry error", async (t) => {
   const testApp = await startTestApp(async () => {
@@ -49,7 +123,7 @@ test("unknown resumed AI session returns a stable expiry error", async (t) => {
   });
   t.after(testApp.close);
 
-  const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const response = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -82,7 +156,7 @@ test("completed AI session replays only events after Last-Event-ID without a sec
   });
   t.after(testApp.close);
 
-  const first = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const first = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "resume-session" },
     body,
@@ -92,7 +166,7 @@ test("completed AI session replays only events after Last-Event-ID without a sec
   assert.match(firstText, /id: 1/);
   assert.match(firstText, /id: 3/);
 
-  const resumed = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const resumed = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -123,7 +197,7 @@ test("client disconnect detaches the subscriber while the selected provider cont
   t.after(testApp.close);
 
   const controller = new AbortController();
-  const first = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const first = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "disconnect-session" },
     body,
@@ -145,7 +219,7 @@ test("client disconnect detaches the subscriber while the selected provider cont
   providerStream.push("data: [DONE]\n\n");
   providerStream.push(null);
 
-  const resumed = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const resumed = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -177,7 +251,7 @@ test("split UTF-8 bytes in upstream chunks are preserved in replayed SSE events"
   );
   t.after(testApp.close);
 
-  const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const response = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "utf8-session" },
     body,
@@ -209,7 +283,7 @@ test("raw provider stream rejects an oversized incomplete SSE frame and aborts u
   );
   t.after(testApp.close);
 
-  const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const response = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "oversized-frame" },
     body,
@@ -238,7 +312,7 @@ test("workflow route aborts upstream when its provider transform rejects an over
   });
   t.after(testApp.close);
 
-  const response = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const response = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "oversized-workflow-frame" },
     body,
@@ -386,17 +460,17 @@ test("evicted AI session aborts an in-flight provider request and disposes a lat
     await testApp.close();
   });
 
-  const firstRequest = fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const firstRequest = fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "evicted-request" },
     body,
   });
   await firstCallStarted;
 
-  const secondResponse = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const secondResponse = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "replacement-request" },
-    body,
+    body: messageBody("replacement-user-message", "第二个请求"),
   });
   assert.equal(secondResponse.status, 200);
   await secondResponse.text();
@@ -456,17 +530,17 @@ test("evicted Workflow JSON response clears its provider timeout after parsing f
   );
   testAppCleanup.close = testApp.close;
 
-  const firstRequest = fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const firstRequest = fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "evicted-json-request" },
     body,
   });
   await jsonStarted;
 
-  const secondResponse = await fetch(`${testApp.baseUrl}/api/ai/chat`, {
+  const secondResponse = await fetch(chatUrl(testApp), {
     method: "POST",
     headers: { "content-type": "application/json", "x-ai-request-id": "replacement-json-request" },
-    body,
+    body: messageBody("replacement-json-user-message", "第二个请求"),
   });
   assert.equal(secondResponse.status, 200);
   await secondResponse.text();
@@ -480,4 +554,8 @@ test("evicted Workflow JSON response clears its provider timeout after parsing f
 
   await new Promise((resolve) => setTimeout(resolve, 1100));
   assert.equal(firstAbortCalls, abortCallsAfterResponse);
+});
+
+test.after(async () => {
+  await prisma.$disconnect();
 });

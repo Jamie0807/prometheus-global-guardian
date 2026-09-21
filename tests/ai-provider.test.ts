@@ -155,6 +155,7 @@ test("buildWorkflowPayload sends the latest user input and workflow context", ()
     total: 22,
     byType: { EARTHQUAKE: 12, TSUNAMI: 10 },
     recent: [],
+    persistentNotes: [],
   });
   assert.equal(payload.inputs.location, "全球");
   assert.equal(payload.inputs.language, "zh");
@@ -182,6 +183,7 @@ test("buildAIProviderRequest chooses workflow protocol for workflow provider", (
     total: 0,
     byType: {},
     recent: [],
+    persistentNotes: [],
   });
   assert.equal(request.payload.inputs.user_input.includes("hello workflow"), true);
 });

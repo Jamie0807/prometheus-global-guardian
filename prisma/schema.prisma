@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../server/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+}
+
+enum AIMessageStatus {
+  STREAMING
+  COMPLETE
+  CANCELLED
+  FAILED
+}
+
+enum AIMemorySuggestionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @unique @db.VarChar(320)
+  passwordHash  String         @map("password_hash")
+  memoryEnabled Boolean        @default(true) @map("memory_enabled")
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt     DateTime       @updatedAt @db.Timestamptz(3) @map("updated_at")
+  sessions      AuthSession[]
+  conversations AIConversation[]
+  memories      AIMemoryItem[]
+  suggestions   AIMemorySuggestion[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid @map("user_id")
+  tokenHash  String   @unique @db.Char(64) @map("token_hash")
+  createdAt  DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3) @map("last_seen_at")
+  expiresAt  DateTime @db.Timestamptz(3) @map("expires_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("auth_sessions")
+}
+
+model AIConversation {
+  id                      String               @id @default(uuid()) @db.Uuid
+  userId                  String               @db.Uuid @map("user_id")
+  title                   String               @default("新对话") @db.VarChar(160)
+  summary                 String?              @db.Text
+  summaryThroughMessageId String?              @db.Uuid @map("summary_through_message_id")
+  lastMessageAt           DateTime?            @db.Timestamptz(3) @map("last_message_at")
+  createdAt               DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt               DateTime             @updatedAt @db.Timestamptz(3) @map("updated_at")
+  user                    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages                AIMessage[]
+  memoryItems             AIMemoryItem[]
+  memorySuggestions       AIMemorySuggestion[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id                String          @id @default(uuid()) @db.Uuid
+  conversationId    String          @db.Uuid @map("conversation_id")
+  clientMessageId   String?         @db.VarChar(128) @map("client_message_id")
+  replyToMessageId  String?         @unique @db.Uuid @map("reply_to_message_id")
+  role              AIMessageRole
+  content           String          @db.Text
+  status            AIMessageStatus @default(COMPLETE)
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
+  conversation      AIConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo           AIMessage?      @relation("AIMessageReply", fields: [replyToMessageId], references: [id], onDelete: Cascade)
+  assistantReply    AIMessage?      @relation("AIMessageReply")
+
+  @@unique([conversationId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+model AIMemoryItem {
+  id                   String          @id @default(uuid()) @db.Uuid
+  userId               String          @db.Uuid @map("user_id")
+  content              String          @db.Text
+  enabled              Boolean         @default(true)
+  sourceConversationId String?         @db.Uuid @map("source_conversation_id")
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt            DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceConversation   AIConversation? @relation(fields: [sourceConversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, enabled, updatedAt])
+  @@index([sourceConversationId])
+  @@map("ai_memory_items")
+}
+
+model AIMemorySuggestion {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  userId               String                    @db.Uuid @map("user_id")
+  sourceConversationId String?                   @db.Uuid @map("source_conversation_id")
+  content              String                    @db.Text
+  reason               String?                   @db.Text
+  status               AIMemorySuggestionStatus  @default(PENDING)
+  createdAt            DateTime                  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @db.Timestamptz(3) @map("updated_at")
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceConversation   AIConversation?           @relation(fields: [sourceConversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([sourceConversationId])
+  @@map("ai_memory_suggestions")
+}

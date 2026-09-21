@@ -1,11 +1,13 @@
 /**
  * AI 灾害分析助手的流式客户端。
  *
- * 将聊天消息和灾害上下文发送至 `/api/ai/chat`，并消费文本 SSE 分块。
- * 仅在特定的服务端配置错误时返回演示回复。
+ * 将单条用户消息发送至已持久化会话，并消费文本 SSE 分块。
+ * 仅在特定服务端配置错误时返回并持久化本地演示回复。
  */
 
 import type { HazardLayerId, HazardSourceId } from "../../../shared/hazards/hazard-event";
+import { getAuthCsrfToken } from "../auth/csrfToken";
+import { requestRaw } from "../http/httpClient";
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 
@@ -35,7 +37,7 @@ export interface DisasterContext {
   }>;
 }
 
-const AI_CHAT_ENDPOINT = "/api/ai/chat";
+const AI_CHAT_ENDPOINT = "/api/ai/conversations";
 
 const DEMO_FALLBACK_CODES = new Set(["AI_PROVIDER_NOT_CONFIGURED", "AI_MODEL_MISSING"]);
 
@@ -50,6 +52,12 @@ export interface StreamChatOptions {
   requestId?: string;
   onReconnect?: (attempt: number, delayMs: number) => void;
   onReconnected?: () => void;
+}
+
+export interface PersistedChatInput {
+  conversationId: string;
+  clientMessageId: string;
+  content: string;
 }
 
 const STREAM_ERROR = "AI 响应异常，请重试。";
@@ -171,7 +179,7 @@ async function readChatCompletionEvents(
   }
 }
 
-function createRequestId(): string {
+export function createAIRequestId(): string {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   if (globalThis.crypto?.getRandomValues) {
     const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -179,6 +187,19 @@ function createRequestId(): string {
     return `ai-${randomPart}`;
   }
   return `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export async function cancelAIStream(requestId: string): Promise<void> {
+  const csrfToken = getAuthCsrfToken();
+  await requestRaw("/api/ai/cancel", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    },
+    body: JSON.stringify({ requestId }),
+    keepalive: true,
+  });
 }
 
 function waitForReconnect(delayMs: number, signal?: AbortSignal): Promise<boolean> {
@@ -203,12 +224,12 @@ function waitForReconnect(delayMs: number, signal?: AbortSignal): Promise<boolea
 // ─── 主流式请求函数 ──────────────────────────────────────────────────────────
 
 export async function streamChatMessage(
-  messages: readonly ChatMessage[],
+  message: PersistedChatInput,
   context: DisasterContext | undefined,
   options: StreamChatOptions,
 ): Promise<AIStreamOutcome> {
   if (options.signal?.aborted) return { kind: "cancelled" };
-  const requestId = options.requestId ?? createRequestId();
+  const requestId = options.requestId ?? createAIRequestId();
   const seenEventIds = new Set<string>();
   const lastEventId: { value?: string } = {};
   let reconnectAttempt = 0;
@@ -216,23 +237,34 @@ export async function streamChatMessage(
   while (true) {
     let outcome: InternalStreamOutcome;
     try {
-      const resp = await fetch(AI_CHAT_ENDPOINT, {
-        method: "POST",
-        signal: options.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "X-AI-Request-Id": requestId,
-          ...(lastEventId.value
-            ? { "Last-Event-ID": lastEventId.value }
-            : reconnectAttempt > 0
-              ? { "Last-Event-ID": "0" }
-              : {}),
+      const csrfToken = getAuthCsrfToken();
+      const resp = await fetch(
+        `${AI_CHAT_ENDPOINT}/${encodeURIComponent(message.conversationId)}/messages`,
+        {
+          method: "POST",
+          signal: options.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "X-AI-Request-Id": requestId,
+            "X-AI-Client-Message-Id": message.clientMessageId,
+            ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+            ...(lastEventId.value
+              ? { "Last-Event-ID": lastEventId.value }
+              : reconnectAttempt > 0
+                ? { "Last-Event-ID": "0" }
+                : {}),
+          },
+          body: JSON.stringify({
+            clientMessageId: message.clientMessageId,
+            content: message.content,
+            disasterContext: context ?? null,
+          }),
         },
-        body: JSON.stringify({
-          messages,
-          disasterContext: context ?? null,
-        }),
-      });
+      );
+
+      if (resp.status === 401 && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("app:auth-expired"));
+      }
 
       if (!resp.ok) {
         const text = await resp.text();
@@ -248,7 +280,49 @@ export async function streamChatMessage(
         if (options.signal?.aborted) return { kind: "cancelled" };
         if (resp.status === 503 && DEMO_FALLBACK_CODES.has(code)) {
           // 仅服务端明确标记为缺少 AI 配置时才使用本地演示回复。
-          return await runDemoMode(messages, context, options);
+          let demoContent = "";
+          const demoOutcome = await runDemoMode(
+            [
+              {
+                id: message.clientMessageId,
+                role: "user",
+                content: message.content,
+                timestamp: "",
+              },
+            ],
+            context,
+            {
+              ...options,
+              onChunk: (chunk) => {
+                demoContent += chunk;
+                options.onChunk(chunk);
+              },
+            },
+          );
+          if (demoOutcome.kind !== "completed") return demoOutcome;
+          try {
+            const saved = await requestRaw(
+              `${AI_CHAT_ENDPOINT}/${encodeURIComponent(message.conversationId)}/demo-reply`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  userClientMessageId: message.clientMessageId,
+                  content: demoContent,
+                }),
+                signal: options.signal,
+              },
+            );
+            if (!saved.ok) {
+              return { kind: "failed", message: "无法保存演示回复，请重试。" };
+            }
+            return demoOutcome;
+          } catch {
+            if (options.signal?.aborted) return { kind: "cancelled" };
+            return { kind: "failed", message: "无法保存演示回复，请重试。" };
+          }
         }
 
         outcome = {

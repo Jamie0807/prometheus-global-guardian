@@ -27,8 +27,17 @@ HAZARD = {
 
 class ApiRouteTests(unittest.TestCase):
     def setUp(self):
+        self.service_token = "test-analytics-service-token"
+        self.service_token_environment = patch.dict(
+            os.environ, {"ANALYTICS_SERVICE_TOKEN": self.service_token}
+        )
+        self.service_token_environment.start()
+        self.addCleanup(self.service_token_environment.stop)
         self.app = create_app()
-        self.client = TestClient(self.app)
+        self.client = TestClient(
+            self.app,
+            headers={"X-Analytics-Service-Token": self.service_token},
+        )
 
     def tearDown(self):
         self.client.close()
@@ -39,6 +48,19 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Statistical Analysis", response.json()["features"])
         self.assertNotIn("23 Statistical Algorithms", response.json()["features"])
+
+    def test_analysis_routes_reject_missing_or_invalid_service_tokens(self):
+        with TestClient(self.app) as client:
+            payload = {"hazards": [HAZARD]}
+            missing_token = client.post("/api/v1/statistics", json=payload)
+            invalid_token = client.post(
+                "/api/v1/statistics",
+                json=payload,
+                headers={"X-Analytics-Service-Token": "incorrect-test-token"},
+            )
+
+        self.assertEqual(missing_token.status_code, 404)
+        self.assertEqual(invalid_token.status_code, 404)
 
     def test_primary_routes_delegate_to_application_analytics_service(self):
         routes = {

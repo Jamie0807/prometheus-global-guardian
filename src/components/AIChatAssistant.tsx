@@ -9,6 +9,7 @@ import { formatTime, QUICK_PROMPTS } from "../utils/aiAssistant";
 import { useAIChatSession } from "../hooks/useAIChatSession";
 import { useMapState } from "../features/map/state/MapStateContext";
 import { useUIState } from "../state/UIStateContext";
+import AIMemoryManager from "./AIMemoryManager";
 
 // ─── 辅助组件：消息气泡 ───────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ const AIChatAssistant: React.FC = () => {
   const { activeModal, closeModal } = useUIState();
   const isOpen = activeModal === "ai";
   const [contextEnabled, setContextEnabled] = useState(true);
+  const [memoryManagerOpen, setMemoryManagerOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -148,15 +150,20 @@ const AIChatAssistant: React.FC = () => {
 
   const {
     messages,
+    conversations,
+    currentConversationId,
     input,
     errorText,
     reconnectingText,
     isStreaming,
+    isLoadingConversations,
     canRetry,
     setInput,
     send,
     stop,
-    clear,
+    newConversation,
+    selectConversation,
+    removeConversation,
     retry,
     close,
   } = useAIChatSession(isOpen, closeModal, contextEnabled ? disasterContext : undefined);
@@ -220,6 +227,13 @@ const AIChatAssistant: React.FC = () => {
             </div>
           </div>
           <div className="ai-header-actions">
+            <button
+              className="ai-new-conversation-btn"
+              type="button"
+              onClick={() => setMemoryManagerOpen((open) => !open)}
+            >
+              长期记忆
+            </button>
             {/* 上下文开关 */}
             <button
               className={`ai-ctx-btn ${contextEnabled ? "active" : ""}`}
@@ -229,12 +243,9 @@ const AIChatAssistant: React.FC = () => {
               {contextEnabled ? "📡 上下文已开" : "📡 上下文已关"}
             </button>
 
-            {/* 清空 */}
-            {messages.length > 0 && (
-              <button className="ai-clear-btn" onClick={clear} title="清空对话">
-                🗑️
-              </button>
-            )}
+            <button className="ai-new-conversation-btn" onClick={() => void newConversation()}>
+              ＋ 新对话
+            </button>
 
             {isStreaming && (
               <button className="ai-clear-btn" onClick={stop} type="button">
@@ -255,6 +266,44 @@ const AIChatAssistant: React.FC = () => {
             </button>
           </div>
         </div>
+
+        <div className="ai-conversation-toolbar">
+          <label htmlFor="ai-conversation-select">历史会话</label>
+          <select
+            id="ai-conversation-select"
+            value={currentConversationId ?? ""}
+            onChange={(event) => void selectConversation(event.target.value)}
+            disabled={isLoadingConversations || isStreaming}
+          >
+            {!currentConversationId && <option value="">新对话</option>}
+            {conversations.map((conversation) => (
+              <option key={conversation.id} value={conversation.id}>
+                {conversation.title}
+              </option>
+            ))}
+          </select>
+          {currentConversationId && (
+            <button
+              className="ai-delete-conversation-btn"
+              type="button"
+              disabled={isStreaming}
+              onClick={() => {
+                if (window.confirm("删除这条会话？已保存的长期记忆会保留。")) {
+                  void removeConversation(currentConversationId);
+                }
+              }}
+              title="删除当前会话"
+            >
+              删除
+            </button>
+          )}
+          {isLoadingConversations && <span className="ai-conversation-loading">正在加载…</span>}
+        </div>
+        <AIMemoryManager
+          open={memoryManagerOpen}
+          conversationId={currentConversationId}
+          onClose={() => setMemoryManagerOpen(false)}
+        />
 
         {/* ── 消息区域 ── */}
         <div className="ai-messages">

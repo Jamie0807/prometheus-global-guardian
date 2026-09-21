@@ -8,7 +8,7 @@ Languages: [English](#english) | [中文](#中文)
 
 Prometheus Global Guardian is a local development project for global hazard monitoring, geospatial visualization, analytics, and AI-assisted incident assessment. It combines live hazard feeds into a shared model, displays the resulting situation on an interactive map, and provides analysis, reporting, and decision-support workflows.
 
-The repository contains a React client, an Express BFF, a FastAPI analytics service, and integrations with external data and AI providers. It is not currently deployed. Docker Compose is supplied only to run the complete stack locally.
+The repository contains a React client, an Express BFF, a FastAPI analytics service, PostgreSQL-backed accounts and AI persistence, and integrations with external data and AI providers. It is not currently deployed. Docker Compose is supplied only to run the complete stack locally.
 
 ### Table of Contents
 
@@ -39,6 +39,7 @@ The platform is organized around four operational domains:
 - **Geospatial operations**: renders active events with Mapbox GL markers, popups, heatmap mode, clickable clustering, optional 3D Tiles, and configurable base styles.
 - **Analytics and reporting**: presents summaries, charts, risk and quality results from the Python service, then exports the current filtered hazards as a readable HTML report.
 - **AI-assisted analysis**: sends live hazard context through a streaming BFF endpoint for situation summaries and response recommendations.
+- **Accounts and AI persistence**: registers local/self-hosted accounts, gates application APIs by server-side sessions, and stores user-owned conversations, bounded context summaries, and user-approved long-term memory in PostgreSQL.
 
 ### Core Capabilities
 
@@ -85,34 +86,37 @@ The platform is organized around four operational domains:
 flowchart LR
   Browser["React client\nVite :5173"]
   BFF["Express BFF\n:8080"]
-  Python["FastAPI analytics\n:8001"]
+  Python["FastAPI analytics\nprivate :8001"]
+  DB[("PostgreSQL")]
   Sources["DisasterAware · USGS\nNASA EONET · GDACS"]
   Workflow["ai-workflow"]
   Ark["Volcengine Ark"]
 
-  Browser -->|"/api/authorize\n/api/hazards/*\n/api/ai/chat"| BFF
-  Browser -->|"VITE_PYTHON_API_URL\n/api/v1/*"| Python
+  Browser -->|"/api/auth/*\n/api/authorize\n/api/hazards/*\n/api/analytics/*\n/api/ai/conversations/*"| BFF
+  BFF -->|"service token"| Python
+  BFF --> DB
   BFF --> Sources
   BFF -->|disaster-domain route| Workflow
   BFF -->|general-conversation route| Ark
 ```
 
-In local development, Vite serves the browser client on port `5173` and proxies `/api/*` to Express on `8080`. The browser directly calls FastAPI at `VITE_PYTHON_API_URL` (default `http://localhost:8001`) for `/api/v1/*` analytics requests. Express handles DisasterAware authorization, public-feed aggregation, and AI provider routing. Browser assets never receive DisasterAware credentials, upstream access tokens, or model-provider secrets.
+In local development, Vite serves the browser client on port `5173` and proxies `/api/*` to Express on `8080`. The browser sends analytics requests to the authenticated BFF; Express forwards an explicit allowlist to FastAPI over the private service network using a service token. Express also owns account sessions and AI conversation persistence in PostgreSQL. Browser assets never receive database credentials, session tokens, analytics service tokens, DisasterAware credentials, upstream access tokens, or model-provider secrets.
 
 Frontend state ownership is deliberately small and explicit:
 
 - `MapStateProvider` owns hazards, the hazard filter, map style, source metadata, and refresh behavior. It retains the data hook's worker lifecycle, cancellation, and stale-response protection.
 - `UIStateProvider` owns `activeView` (`map` or `analytics`) and `activeModal` (`save-report`, `settings`, `ai`, or `null`).
-- `App` only performs initial authorization, composes providers, handles Escape for report/settings modals, and selects the map or analytics view. Mapbox instances, AI session state, and analytics-fetch state remain in their feature boundaries.
+- `AuthProvider` resolves the server-side user session before mounting protected application state. `App` composes providers, handles Escape for report/settings modals, and selects the map or analytics view. Mapbox instances, AI session state, and analytics-fetch state remain in their feature boundaries.
 
 ### Service Topology
 
-| Service                        | Runtime | Default port | Responsibility                                              |
-| ------------------------------ | ------: | -----------: | ----------------------------------------------------------- |
-| React / Vite client            | Node.js |         5173 | Local frontend development server                           |
-| Express BFF                    | Node.js |         8080 | Static files, authorization, hazard aggregation, AI routing |
-| Python analytics service       |  Python |         8001 | Analysis, prediction, risk, ETL, quality, and pivot APIs    |
-| External data and AI providers |    SaaS |        HTTPS | Hazard feeds and streaming model responses                  |
+| Service                        | Runtime | Default port | Responsibility                                                                               |
+| ------------------------------ | ------: | -----------: | -------------------------------------------------------------------------------------------- |
+| React / Vite client            | Node.js |         5173 | Local frontend development server                                                            |
+| Express BFF                    | Node.js |         8080 | Static files, user sessions, hazard aggregation, analytics proxy, AI routing and persistence |
+| PostgreSQL                     |     SQL |         5432 | Accounts, sessions, conversations, messages and memory                                       |
+| Python analytics service       |  Python |         8001 | Internal analysis, prediction, risk, ETL, quality and pivot APIs                             |
+| External data and AI providers |    SaaS |        HTTPS | Hazard feeds and streaming model responses                                                   |
 
 ### Technology Stack
 
@@ -155,12 +159,13 @@ Create a local environment file before starting services:
 cp .env.example .env
 ```
 
+Before starting the Compose stack, replace the placeholder `AUTH_CSRF_SECRET` and `ANALYTICS_SERVICE_TOKEN` with independent values from `openssl rand -base64 48`. Production mode rejects the CSRF placeholder. Keep the sample PostgreSQL password only for local use.
+
 #### Frontend values
 
 ```dotenv
 VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
 VITE_LOG_LEVEL=debug
-VITE_PYTHON_API_URL=http://localhost:8001
 VITE_3D_TILES_URL=
 VITE_CESIUM_ION_TOKEN=
 ```
@@ -190,9 +195,19 @@ VOLCENGINE_ARK_API_KEY=
 VOLCENGINE_ARK_MODEL=ark-code-latest
 VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/plan/v3
 VOLCENGINE_ARK_TIMEOUT_MS=30000
+
+DATABASE_URL=postgresql://prometheus:prometheus@localhost:5432/prometheus?schema=public
+AUTH_CSRF_SECRET=replace_with_random_secret_at_least_32_characters
+PUBLIC_ORIGIN=https://guardian.example.com
+ANALYTICS_SERVICE_URL=http://localhost:8001
+ANALYTICS_SERVICE_TOKEN=replace_with_a_random_service_secret
 ```
 
 These values are read by Express at runtime and must never use a `VITE_` prefix. `AI_PROVIDER=router` enables smart routing; use `workflow` or `ark` to force one provider while troubleshooting. If the workflow runs on the macOS host while Express runs in Docker, set its URL to `http://host.docker.internal:3100/api/v1/apps/run`.
+
+PostgreSQL is required for account and AI persistence. Generate `AUTH_CSRF_SECRET` and `ANALYTICS_SERVICE_TOKEN` with `openssl rand -base64 48`; replace the local-only PostgreSQL password before exposing a self-hosted instance. Keep all three values server-side.
+
+When TLS terminates at a reverse proxy, set `PUBLIC_ORIGIN` to the exact browser-facing origin (scheme and host, with no path). This lets the BFF validate browser mutations and mark the session cookie `Secure` without trusting forwarded headers. Leave it unset for direct local development.
 
 #### Analytics administration values
 
@@ -220,6 +235,7 @@ Start the Express BFF in one terminal:
 
 ```bash
 pnpm run build:server
+pnpm run db:migrate:deploy
 node dist-server/server.js
 ```
 
@@ -234,6 +250,8 @@ Open `http://localhost:5173`. Start the Python service whenever analytics featur
 ```bash
 ./scripts/start-python-service.sh
 ```
+
+For direct local development, set `DATABASE_URL` to a local PostgreSQL database and `ANALYTICS_SERVICE_URL=http://localhost:8001` in `.env`. Apply the checked-in schema with `pnpm run db:migrate:deploy` before starting Express. Registration is intended for local or privately operated instances; email verification, password reset, OAuth and public-service abuse controls are not included.
 
 ### Testing and Quality
 
@@ -268,22 +286,30 @@ pnpm run build
 Docker Compose is a **local complete-stack startup** path. It does not represent a deployment configuration.
 
 ```bash
-docker compose up --build
+docker compose up --build -d
+docker compose exec web pnpm run db:migrate:deploy
 ```
 
-Open `http://localhost:8080` and check FastAPI at `http://localhost:8001/health`. Stop with `docker compose down`, inspect with `docker compose ps`, and follow output with `docker compose logs -f`.
+Open `http://localhost:8080`. FastAPI and PostgreSQL are private Compose services; check them with `docker compose ps` and `docker compose logs -f analytics db`. Stop with `docker compose down`.
 
-The web container exposes 8080. Analytics is mapped as `127.0.0.1:8001:8001`, so it is not exposed to the local network. Compose passes public `VITE_*` build values to the client build; DisasterAware and AI values remain Express runtime variables. Keep `VITE_PYTHON_API_URL=http://localhost:8001` when using Compose because analytics calls originate in the host browser.
+The web container exposes 8080; Analytics and PostgreSQL do not publish host ports. Analytics requests go through the authenticated BFF and its private service token. Compose passes public `VITE_*` build values to the client build; database, session, analytics service, DisasterAware and AI values remain server-side. The sample database password is for local use only. Back up the PostgreSQL volume before upgrades or maintenance; the migration command is explicit and is not run automatically by startup. For a local SQL backup and restore:
+
+```bash
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
+```
+
+Protect backup files as user data and store them separately from the Compose volume.
 
 ### Python Analytics Service
 
-FastAPI is an independent local service. Its public endpoints include `/`, `/health`, `/docs`, and `/redoc`; browser analytics requests use `/api/v1/*`. `/metrics` and `/cache/clear` are disabled until `ANALYTICS_ADMIN_TOKEN` is set, then require the `X-Analytics-Admin-Token` header.
+FastAPI is an internal analytics service. `/`, `/health`, `/docs`, and `/redoc` are available on its service network; business `/api/v1/*` requests require the BFF service token and are proxied through `/api/analytics`. `/metrics` and `/cache/clear` remain management endpoints and require `X-Analytics-Admin-Token` when enabled.
 
 Read [python-analytics-service/README.md](python-analytics-service/README.md) for startup instructions, request format, endpoint groups, analysis semantics, and the Python test suite.
 
 ### AI Assistant Provider
 
-The browser sends chat requests only to `POST /api/ai/chat`. Express validates the request and streams an adapted response back to the assistant. With `AI_PROVIDER=router`, disaster knowledge, emergency plans, historical cases, and live hazard analysis can go to ai-workflow; general conversation can go to Volcengine Ark. The BFF supports Ark's OpenAI-compatible Chat Completions and Responses protocols. Without a configured provider key, the frontend uses its local demo fallback.
+The browser sends new messages to `POST /api/ai/conversations/:id/messages`; Express loads the user-owned conversation, applies bounded context and approved memories, then streams and persists the result. `POST /api/ai/cancel` stops an active generation for the current user. Conversation history is restored after reload. Memory suggestions are generated only on explicit user action and are not used until accepted. With `AI_PROVIDER=router`, disaster-domain analysis can go to ai-workflow and general conversation can go to Volcengine Ark. The BFF supports Ark's OpenAI-compatible Chat Completions and Responses protocols. If no provider is configured, the existing local demo reply remains available; provider-backed assistant output is stored server-side.
 
 ### Local Production Build
 
@@ -305,15 +331,23 @@ It listens on `http://localhost:8080` by default. `pnpm run start:static` serves
 
 #### Express BFF
 
-| Endpoint                           | Method | Purpose                                                                          |
-| ---------------------------------- | ------ | -------------------------------------------------------------------------------- |
-| `/api/authorize`                   | `POST` | Uses server-side DisasterAware credentials and returns authorization status only |
-| `/api/hazards`                     | `GET`  | Aggregates public hazard feeds; supports `source` and `type` filters             |
-| `/api/ai/chat`                     | `POST` | Streams AI assistant responses through the BFF                                   |
-| `/api/hazards/types`               | `GET`  | Proxies the authenticated DisasterAware type endpoint                            |
-| `/api/hazards/active`              | `GET`  | Proxies authenticated active hazards                                             |
-| `/api/hazards/active/category/:id` | `GET`  | Proxies authenticated category hazards                                           |
-| Other `/api/*`                     | Any    | Returns a stable 404 or 405; arbitrary upstream proxying is not supported        |
+| Endpoint                             | Method                    | Purpose                                                                          |
+| ------------------------------------ | ------------------------- | -------------------------------------------------------------------------------- |
+| `/api/authorize`                     | `POST`                    | Uses server-side DisasterAware credentials and returns authorization status only |
+| `/api/auth/register`                 | `POST`                    | Creates a local account and server-side session                                  |
+| `/api/auth/login`                    | `POST`                    | Starts an authenticated session                                                  |
+| `/api/auth/session`                  | `GET`                     | Restores the current browser session                                             |
+| `/api/auth/logout`                   | `POST`                    | Revokes the current session                                                      |
+| `/api/auth/account`                  | `PATCH` / `DELETE`        | Updates memory preference or deletes the account and owned data                  |
+| `/api/hazards`                       | `GET`                     | Aggregates public hazard feeds; supports `source` and `type` filters             |
+| `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | Manages only the signed-in user's conversations and messages                     |
+| `/api/ai/conversations/:id/messages` | `POST`                    | Streams and persists an AI response                                              |
+| `/api/ai/memories*`                  | Various                   | Manages user-approved long-term memory                                           |
+| `/api/analytics/*`                   | Various                   | Proxies allowlisted analytics calls to private FastAPI                           |
+| `/api/hazards/types`                 | `GET`                     | Proxies the authenticated DisasterAware type endpoint                            |
+| `/api/hazards/active`                | `GET`                     | Proxies authenticated active hazards                                             |
+| `/api/hazards/active/category/:id`   | `GET`                     | Proxies authenticated category hazards                                           |
+| Other `/api/*`                       | Any                       | Returns a stable 404 or 405; arbitrary upstream proxying is not supported        |
 
 #### Python analytics
 
@@ -358,13 +392,16 @@ prometheus-global-guardian/
 │   ├── features/
 │   │   ├── map/                 # Map page, Mapbox hooks, worker, and MapStateProvider
 │   │   └── analytics/           # Analytics page, tabs, data hook, and transformations
-│   ├── state/                   # UIStateProvider and UI state contracts
+│   ├── state/                   # Authentication and UI state providers
 │   ├── services/                # Frontend HTTP, hazard, AI, auth, and analytics boundaries
 │   ├── components/              # Shared React components and modals
 │   ├── workers/                 # Hazard processing Web Worker
-│   └── App.tsx                  # Authorization and provider/view composition
+│   └── App.tsx                  # Authentication gate and provider/view composition
 ├── server/
-│   ├── ai/                      # Provider selection, routing, and stream adaptation
+│   ├── ai/                      # Provider routing, persistent conversations, and memory
+│   ├── auth/                    # Account endpoints, password hashing, and sessions
+│   ├── db/                      # Prisma/PostgreSQL client
+│   ├── analytics/               # Authenticated Analytics proxy
 │   ├── hazards/                 # Public-feed aggregation
 │   └── security/                # BFF request boundaries
 ├── python-analytics-service/
@@ -372,6 +409,7 @@ prometheus-global-guardian/
 │   ├── analytics/               # Statistics, prediction, risk, quality, ETL, and pivot logic
 │   └── tests/                   # Python unittest suite
 ├── tests/                       # BFF, Service, component, and E2E tests
+├── prisma/                      # PostgreSQL schema and explicit migrations
 ├── docs/                        # Governance, test baseline, plans, and specifications
 ├── scripts/                     # Node-version, Python-test, and service-start scripts
 ├── server.ts                    # Express application entry
@@ -385,7 +423,7 @@ prometheus-global-guardian/
 
 Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、地理态势可视化、数据分析和 AI 辅助研判项目。它把实时灾害数据源统一为共享模型，在交互式地图上呈现态势，并提供风险复盘、分析、报告和决策支持工作流。
 
-仓库包含 React 前端、Express BFF、FastAPI 分析服务，以及外部数据源和 AI 服务集成。当前未部署；Docker Compose 仅用于在本地启动完整技术栈。
+仓库包含 React 前端、Express BFF、FastAPI 分析服务、PostgreSQL 账号与 AI 数据持久化，以及外部数据源和 AI 服务集成。当前未部署；Docker Compose 仅用于在本地启动完整技术栈。
 
 ### 目录
 
@@ -416,6 +454,7 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 - **地理态势**：以 Mapbox GL 呈现活动事件、标记、弹窗、热力图、可点击展开的聚合、可选 3D Tiles 和可配置底图。
 - **分析与报告**：调用 Python 服务呈现统计、图表、风险和质量结果，并把当前筛选后的灾害数据导出为可读 HTML 报告。
 - **AI 辅助研判**：将实时灾害上下文送入流式 BFF 接口，生成态势摘要和响应建议。
+- **账号与 AI 持久化**：支持本地/自托管账号注册，全站 API 按服务端会话鉴权；会话、对话、上下文摘要和用户确认的长期记忆保存在 PostgreSQL。
 
 ### 核心能力
 
@@ -450,6 +489,14 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 - 支持强制指定 Provider；未配置模型 Key 时使用本地演示回复。
 - 关闭助手会取消正在进行的流。App 级 Escape 只关闭报告和设置弹窗；AI 组件自身处理 Escape，关闭助手并取消正在进行的流。
 
+#### 账号与 AI 持久化
+
+- 注册和登录后由 Express 通过 HttpOnly Cookie 恢复全站会话，受保护的业务 API 均按当前用户授权。
+- PostgreSQL 保存用户账号、会话、AI 对话和消息；新设备/刷新页面后可继续查看自己的历史对话。
+- 对话上下文有大小上限；较早消息会进入摘要，不会从原始会话记录中删除。
+- 长期记忆需用户主动生成建议并逐条确认；用户可编辑、停用或删除记忆。
+- 注册面向本地或私有运营实例；不包含邮箱验证、密码找回、OAuth 和公网滥用防护。
+
 #### 报告与通知
 
 - 下载可读 HTML 报告，包含报告信息、筛选条件、类型汇总、灾害明细和导出时间；可在浏览器中打印为 PDF。
@@ -462,34 +509,37 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 flowchart LR
   Browser["React 客户端\nVite :5173"]
   BFF["Express BFF\n:8080"]
-  Python["FastAPI 分析服务\n:8001"]
+  Python["FastAPI 分析服务\n私有 :8001"]
+  DB[("PostgreSQL")]
   Sources["DisasterAware · USGS\nNASA EONET · GDACS"]
   Workflow["ai-workflow"]
   Ark["Volcengine Ark"]
 
-  Browser -->|"/api/authorize\n/api/hazards/*\n/api/ai/chat"| BFF
-  Browser -->|"VITE_PYTHON_API_URL\n/api/v1/*"| Python
+  Browser -->|"/api/auth/*\n/api/authorize\n/api/hazards/*\n/api/analytics/*\n/api/ai/conversations/*"| BFF
+  BFF -->|"服务间令牌"| Python
+  BFF --> DB
   BFF --> Sources
   BFF -->|灾害领域路由| Workflow
   BFF -->|通用对话路由| Ark
 ```
 
-本地开发时，Vite 在 `5173` 提供浏览器客户端，并把 `/api/*` 转发到 `8080` 的 Express。浏览器通过 `VITE_PYTHON_API_URL`（默认 `http://localhost:8001`）直接调用 FastAPI 的 `/api/v1/*` 分析接口。Express 负责 DisasterAware 鉴权、公开数据聚合和 AI Provider 路由。浏览器构建产物不会获得 DisasterAware 凭据、上游 token 或模型服务密钥。
+本地开发时，Vite 在 `5173` 提供浏览器客户端，并把 `/api/*` 转发到 `8080` 的 Express。浏览器通过已鉴权的 BFF 请求分析数据；Express 使用服务间令牌将允许的请求转发到私有网络中的 FastAPI。Express 还负责账号会话及 PostgreSQL 中的 AI 对话持久化。浏览器构建产物不会获得数据库凭据、会话令牌、分析服务令牌、DisasterAware 凭据、上游 token 或模型服务密钥。
 
 前端状态归属保持小而明确：
 
 - `MapStateProvider` 负责灾害数据、筛选条件、地图样式、来源元信息和刷新；其内部数据 Hook 保留 Worker 生命周期、取消逻辑和陈旧响应保护。
 - `UIStateProvider` 负责 `activeView`（`map` 或 `analytics`）和 `activeModal`（`save-report`、`settings`、`ai` 或 `null`）。
-- `App` 只负责初始鉴权、Provider 组合、报告/设置弹窗的 Escape 行为，以及地图和分析视图的选择。Mapbox 实例、AI 会话和分析请求状态各自在功能边界内管理。
+- `AuthProvider` 在挂载受保护的应用状态前恢复服务端用户会话。`App` 负责 Provider 组合、报告/设置弹窗的 Escape 行为，以及地图和分析视图的选择。Mapbox 实例、AI 会话和分析请求状态各自在功能边界内管理。
 
 ### 服务拓扑
 
-| 服务                |  运行时 | 默认端口 | 职责                                  |
-| ------------------- | ------: | -------: | ------------------------------------- |
-| React / Vite 客户端 | Node.js |     5173 | 本地前端开发服务                      |
-| Express BFF         | Node.js |     8080 | 静态文件、鉴权、灾害聚合和 AI 路由    |
-| Python 分析服务     |  Python |     8001 | 分析、预测、风险、ETL、质量和透视接口 |
-| 外部数据与 AI 服务  |    SaaS |    HTTPS | 灾害数据与流式模型响应                |
+| 服务                |  运行时 | 默认端口 | 职责                                               |
+| ------------------- | ------: | -------: | -------------------------------------------------- |
+| React / Vite 客户端 | Node.js |     5173 | 本地前端开发服务                                   |
+| Express BFF         | Node.js |     8080 | 静态文件、用户会话、灾害聚合、分析代理和 AI 持久化 |
+| PostgreSQL          |     SQL |     5432 | 账号、会话、对话、消息与记忆                       |
+| Python 分析服务     |  Python |     8001 | 内部分析、预测、风险、ETL、质量和透视接口          |
+| 外部数据与 AI 服务  |    SaaS |    HTTPS | 灾害数据与流式模型响应                             |
 
 ### 技术栈
 
@@ -532,12 +582,13 @@ flowchart LR
 cp .env.example .env
 ```
 
+启动 Compose 前，请将占位的 `AUTH_CSRF_SECRET` 和 `ANALYTICS_SERVICE_TOKEN` 替换为 `openssl rand -base64 48` 生成的不同随机值。生产模式会拒绝 CSRF 占位密钥。示例 PostgreSQL 密码只用于本地。
+
 #### 前端变量
 
 ```dotenv
 VITE_MAPBOX_TOKEN=pk.your_mapbox_token_here
 VITE_LOG_LEVEL=debug
-VITE_PYTHON_API_URL=http://localhost:8001
 VITE_3D_TILES_URL=
 VITE_CESIUM_ION_TOKEN=
 ```
@@ -567,9 +618,19 @@ VOLCENGINE_ARK_API_KEY=
 VOLCENGINE_ARK_MODEL=ark-code-latest
 VOLCENGINE_ARK_API_URL=https://ark.cn-beijing.volces.com/api/plan/v3
 VOLCENGINE_ARK_TIMEOUT_MS=30000
+
+DATABASE_URL=postgresql://prometheus:prometheus@localhost:5432/prometheus?schema=public
+AUTH_CSRF_SECRET=replace_with_random_secret_at_least_32_characters
+PUBLIC_ORIGIN=https://guardian.example.com
+ANALYTICS_SERVICE_URL=http://localhost:8001
+ANALYTICS_SERVICE_TOKEN=replace_with_a_random_service_secret
 ```
 
 这些变量由 Express 在运行时读取，不能使用 `VITE_` 前缀。`AI_PROVIDER=router` 启用智能路由；排查问题时可使用 `workflow` 或 `ark` 强制单一 Provider。若工作流运行在 macOS 主机、Express 运行在 Docker 中，应把工作流 URL 设为 `http://host.docker.internal:3100/api/v1/apps/run`。
+
+账号和 AI 持久化需要 PostgreSQL。使用 `openssl rand -base64 48` 生成 `AUTH_CSRF_SECRET` 与 `ANALYTICS_SERVICE_TOKEN`；对外开放自托管实例前替换仅供本地使用的数据库密码。以上值都只能保留在服务端。
+
+如果 TLS 在反向代理终止，请将 `PUBLIC_ORIGIN` 设置为浏览器实际访问的完整源（协议和主机，不带路径）。BFF 会使用它校验浏览器写请求并设置 `Secure` 会话 Cookie，无需信任转发头。本地直连开发时留空即可。
 
 #### 分析服务管理变量
 
@@ -597,6 +658,7 @@ pnpm install
 
 ```bash
 pnpm run build:server
+pnpm run db:migrate:deploy
 node dist-server/server.js
 ```
 
@@ -611,6 +673,8 @@ pnpm run dev
 ```bash
 ./scripts/start-python-service.sh
 ```
+
+直接本地开发时，在 `.env` 中把 `DATABASE_URL` 指向本机 PostgreSQL，并设置 `ANALYTICS_SERVICE_URL=http://localhost:8001`。启动 Express 前先执行仓库迁移 `pnpm run db:migrate:deploy`。注册功能面向本地或私有运营实例；当前不包含邮箱验证、密码找回、OAuth 或公网滥用防护。
 
 ### 测试与质量
 
@@ -645,22 +709,41 @@ pnpm run build
 Docker Compose 是**本地完整栈启动方式**，不代表部署配置。
 
 ```bash
-docker compose up --build
+docker compose up --build -d
+docker compose exec web pnpm run db:migrate:deploy
 ```
 
-访问 `http://localhost:8080`，并通过 `http://localhost:8001/health` 检查 FastAPI。用 `docker compose down` 停止本地栈，用 `docker compose ps` 查看容器，用 `docker compose logs -f` 查看日志。
+访问 `http://localhost:8080`。FastAPI 和 PostgreSQL 是 Compose 私有服务；用 `docker compose ps` 查看状态，用 `docker compose logs -f analytics db` 查看日志，用 `docker compose down` 停止本地栈。
 
-Web 容器暴露 8080；分析服务映射为 `127.0.0.1:8001:8001`，不会暴露到局域网。Compose 只将公开的 `VITE_*` 构建变量传入客户端构建；DisasterAware 和 AI 变量仍为 Express 运行时变量。使用 Compose 时保持 `VITE_PYTHON_API_URL=http://localhost:8001`，因为分析请求来自主机浏览器。
+Web 容器暴露 8080；Analytics 和 PostgreSQL 不发布主机端口。分析请求经已鉴权的 BFF 和私有服务令牌转发。Compose 只将公开的 `VITE_*` 构建变量传入客户端构建；数据库、会话、分析服务、DisasterAware 和 AI 配置都保留在服务端。示例数据库密码仅供本地使用。升级或维护前先备份 PostgreSQL 数据卷；迁移命令需显式执行，不会随服务启动自动运行。
+
+本地 SQL 备份与恢复示例：
+
+```bash
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
+```
+
+备份文件包含用户数据，应妥善保护，并与 Compose 数据卷分开保存。
+
+本地 SQL 备份与恢复示例：
+
+```bash
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
+```
+
+备份文件包含用户数据，应妥善保护，并与 Compose 数据卷分开保存。
 
 ### Python 分析服务
 
-FastAPI 是独立的本地服务。公开接口包括 `/`、`/health`、`/docs` 和 `/redoc`；浏览器分析请求使用 `/api/v1/*`。在设置 `ANALYTICS_ADMIN_TOKEN` 前，`/metrics` 和 `/cache/clear` 不启用；设置后请求必须携带 `X-Analytics-Admin-Token`。
+FastAPI 是内部分析服务。`/`、`/health`、`/docs` 和 `/redoc` 可在服务网络中访问；业务 `/api/v1/*` 请求要求 BFF 服务令牌，并通过 `/api/analytics` 代理。`/metrics` 和 `/cache/clear` 仍是管理接口，启用后要求 `X-Analytics-Admin-Token`。
 
 请阅读 [python-analytics-service/README.md](python-analytics-service/README.md)，其中包含启动方法、请求结构、接口分组、分析语义和 Python 测试说明。
 
 ### AI 助手服务
 
-浏览器只向 `POST /api/ai/chat` 发送聊天请求。Express 校验请求并把适配后的流式响应返回给助手。使用 `AI_PROVIDER=router` 时，灾害知识、应急预案、历史案例和实时灾害分析可路由至 ai-workflow，通用对话可路由至火山方舟。BFF 支持 Ark 的 OpenAI 兼容 Chat Completions 与 Responses 协议。未配置 Provider Key 时，前端使用本地演示回复。
+浏览器向 `POST /api/ai/conversations/:id/messages` 提交新消息；Express 读取当前用户自己的对话，组装有长度上限的上下文和已确认记忆，再流式返回并持久化回复。`POST /api/ai/cancel` 会停止当前用户正在进行的生成。刷新后可以恢复对话。只有用户主动发起时才生成记忆建议，接受后才会用于后续上下文。使用 `AI_PROVIDER=router` 时，灾害分析可路由至 ai-workflow，通用对话可路由至火山方舟；如果 Ark 未配置，后台摘要和记忆任务会回退到已配置的工作流。BFF 支持 Ark 的 OpenAI 兼容 Chat Completions 与 Responses 协议。未配置 Provider 时仍可使用本地演示回复；真实 Provider 的助手回复保存在服务端。
 
 ### 本地生产构建
 
@@ -682,15 +765,23 @@ pnpm start
 
 #### Express BFF
 
-| 接口                               | 方法   | 作用                                           |
-| ---------------------------------- | ------ | ---------------------------------------------- |
-| `/api/authorize`                   | `POST` | 使用服务端 DisasterAware 凭据，只返回鉴权状态  |
-| `/api/hazards`                     | `GET`  | 聚合公开灾害数据，支持 `source` 和 `type` 筛选 |
-| `/api/ai/chat`                     | `POST` | 通过 BFF 流式返回 AI 助手响应                  |
-| `/api/hazards/types`               | `GET`  | 代理已鉴权的 DisasterAware 类型接口            |
-| `/api/hazards/active`              | `GET`  | 代理已鉴权的活动灾害接口                       |
-| `/api/hazards/active/category/:id` | `GET`  | 代理已鉴权的分类灾害接口                       |
-| 其他 `/api/*`                      | Any    | 返回稳定的 404 或 405，不支持任意上游代理      |
+| 接口                                 | 方法                      | 作用                                           |
+| ------------------------------------ | ------------------------- | ---------------------------------------------- |
+| `/api/authorize`                     | `POST`                    | 使用服务端 DisasterAware 凭据，只返回鉴权状态  |
+| `/api/auth/register`                 | `POST`                    | 创建本地账号和服务端会话                       |
+| `/api/auth/login`                    | `POST`                    | 建立已鉴权会话                                 |
+| `/api/auth/session`                  | `GET`                     | 恢复当前浏览器会话                             |
+| `/api/auth/logout`                   | `POST`                    | 撤销当前会话                                   |
+| `/api/auth/account`                  | `PATCH` / `DELETE`        | 修改记忆偏好或删除账号及其数据                 |
+| `/api/hazards`                       | `GET`                     | 聚合公开灾害数据，支持 `source` 和 `type` 筛选 |
+| `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | 管理当前用户自己的对话和消息                   |
+| `/api/ai/conversations/:id/messages` | `POST`                    | 流式生成并保存 AI 回复                         |
+| `/api/ai/memories*`                  | 多种                      | 管理用户确认的长期记忆                         |
+| `/api/analytics/*`                   | 多种                      | 代理允许的请求到私有 FastAPI                   |
+| `/api/hazards/types`                 | `GET`                     | 代理已鉴权的 DisasterAware 类型接口            |
+| `/api/hazards/active`                | `GET`                     | 代理已鉴权的活动灾害接口                       |
+| `/api/hazards/active/category/:id`   | `GET`                     | 代理已鉴权的分类灾害接口                       |
+| 其他 `/api/*`                        | Any                       | 返回稳定的 404 或 405，不支持任意上游代理      |
 
 #### Python 分析服务
 

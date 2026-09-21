@@ -1,20 +1,24 @@
-/**
- * 提供 AI 聊天会话的状态管理与流式交互 Hook。
- */
+/** 管理持久化 AI 对话、历史会话选择和流式交互。 */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  cancelAIStream,
+  createAIRequestId,
   streamChatMessage,
   type ChatMessage,
   type DisasterContext,
 } from "../services/ai/aiAssistantService";
+import {
+  createAIConversation,
+  deleteAIConversation,
+  getAIConversation,
+  listAIConversations,
+} from "../services/ai/conversationService";
+import type { AIConversationSummary } from "../services/ai/conversationService";
 import { generateMessageId } from "../utils/aiAssistant";
 
-const MAX_MESSAGES = 50;
-const MAX_MESSAGE_CHARACTERS = 8_000;
-const MAX_REQUEST_BYTES = 64 * 1024;
-
 interface RetrySnapshot {
-  history: ChatMessage[];
+  conversationId: string;
+  clientMessageId: string;
   userMessage: ChatMessage;
   context: DisasterContext | undefined;
   failedAssistantId?: string;
@@ -22,60 +26,33 @@ interface RetrySnapshot {
 
 interface ActiveRequest {
   requestId: number;
+  serverRequestId: string;
   assistantId: string;
   controller: AbortController;
-  assistantCreated: boolean;
+  conversationId: string;
 }
 
 export interface AIChatSession {
   messages: readonly ChatMessage[];
+  conversations: readonly AIConversationSummary[];
+  currentConversationId?: string;
   input: string;
   errorText: string;
   reconnectingText: string;
   isStreaming: boolean;
+  isLoadingConversations: boolean;
   canRetry: boolean;
   setInput: (value: string) => void;
   send: (text: string) => Promise<void>;
   stop: () => void;
-  clear: () => void;
+  newConversation: () => Promise<void>;
+  selectConversation: (id: string) => Promise<void>;
+  removeConversation: (id: string) => Promise<void>;
   retry: () => Promise<void>;
   close: () => void;
 }
 
-function requestBytes(
-  messages: readonly ChatMessage[],
-  context: DisasterContext | undefined,
-): number {
-  return new TextEncoder().encode(JSON.stringify({ messages, disasterContext: context ?? null }))
-    .byteLength;
-}
-
-function completedConversation(messages: readonly ChatMessage[]): ChatMessage[] {
-  const history: ChatMessage[] = [];
-  // 只重放已完成的用户/助手成对消息，避免把中断或失败的回复发给服务端。
-  for (let index = 0; index < messages.length - 1; index += 1) {
-    const user = messages[index];
-    const assistant = messages[index + 1];
-    if (user.role === "user" && assistant.role === "assistant" && assistant.isComplete) {
-      history.push(user, assistant);
-      index += 1;
-    }
-  }
-  return history;
-}
-
-function prepareHistory(
-  messages: readonly ChatMessage[],
-  userMessage: ChatMessage,
-  context: DisasterContext | undefined,
-): ChatMessage[] | undefined {
-  const history = [...completedConversation(messages), userMessage];
-  while (history.length > MAX_MESSAGES || requestBytes(history, context) > MAX_REQUEST_BYTES) {
-    if (history.length <= 1) return undefined;
-    history.splice(0, 2);
-  }
-  return history;
-}
+const MAX_MESSAGE_CHARACTERS = 8_000;
 
 export function useAIChatSession(
   isOpen: boolean,
@@ -83,22 +60,26 @@ export function useAIChatSession(
   context: DisasterContext | undefined,
 ): AIChatSession {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversations, setConversations] = useState<AIConversationSummary[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>();
   const [input, setInput] = useState("");
   const [errorText, setErrorText] = useState("");
   const [reconnectingText, setReconnectingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [retrySnapshot, setRetrySnapshot] = useState<RetrySnapshot>();
   const activeRequestRef = useRef<ActiveRequest | undefined>(undefined);
   const requestSequenceRef = useRef(0);
+  const selectionSequenceRef = useRef(0);
 
   const stop = useCallback(() => {
     const active = activeRequestRef.current;
     setReconnectingText("");
     if (!active) return;
 
-    // 先使当前请求失效，再 abort；迟到的分块会被 requestId 守卫忽略。
     activeRequestRef.current = undefined;
     requestSequenceRef.current += 1;
+    void cancelAIStream(active.serverRequestId).catch(() => undefined);
     active.controller.abort();
     setMessages((current) =>
       current.map((message) =>
@@ -110,18 +91,70 @@ export function useAIChatSession(
     setIsStreaming(false);
   }, []);
 
+  const loadConversation = useCallback(async (id: string): Promise<void> => {
+    const selection = ++selectionSequenceRef.current;
+    const conversation = await getAIConversation(id);
+    if (selection !== selectionSequenceRef.current) return;
+    setCurrentConversationId(conversation.id);
+    setMessages(conversation.messages);
+    setErrorText("");
+    setRetrySnapshot(undefined);
+  }, []);
+
+  const refreshConversations = useCallback(async (): Promise<AIConversationSummary[]> => {
+    const current = await listAIConversations();
+    setConversations(current);
+    return current;
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setIsLoadingConversations(true);
+    void (async () => {
+      try {
+        const current = await listAIConversations();
+        if (cancelled) return;
+        setConversations(current);
+        const latest = current[0];
+        if (latest) {
+          const conversation = await getAIConversation(latest.id);
+          if (!cancelled) {
+            setCurrentConversationId(conversation.id);
+            setMessages(conversation.messages);
+          }
+        } else {
+          setCurrentConversationId(undefined);
+          setMessages([]);
+        }
+        setErrorText("");
+        setRetrySnapshot(undefined);
+      } catch {
+        if (!cancelled) setErrorText("无法加载历史会话，请重试。");
+      } finally {
+        if (!cancelled) setIsLoadingConversations(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      selectionSequenceRef.current += 1;
+    };
+  }, [isOpen]);
+
   const start = useCallback(
     async (snapshot: RetrySnapshot, appendUserMessage: boolean): Promise<void> => {
       if (activeRequestRef.current) return;
 
       const requestId = ++requestSequenceRef.current;
+      const serverRequestId = createAIRequestId();
       const controller = new AbortController();
       const assistantId = generateMessageId();
       const activeRequest: ActiveRequest = {
         requestId,
+        serverRequestId,
         assistantId,
         controller,
-        assistantCreated: false,
+        conversationId: snapshot.conversationId,
       };
       const assistantMessage: ChatMessage = {
         id: assistantId,
@@ -131,7 +164,6 @@ export function useAIChatSession(
         isStreaming: true,
       };
 
-      // 将活动请求写入 ref，使停止、关闭和卸载都能取消同一条流。
       activeRequestRef.current = activeRequest;
       setErrorText("");
       setReconnectingText("");
@@ -146,71 +178,69 @@ export function useAIChatSession(
       });
       setIsStreaming(true);
 
-      // 防止取消后的异步读取或旧请求分块覆盖当前会话状态。
       const isCurrentRequest = (): boolean => activeRequestRef.current?.requestId === requestId;
-      const outcome = await streamChatMessage(snapshot.history, snapshot.context, {
-        signal: controller.signal,
-        onReconnect: (attempt) => {
-          if (isCurrentRequest()) {
-            setReconnectingText(`连接中断，正在自动恢复（第 ${attempt}/3 次）……`);
-          }
+      const outcome = await streamChatMessage(
+        {
+          conversationId: snapshot.conversationId,
+          clientMessageId: snapshot.clientMessageId,
+          content: snapshot.userMessage.content,
         },
-        onReconnected: () => {
-          if (isCurrentRequest()) setReconnectingText("");
+        snapshot.context,
+        {
+          signal: controller.signal,
+          requestId: serverRequestId,
+          onReconnect: (attempt) => {
+            if (isCurrentRequest()) {
+              setReconnectingText(`连接中断，正在自动恢复（第 ${attempt}/3 次）……`);
+            }
+          },
+          onReconnected: () => {
+            if (isCurrentRequest()) setReconnectingText("");
+          },
+          onChunk: (chunk) => {
+            if (!isCurrentRequest() || !chunk.trim()) return;
+            setMessages((current) => {
+              const exists = current.some((message) => message.id === assistantId);
+              return exists
+                ? current.map((message) =>
+                    message.id === assistantId
+                      ? { ...message, content: message.content + chunk }
+                      : message,
+                  )
+                : [...current, { ...assistantMessage, content: chunk }];
+            });
+          },
         },
-        onChunk: (chunk) => {
-          if (!isCurrentRequest()) return;
-          if (!chunk.trim()) return;
-          if (!activeRequest.assistantCreated) {
-            // 第一个有效分块才创建助手消息，空流不会留下空白气泡。
-            activeRequest.assistantCreated = true;
-            setMessages((current) => [...current, { ...assistantMessage, content: chunk }]);
-            return;
-          }
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantId
-                ? { ...message, content: message.content + chunk }
-                : message,
-            ),
-          );
-        },
-      });
+      );
 
       if (!isCurrentRequest()) return;
 
       if (outcome.kind === "completed") {
         setReconnectingText("");
-        if (activeRequest.assistantCreated) {
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantId
-                ? { ...message, isStreaming: false, isComplete: true }
-                : message,
-            ),
-          );
-        }
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantId
+              ? { ...message, isStreaming: false, isComplete: true }
+              : message,
+          ),
+        );
+        void refreshConversations().catch(() => undefined);
       } else if (outcome.kind === "cancelled") {
         setReconnectingText("");
-        if (activeRequest.assistantCreated) {
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantId
-                ? { ...message, isStreaming: false, isCancelled: true }
-                : message,
-            ),
-          );
-        }
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantId
+              ? { ...message, isStreaming: false, isCancelled: true }
+              : message,
+          ),
+        );
       } else {
         setReconnectingText("");
-        if (activeRequest.assistantCreated) {
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === assistantId ? { ...message, isStreaming: false } : message,
-            ),
-          );
-        }
-        // 失败时保存本次请求快照，供 retry 原样重发。
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantId ? { ...message, isStreaming: false } : message,
+          ),
+        );
         setErrorText(outcome.message);
         setRetrySnapshot({ ...snapshot, failedAssistantId: assistantId });
       }
@@ -220,7 +250,7 @@ export function useAIChatSession(
         setIsStreaming(false);
       }
     },
-    [],
+    [refreshConversations],
   );
 
   const send = useCallback(
@@ -232,23 +262,31 @@ export function useAIChatSession(
         return;
       }
 
-      const userMessage: ChatMessage = {
-        id: generateMessageId(),
-        role: "user",
-        content,
-        timestamp: new Date().toISOString(),
-        isComplete: true,
-      };
-      const history = prepareHistory(messages, userMessage, context);
-      if (!history) {
-        setErrorText("请求内容超过 64 KiB，请缩短消息后重试。");
-        return;
-      }
-
       setInput("");
-      await start({ history, userMessage, context }, true);
+      setErrorText("");
+      try {
+        let conversationId = currentConversationId;
+        if (!conversationId) {
+          const conversation = await createAIConversation();
+          conversationId = conversation.id;
+          setCurrentConversationId(conversation.id);
+          setConversations((current) => [conversation, ...current]);
+        }
+        const clientMessageId = generateMessageId();
+        const userMessage: ChatMessage = {
+          id: clientMessageId,
+          role: "user",
+          content,
+          timestamp: new Date().toISOString(),
+          isComplete: true,
+        };
+        await start({ conversationId, clientMessageId, userMessage, context }, true);
+      } catch {
+        setInput(content);
+        setErrorText("无法创建会话，请稍后重试。");
+      }
     },
-    [context, messages, start],
+    [context, currentConversationId, start],
   );
 
   const retry = useCallback(async (): Promise<void> => {
@@ -256,14 +294,58 @@ export function useAIChatSession(
     await start(retrySnapshot, false);
   }, [retrySnapshot, start]);
 
-  const clear = useCallback(() => {
+  const newConversation = useCallback(async (): Promise<void> => {
     stop();
     setMessages([]);
     setInput("");
     setErrorText("");
-    setReconnectingText("");
     setRetrySnapshot(undefined);
+    try {
+      const conversation = await createAIConversation();
+      setConversations((current) => [conversation, ...current]);
+      setCurrentConversationId(conversation.id);
+    } catch {
+      setCurrentConversationId(undefined);
+      setErrorText("无法创建新会话，请稍后重试。");
+    }
   }, [stop]);
+
+  const selectConversation = useCallback(
+    async (id: string): Promise<void> => {
+      if (id === currentConversationId || isStreaming) return;
+      stop();
+      setIsLoadingConversations(true);
+      try {
+        await loadConversation(id);
+      } catch {
+        setErrorText("无法加载所选会话。");
+      } finally {
+        setIsLoadingConversations(false);
+      }
+    },
+    [currentConversationId, isStreaming, loadConversation, stop],
+  );
+
+  const removeConversation = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        await deleteAIConversation(id);
+        const remaining = conversations.filter((conversation) => conversation.id !== id);
+        setConversations(remaining);
+        if (currentConversationId === id) {
+          const next = remaining[0];
+          if (next) await loadConversation(next.id);
+          else {
+            setCurrentConversationId(undefined);
+            setMessages([]);
+          }
+        }
+      } catch {
+        setErrorText("无法删除会话，请重试。");
+      }
+    },
+    [conversations, currentConversationId, loadConversation],
+  );
 
   const close = useCallback(() => {
     stop();
@@ -271,24 +353,27 @@ export function useAIChatSession(
   }, [onClose, stop]);
 
   useEffect(() => {
-    // 面板隐藏时停止正在读取的响应流。
     if (!isOpen) stop();
   }, [isOpen, stop]);
 
-  // 组件卸载时同样取消流，避免在已卸载会话上更新状态。
   useEffect(() => stop, [stop]);
 
   return {
     messages,
+    conversations,
+    currentConversationId,
     input,
     errorText,
     reconnectingText,
     isStreaming,
+    isLoadingConversations,
     canRetry: Boolean(retrySnapshot) && !isStreaming,
     setInput,
     send,
     stop,
-    clear,
+    newConversation,
+    selectConversation,
+    removeConversation,
     retry,
     close,
   };

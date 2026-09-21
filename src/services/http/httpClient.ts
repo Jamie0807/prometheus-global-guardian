@@ -2,6 +2,7 @@
  * 提供 HTTP 请求客户端及流式请求工具。
  */
 import { ServiceError, type ServiceErrorCode } from "./serviceError";
+import { getAuthCsrfToken } from "../auth/csrfToken";
 
 export interface HttpRequestOptions {
   timeoutMs?: number;
@@ -69,9 +70,29 @@ async function requestResponse(
     }
 
     try {
-      const response = await fetch(input, { ...init, signal: controller.signal });
+      const headers = new Headers(init.headers);
+      const method = (init.method ?? "GET").toUpperCase();
+      if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        const csrfToken = getAuthCsrfToken();
+        if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
+      }
+      const response = await fetch(input, {
+        ...init,
+        headers,
+        credentials: init.credentials ?? "same-origin",
+        signal: controller.signal,
+      });
       if (callerSignal?.aborted) {
         throw callerAbortError(callerSignal);
+      }
+      if (
+        response.status === 401 &&
+        typeof input === "string" &&
+        input.startsWith("/api/") &&
+        !input.startsWith("/api/auth/") &&
+        typeof window !== "undefined"
+      ) {
+        window.dispatchEvent(new Event("app:auth-expired"));
       }
       if (response.ok) {
         return response;
