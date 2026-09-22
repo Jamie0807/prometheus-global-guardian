@@ -1,6 +1,14 @@
 FROM node:20.19-slim AS build
 WORKDIR /app
 
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+        g++ \
+        make \
+        openssl \
+        python3 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
 COPY prisma ./prisma
@@ -28,15 +36,27 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
+        g++ \
+        make \
+        openssl \
+        python3 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
-RUN npm install --global pnpm@10.15.1 && pnpm install --prod --frozen-lockfile
+RUN node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); if (pkg.scripts) delete pkg.scripts.prepare; fs.writeFileSync('package.json', JSON.stringify(pkg));" \
+    && npm install --global pnpm@10.15.1 \
+    && pnpm install --prod --frozen-lockfile
 
 COPY --from=build /app/dist-server ./dist-server
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build /app/.nvmrc ./.nvmrc
+COPY --from=build /app/scripts/with-node-version.sh ./scripts/with-node-version.sh
 
 EXPOSE 8080
 CMD ["node", "dist-server/server.js"]
