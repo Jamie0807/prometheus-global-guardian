@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -13,6 +13,7 @@ import {
   selectPrunableBackups,
 } from "../scripts/persistence/backup-utils.mjs";
 import {
+  backup,
   runCompose,
   validateBackupDirectory,
   verifyBackupManifest,
@@ -92,10 +93,100 @@ describe("persistence backup artifacts", () => {
 });
 
 describe("persistence command boundaries", () => {
+  const now = new Date("2026-09-23T08:09:10.000Z");
+  const dumpName = makeBackupArtifactName(now);
+
+  async function withBackupDirectory(test: (directory: string) => Promise<void>) {
+    const directory = await mkdtemp(path.join(await realpath(os.tmpdir()), "pgg-backup-test-"));
+    try {
+      await test(directory);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  async function fakeCompose(args: string[], options?: { stdoutPath?: string }) {
+    if (args.some((arg) => arg.includes("pg_isready"))) return "prometheus";
+    if (options?.stdoutPath) await writeFile(options.stdoutPath, "new dump");
+    return "";
+  }
+
   it("rejects backup directories nested inside a project file", async () => {
     await expect(
       validateBackupDirectory(resolveBackupDirectory("package.json/backups", process.cwd())),
     ).rejects.toThrow(/directory|file/i);
+  });
+
+  it("rejects custom backup directories inside the repository", async () => {
+    await expect(validateBackupDirectory(path.join(process.cwd(), "archive/db"))).rejects.toThrow(
+      /ignored|repository/i,
+    );
+    await expect(validateBackupDirectory(path.join(process.cwd(), "backups/nested"))).resolves.toBe(
+      path.join(process.cwd(), "backups/nested"),
+    );
+  });
+
+  it("keeps an existing dump and manifest when the timestamp repeats", async () => {
+    await withBackupDirectory(async (directory) => {
+      const dumpPath = path.join(directory, dumpName);
+      const manifestPath = `${dumpPath}.sha256`;
+      await writeFile(dumpPath, "original dump");
+      await writeFile(manifestPath, "original manifest");
+
+      await expect(
+        backup({ backupDirectory: directory, now, composeRunner: fakeCompose }),
+      ).rejects.toMatchObject({ code: "EEXIST" });
+      expect(await readFile(dumpPath, "utf8")).toBe("original dump");
+      expect(await readFile(manifestPath, "utf8")).toBe("original manifest");
+      expect(await readdir(directory)).toEqual([dumpName, `${dumpName}.sha256`]);
+    });
+  });
+
+  it("removes only its own temporary files when dump generation fails", async () => {
+    await withBackupDirectory(async (directory) => {
+      const unrelatedTemp = path.join(directory, `.${dumpName}.tmp`);
+      await writeFile(unrelatedTemp, "another process");
+      await expect(
+        backup({
+          backupDirectory: directory,
+          now,
+          composeRunner: async (args, options) => {
+            if (args.some((arg) => arg.includes("pg_isready"))) return "prometheus";
+            if (options?.stdoutPath) await writeFile(options.stdoutPath, "partial dump");
+            throw new Error("pg_dump failed");
+          },
+        }),
+      ).rejects.toThrow("pg_dump failed");
+      expect(await readFile(unrelatedTemp, "utf8")).toBe("another process");
+      expect(await readdir(directory)).toEqual([`.${dumpName}.tmp`]);
+    });
+  });
+
+  it("preserves a competing manifest and cleans its own staged files", async () => {
+    await withBackupDirectory(async (directory) => {
+      const dumpPath = path.join(directory, dumpName);
+      const manifestPath = `${dumpPath}.sha256`;
+      await expect(
+        backup({
+          backupDirectory: directory,
+          now,
+          composeRunner: async (args, options) => {
+            if (args.some((arg) => arg.includes("pg_isready"))) return "prometheus";
+            if (options?.stdoutPath) await writeFile(options.stdoutPath, "new dump");
+            await writeFile(manifestPath, "competing manifest", { flag: "wx" });
+            return "";
+          },
+        }),
+      ).rejects.toMatchObject({ code: "EEXIST" });
+      expect(await readFile(manifestPath, "utf8")).toBe("competing manifest");
+      expect(await readdir(directory)).toEqual([`${dumpName}.sha256`]);
+    });
+  });
+
+  it("includes both Task 1 utility files in the format check", async () => {
+    const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+    expect(packageJson.scripts["format:check"]).toContain("scripts/persistence/backup-utils.mjs");
+    expect(packageJson.scripts["format:check"]).toContain("scripts/persistence/backup-utils.d.ts");
   });
 
   it("preserves files outside the fixed artifact pattern during pruning", () => {

@@ -25,9 +25,16 @@ export async function validateBackupDirectory(directory) {
       if (error.code !== "ENOENT") throw error;
     }
     const parent = path.dirname(current);
-    if (parent === current) return absolute;
+    if (parent === current) break;
     current = parent;
   }
+  const relative = path.relative(projectRoot, absolute);
+  const insideProject =
+    relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  if (insideProject && relative !== "backups" && !relative.startsWith(`backups${path.sep}`)) {
+    throw new Error("backup directory inside repository must be under ignored backups/");
+  }
+  return absolute;
 }
 
 async function defaultRunner(command, args, { stdoutPath } = {}) {
@@ -89,20 +96,9 @@ export async function verifyBackupManifest(dumpPath, manifestPath = `${dumpPath}
   return manifest;
 }
 
-async function writeFileAtomically(destination, content) {
-  const temporary = `${destination}.tmp`;
-  try {
-    await fs.writeFile(temporary, content, { flag: "wx", mode: 0o600 });
-    await fs.rename(temporary, destination);
-  } catch (error) {
-    await fs.rm(temporary, { force: true });
-    throw error;
-  }
-}
-
-async function ensureDatabaseReady() {
+async function ensureDatabaseReady(composeRunner) {
   return (
-    await runCompose([
+    await composeRunner([
       "exec",
       "-T",
       "db",
@@ -113,30 +109,33 @@ async function ensureDatabaseReady() {
   ).trim();
 }
 
-async function backup() {
-  const backupDir = await validateBackupDirectory(
-    resolveBackupDirectory(process.env.PERSISTENCE_BACKUP_DIR, projectRoot),
-  );
-  const now = new Date();
+export async function backup({
+  backupDirectory = resolveBackupDirectory(process.env.PERSISTENCE_BACKUP_DIR, projectRoot),
+  now = new Date(),
+  composeRunner = runCompose,
+} = {}) {
+  const backupDir = await validateBackupDirectory(backupDirectory);
   const artifactName = makeBackupArtifactName(now);
   const dumpPath = path.join(backupDir, artifactName);
   const manifestPath = `${dumpPath}.sha256`;
-  let tempPath;
+  let temporaryDirectory;
+  let publishedDump = false;
   try {
-    const database = await ensureDatabaseReady();
+    const database = await ensureDatabaseReady(composeRunner);
     await fs.mkdir(backupDir, { recursive: true, mode: 0o700 });
-    tempPath = path.join(backupDir, `.${artifactName}.tmp`);
+    temporaryDirectory = await fs.mkdtemp(path.join(backupDir, `.${artifactName}-`));
+    const tempPath = path.join(temporaryDirectory, artifactName);
+    const temporaryManifest = path.join(temporaryDirectory, `${artifactName}.sha256`);
     const pgDumpCommand =
       'exec pg_dump --format=custom --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"';
-    await runCompose(["exec", "-T", "db", "sh", "-ec", pgDumpCommand], {
+    await composeRunner(["exec", "-T", "db", "sh", "-ec", pgDumpCommand], {
       stdoutPath: tempPath,
     });
     const stat = await fs.stat(tempPath);
     if (stat.size === 0) throw new Error("backup is empty");
     const sha256 = await sha256File(tempPath);
-    await fs.rename(tempPath, dumpPath);
-    await writeFileAtomically(
-      manifestPath,
+    await fs.writeFile(
+      temporaryManifest,
       buildManifest({
         dumpName: artifactName,
         sizeBytes: stat.size,
@@ -145,11 +144,19 @@ async function backup() {
         schema: "public",
         createdAt: now.toISOString(),
       }),
+      { flag: "wx", mode: 0o600 },
     );
+    // link fails with EEXIST and never replaces an existing artifact.
+    await fs.link(tempPath, dumpPath);
+    publishedDump = true;
+    await fs.link(temporaryManifest, manifestPath);
+    publishedDump = false;
     console.log(`Created ${artifactName} and checksum manifest`);
   } catch (error) {
-    if (tempPath) await fs.rm(tempPath, { force: true });
+    if (publishedDump) await fs.unlink(dumpPath);
     throw error;
+  } finally {
+    if (temporaryDirectory) await fs.rm(temporaryDirectory, { recursive: true, force: true });
   }
 }
 
