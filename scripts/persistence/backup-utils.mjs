@@ -51,15 +51,22 @@ export function selectPrunableBackups(entries, now, retentionDays = 7) {
     throw new TypeError("retentionDays must be a non-negative integer");
   }
 
-  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - retentionDays);
+  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - retentionDays + 1);
+  const cutoffDate = [cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate()];
 
   return entries.filter((entry) => {
     const artifact = parseBackupArtifact(entry);
     if (!artifact) return false;
 
     const created = artifact.timestamp;
-    const artifactDate = new Date(created.getFullYear(), created.getMonth(), created.getDate());
-    return artifactDate < cutoff;
+    const artifactDate = [created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate()];
+    return (
+      artifactDate[0] < cutoffDate[0] ||
+      (artifactDate[0] === cutoffDate[0] && artifactDate[1] < cutoffDate[1]) ||
+      (artifactDate[0] === cutoffDate[0] &&
+        artifactDate[1] === cutoffDate[1] &&
+        artifactDate[2] < cutoffDate[2])
+    );
   });
 }
 
