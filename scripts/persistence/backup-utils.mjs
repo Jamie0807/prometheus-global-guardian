@@ -59,7 +59,7 @@ export function selectPrunableBackups(entries, now, retentionDays = 7) {
     if (!artifact) return false;
 
     const created = artifact.timestamp;
-    const artifactDate = [created.getUTCFullYear(), created.getUTCMonth(), created.getUTCDate()];
+    const artifactDate = [created.getFullYear(), created.getMonth(), created.getDate()];
     return (
       artifactDate[0] < cutoffDate[0] ||
       (artifactDate[0] === cutoffDate[0] && artifactDate[1] < cutoffDate[1]) ||
