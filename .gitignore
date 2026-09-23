@@ -16,6 +16,7 @@ dist-ssr
 server/generated/prisma/
 playwright-report/
 test-results/
+backups/
 .worktrees/
 
 # Environment variables

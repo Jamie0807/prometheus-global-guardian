@@ -1,3 +1,8 @@
+import { createHash } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +12,11 @@ import {
   resolveBackupDirectory,
   selectPrunableBackups,
 } from "../scripts/persistence/backup-utils.mjs";
+import {
+  runCompose,
+  validateBackupDirectory,
+  verifyBackupManifest,
+} from "../scripts/persistence/db-ops.mjs";
 
 describe("persistence backup artifacts", () => {
   it("creates and parses a deterministic timestamped filename", () => {
@@ -78,5 +88,72 @@ describe("persistence backup artifacts", () => {
 
     expect(() => buildManifest({ ...base, sizeBytes: -1 })).toThrow(TypeError);
     expect(() => buildManifest({ ...base, sha256: "not-a-hash" })).toThrow(TypeError);
+  });
+});
+
+describe("persistence command boundaries", () => {
+  it("rejects backup directories nested inside a project file", async () => {
+    await expect(
+      validateBackupDirectory(resolveBackupDirectory("package.json/backups", process.cwd())),
+    ).rejects.toThrow(/directory|file/i);
+  });
+
+  it("preserves files outside the fixed artifact pattern during pruning", () => {
+    expect(
+      selectPrunableBackups(
+        ["pgg-postgres-20260901-010203.dump", "pgg-postgres-20260901-010203.dump.bak", "notes.txt"],
+        new Date("2026-09-23T12:00:00+08:00"),
+      ),
+    ).toEqual(["pgg-postgres-20260901-010203.dump"]);
+  });
+
+  it("rejects a manifest whose checksum differs from the dump", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "pgg-backup-test-"));
+    const dumpName = "pgg-postgres-20260923-080910.dump";
+    const dumpPath = path.join(directory, dumpName);
+    const manifestPath = `${dumpPath}.sha256`;
+    try {
+      await writeFile(dumpPath, "dump bytes");
+      await writeFile(
+        manifestPath,
+        buildManifest({
+          dumpName,
+          sizeBytes: 10,
+          sha256: createHash("sha256").update("different!").digest("hex"),
+          database: "prometheus",
+          schema: "public",
+          createdAt: "2026-09-23T08:09:10.000Z",
+        }),
+      );
+      await expect(verifyBackupManifest(dumpPath, manifestPath)).rejects.toThrow(/checksum/i);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("passes Compose project and file options to the injected runner", async () => {
+    const invocations: Array<{ command: string; args: string[] }> = [];
+    await runCompose(["ps", "--status", "running"], {
+      composeProject: "pgg-test",
+      composeFile: "docker-compose.test.yml",
+      runner: async (command: string, args: string[]) => {
+        invocations.push({ command, args });
+      },
+    });
+    expect(invocations).toEqual([
+      {
+        command: "docker",
+        args: [
+          "compose",
+          "-f",
+          "docker-compose.test.yml",
+          "-p",
+          "pgg-test",
+          "ps",
+          "--status",
+          "running",
+        ],
+      },
+    ]);
   });
 });
