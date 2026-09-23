@@ -59,12 +59,17 @@ describe("persistence backup artifacts", () => {
   it("prunes only matching artifacts older than seven local calendar days", () => {
     const entries = [
       "pgg-postgres-20260923-010000.dump",
+      "pgg-postgres-20260917-235959.dump",
       "pgg-postgres-20260916-235959.dump",
+      "pgg-postgres-20260916-150000.dump",
+      "pgg-postgres-20260916-150000.dump.sha256",
       "pgg-postgres-20260915-010000.dump",
       "pgg-postgres-20260915-010000.dump.sha256",
       "notes.txt",
     ];
     expect(selectPrunableBackups(entries, new Date("2026-09-23T12:00:00+08:00"))).toEqual([
+      "pgg-postgres-20260916-150000.dump",
+      "pgg-postgres-20260916-150000.dump.sha256",
       "pgg-postgres-20260915-010000.dump",
       "pgg-postgres-20260915-010000.dump.sha256",
     ]);
