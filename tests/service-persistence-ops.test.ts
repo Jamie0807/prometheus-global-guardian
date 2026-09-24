@@ -142,12 +142,24 @@ describe("persistence health and restore rehearsal", () => {
         composeRunner: async (args: string[]) => {
           calls.push(args);
           if (args.includes("run")) return "Database schema is up to date";
-          if (args.some((arg) => arg.includes("public.ai_messages"))) return "f\n";
+          if (args.some((arg) => arg.includes("'ai_messages'"))) return "f\n";
           return "t\n";
         },
       }),
     ).rejects.toThrow(/ai_messages/);
     expect(calls.some((args) => args.includes("run") && args.includes("web"))).toBe(true);
+  });
+
+  it("rejects a same-named view in place of a required ordinary table", async () => {
+    await expect(
+      checkDatabase({
+        composeRunner: async (args: string[]) => {
+          if (args.includes("run")) return "Database schema is up to date";
+          if (args.some((arg) => arg.includes("relkind") && arg.includes("'users'"))) return "f\n";
+          return "t\n";
+        },
+      }),
+    ).rejects.toThrow(/users/);
   });
 
   it("fails health checks for unavailable database, absent migration history, or pending migrations", async () => {
@@ -184,6 +196,38 @@ describe("persistence health and restore rehearsal", () => {
       ).rejects.toThrow(/checksum|size/i);
       expect(calls).toEqual([]);
     });
+  });
+
+  it("rejects an empty dump with a matching manifest before Docker", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "pgg-empty-restore-test-"));
+    const dumpPath = path.join(directory, dumpName);
+    const calls: string[][] = [];
+    try {
+      await writeFile(dumpPath, "");
+      await writeFile(
+        `${dumpPath}.sha256`,
+        buildManifest({
+          dumpName,
+          sizeBytes: 0,
+          sha256: createHash("sha256").update("").digest("hex"),
+          database: "prometheus",
+          schema: "public",
+          createdAt: "2026-09-23T08:09:10.000Z",
+        }),
+      );
+      await expect(
+        restoreVerify({
+          dumpPath,
+          dockerRunner: async (args: string[]) => {
+            calls.push(args);
+            return "";
+          },
+        }),
+      ).rejects.toThrow(/empty/i);
+      expect(calls).toEqual([]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("restores only to a temporary container and volume, then cleans both", async () => {
@@ -232,19 +276,61 @@ describe("persistence health and restore rehearsal", () => {
 
   it("propagates cleanup failure", async () => {
     await withVerifiedDump(async (dumpPath) => {
-      await expect(
-        restoreVerify({
+      let containerName = "";
+      let volumeName = "";
+      let failure: unknown;
+      try {
+        await restoreVerify({
           dumpPath,
           dockerRunner: async (args: string[]) => {
             if (args[0] === "compose" && args.includes("config"))
               return JSON.stringify({ name: "pgg-test" });
+            if (args[0] === "create") containerName = args[args.indexOf("--name") + 1];
+            if (args[0] === "volume" && args[1] === "create") volumeName = args.at(-1)!;
             if (args[0] === "rm") throw new Error("container cleanup failed");
             if (args[0] === "compose" && args.includes("run"))
               return "Database schema is up to date";
             return "t\n";
           },
-        }),
-      ).rejects.toThrow(/cleanup/i);
+        });
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(AggregateError);
+      expect((failure as Error).message).toContain(containerName);
+      expect((failure as Error).message).toContain(volumeName);
+    });
+  });
+
+  it("uses the configured Compose project for both restore Compose commands", async () => {
+    await withVerifiedDump(async (dumpPath) => {
+      const oldProject = process.env.PERSISTENCE_COMPOSE_PROJECT;
+      const oldFile = process.env.COMPOSE_FILE;
+      process.env.PERSISTENCE_COMPOSE_PROJECT = "pgg-custom";
+      process.env.COMPOSE_FILE = "docker-compose.yml:docker-compose.test.yml";
+      const calls: string[][] = [];
+      try {
+        await restoreVerify({
+          dumpPath,
+          dockerRunner: async (args: string[]) => {
+            calls.push(args);
+            if (args.includes("config")) return JSON.stringify({ name: "pgg-custom" });
+            if (args.includes("run")) return "Database schema is up to date";
+            if (args.includes("psql")) return "t\n";
+            return "";
+          },
+        });
+      } finally {
+        if (oldProject === undefined) delete process.env.PERSISTENCE_COMPOSE_PROJECT;
+        else process.env.PERSISTENCE_COMPOSE_PROJECT = oldProject;
+        if (oldFile === undefined) delete process.env.COMPOSE_FILE;
+        else process.env.COMPOSE_FILE = oldFile;
+      }
+      for (const args of calls.filter((args) => args.includes("config") || args.includes("run"))) {
+        expect(args.slice(0, 3)).toEqual(["compose", "-p", "pgg-custom"]);
+        expect(args).not.toContain("-f");
+        expect(args.some((arg) => arg.startsWith("DATABASE_URL="))).toBe(false);
+      }
     });
   });
 });
@@ -403,5 +489,26 @@ describe("persistence command boundaries", () => {
         ],
       },
     ]);
+  });
+
+  it("lets Docker parse COMPOSE_FILE while passing the persistence project", async () => {
+    const oldProject = process.env.PERSISTENCE_COMPOSE_PROJECT;
+    const oldFile = process.env.COMPOSE_FILE;
+    process.env.PERSISTENCE_COMPOSE_PROJECT = "pgg-custom";
+    process.env.COMPOSE_FILE = "docker-compose.yml:docker-compose.test.yml";
+    const invocations: string[][] = [];
+    try {
+      await runCompose(["ps", "db"], {
+        runner: async (_command: string, args: string[]) => {
+          invocations.push(args);
+        },
+      });
+    } finally {
+      if (oldProject === undefined) delete process.env.PERSISTENCE_COMPOSE_PROJECT;
+      else process.env.PERSISTENCE_COMPOSE_PROJECT = oldProject;
+      if (oldFile === undefined) delete process.env.COMPOSE_FILE;
+      else process.env.COMPOSE_FILE = oldFile;
+    }
+    expect(invocations).toEqual([["compose", "-p", "pgg-custom", "ps", "db"]]);
   });
 });

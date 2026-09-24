@@ -68,14 +68,18 @@ export async function defaultRunner(command, args, { stdoutPath, env } = {}) {
   }
 }
 
-export async function runCompose(args, options = {}) {
-  const composeFile = options.composeFile ?? process.env.COMPOSE_FILE;
+function composeCommand(args, options = {}) {
+  const composeFile = options.composeFile;
   const composeProject = options.composeProject ?? process.env.PERSISTENCE_COMPOSE_PROJECT;
   const command = ["compose"];
   if (composeFile) command.push("-f", composeFile);
   if (composeProject) command.push("-p", composeProject);
   command.push(...args);
-  return (options.runner ?? defaultRunner)("docker", command, {
+  return command;
+}
+
+export async function runCompose(args, options = {}) {
+  return (options.runner ?? defaultRunner)("docker", composeCommand(args, options), {
     stdoutPath: options.stdoutPath,
   });
 }
@@ -116,8 +120,10 @@ async function checkSchema(query, { composeRunner, dockerRunner, containerName }
   for (const [label, sql] of [
     ["connection", "SELECT true"],
     ["public schema", "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public')"],
-    ...requiredTables.map((table) => [table, `SELECT to_regclass('public.${table}') IS NOT NULL`]),
-    ["_prisma_migrations", "SELECT to_regclass('public._prisma_migrations') IS NOT NULL"],
+    ...[...requiredTables, "_prisma_migrations"].map((table) => [
+      table,
+      `SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname = '${table}' AND c.relkind = 'r')`,
+    ]),
     [
       "migration history",
       "SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE finished_at IS NOT NULL)",
@@ -132,8 +138,7 @@ async function checkSchema(query, { composeRunner, dockerRunner, containerName }
   try {
     const status = await (containerName
       ? dockerRunner(
-          [
-            "compose",
+          composeCommand([
             "run",
             "--rm",
             "--no-deps",
@@ -145,7 +150,7 @@ async function checkSchema(query, { composeRunner, dockerRunner, containerName }
             "prisma",
             "migrate",
             "status",
-          ],
+          ]),
           { env: { DATABASE_URL: query } },
         )
       : composeRunner([
@@ -208,7 +213,7 @@ export async function restoreVerify({
   let containerCreated = false;
   let operationError;
   try {
-    const config = JSON.parse(await dockerRunner(["compose", "config", "--format", "json"]));
+    const config = JSON.parse(await dockerRunner(composeCommand(["config", "--format", "json"])));
     if (typeof config.name !== "string" || !/^[a-z0-9][a-z0-9_-]*$/.test(config.name)) {
       throw new Error("invalid Compose project name");
     }
@@ -289,7 +294,7 @@ export async function restoreVerify({
     if (cleanupErrors.length) {
       throw new AggregateError(
         [operationError, ...cleanupErrors].filter(Boolean),
-        "restore cleanup failed",
+        `restore cleanup failed for container ${containerName} and volume ${volumeName}`,
       );
     }
   }
@@ -314,6 +319,7 @@ export async function verifyBackupManifest(dumpPath, manifestPath = `${dumpPath}
   if (!dumpStat.isFile() || !manifestStat.isFile()) {
     throw new Error("backup artifact must be a regular file");
   }
+  if (dumpStat.size === 0) throw new Error("backup is empty");
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
   if (manifest.dumpName !== path.basename(dumpPath) || manifest.sizeBytes !== dumpStat.size) {
     throw new Error("backup manifest size or name mismatch");
