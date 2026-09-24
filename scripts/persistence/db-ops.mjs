@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -7,11 +7,20 @@ import { fileURLToPath } from "node:url";
 import {
   buildManifest,
   makeBackupArtifactName,
+  parseBackupArtifact,
   resolveBackupDirectory,
   selectPrunableBackups,
 } from "./backup-utils.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const requiredTables = [
+  "users",
+  "auth_sessions",
+  "ai_conversations",
+  "ai_messages",
+  "ai_memory_items",
+  "ai_memory_suggestions",
+];
 
 export async function validateBackupDirectory(directory) {
   const absolute = path.resolve(directory);
@@ -37,12 +46,13 @@ export async function validateBackupDirectory(directory) {
   return absolute;
 }
 
-async function defaultRunner(command, args, { stdoutPath } = {}) {
+export async function defaultRunner(command, args, { stdoutPath, env } = {}) {
   const output = stdoutPath ? await fs.open(stdoutPath, "wx", 0o600) : undefined;
   try {
     return await new Promise((resolve, reject) => {
       const child = spawn(command, args, {
         stdio: ["ignore", output?.fd ?? "pipe", "pipe"],
+        env: env ? { ...process.env, ...env } : process.env,
       });
       const chunks = [];
       if (!output) child.stdout.on("data", (chunk) => chunks.push(chunk));
@@ -68,6 +78,223 @@ export async function runCompose(args, options = {}) {
   return (options.runner ?? defaultRunner)("docker", command, {
     stdoutPath: options.stdoutPath,
   });
+}
+
+async function runDocker(args, options = {}, runner = defaultRunner) {
+  return runner("docker", args, options);
+}
+
+async function checkSchema(query, { composeRunner, dockerRunner, containerName } = {}) {
+  const failures = [];
+  const runQuery = containerName
+    ? (sql) =>
+        dockerRunner([
+          "exec",
+          containerName,
+          "psql",
+          "-X",
+          "-At",
+          "-v",
+          "ON_ERROR_STOP=1",
+          "-U",
+          "pgg_restore",
+          "-d",
+          "pgg_restore",
+          "-c",
+          sql,
+        ])
+    : (sql) =>
+        composeRunner([
+          "exec",
+          "-T",
+          "db",
+          "sh",
+          "-ec",
+          `psql -X -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "${sql}"`,
+        ]);
+
+  for (const [label, sql] of [
+    ["connection", "SELECT true"],
+    ["public schema", "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public')"],
+    ...requiredTables.map((table) => [table, `SELECT to_regclass('public.${table}') IS NOT NULL`]),
+    ["_prisma_migrations", "SELECT to_regclass('public._prisma_migrations') IS NOT NULL"],
+    [
+      "migration history",
+      "SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE finished_at IS NOT NULL)",
+    ],
+  ]) {
+    try {
+      if ((await runQuery(sql)).trim() !== "t") failures.push(label);
+    } catch {
+      failures.push(label);
+    }
+  }
+  try {
+    const status = await (containerName
+      ? dockerRunner(
+          [
+            "compose",
+            "run",
+            "--rm",
+            "--no-deps",
+            "-e",
+            "DATABASE_URL",
+            "web",
+            "pnpm",
+            "exec",
+            "prisma",
+            "migrate",
+            "status",
+          ],
+          { env: { DATABASE_URL: query } },
+        )
+      : composeRunner([
+          "run",
+          "--rm",
+          "--no-deps",
+          "web",
+          "pnpm",
+          "exec",
+          "prisma",
+          "migrate",
+          "status",
+        ]));
+    if (!status.includes("Database schema is up to date")) failures.push("Prisma migration status");
+  } catch {
+    failures.push("Prisma migration status");
+  }
+  if (failures.length) throw new Error(`Database check failed: ${failures.join(", ")}`);
+  console.log(`Verified public schema, ${requiredTables.join(", ")}, and Prisma migrations`);
+}
+
+export async function checkDatabase({ composeRunner = runCompose } = {}) {
+  await checkSchema(undefined, { composeRunner });
+}
+
+async function selectBackup(backupDirectory) {
+  const directory = await validateBackupDirectory(backupDirectory);
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const artifacts = entries
+    .filter((entry) => entry.isFile() && parseBackupArtifact(entry.name)?.dumpName === entry.name)
+    .map((entry) => entry.name)
+    .sort()
+    .reverse();
+  for (const name of artifacts) {
+    const candidate = path.join(directory, name);
+    try {
+      await verifyBackupManifest(candidate);
+      return candidate;
+    } catch {
+      // A newer incomplete or corrupt artifact does not hide an older verified one.
+    }
+  }
+  throw new Error("no verified backup artifact found");
+}
+
+export async function restoreVerify({
+  dumpPath,
+  backupDirectory = resolveBackupDirectory(process.env.PERSISTENCE_BACKUP_DIR, projectRoot),
+  dockerRunner = (args, options) => runDocker(args, options),
+} = {}) {
+  const verifiedDump = dumpPath ?? (await selectBackup(backupDirectory));
+  await verifyBackupManifest(verifiedDump);
+
+  const suffix = randomBytes(12).toString("hex");
+  const containerName = `pgg-restore-${suffix}`;
+  const volumeName = `pgg-restore-${suffix}-data`;
+  const password = randomBytes(24).toString("hex");
+  const databaseUrl = `postgresql://pgg_restore:${password}@${containerName}:5432/pgg_restore?schema=public`;
+  let volumeCreated = false;
+  let containerCreated = false;
+  let operationError;
+  try {
+    const config = JSON.parse(await dockerRunner(["compose", "config", "--format", "json"]));
+    if (typeof config.name !== "string" || !/^[a-z0-9][a-z0-9_-]*$/.test(config.name)) {
+      throw new Error("invalid Compose project name");
+    }
+    await dockerRunner(["volume", "create", volumeName]);
+    volumeCreated = true;
+    await dockerRunner(
+      [
+        "create",
+        "--name",
+        containerName,
+        "--network",
+        `${config.name}_default`,
+        "-v",
+        `${volumeName}:/var/lib/postgresql/data`,
+        "-e",
+        "POSTGRES_DB=pgg_restore",
+        "-e",
+        "POSTGRES_USER=pgg_restore",
+        "-e",
+        "POSTGRES_PASSWORD",
+        "postgres:16-alpine",
+      ],
+      { env: { POSTGRES_PASSWORD: password } },
+    );
+    containerCreated = true;
+    await dockerRunner(["start", containerName]);
+    let ready = false;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      try {
+        await dockerRunner([
+          "exec",
+          containerName,
+          "pg_isready",
+          "-U",
+          "pgg_restore",
+          "-d",
+          "pgg_restore",
+        ]);
+        ready = true;
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+    if (!ready) throw new Error("temporary PostgreSQL did not become ready");
+    await dockerRunner(["cp", verifiedDump, `${containerName}:/tmp/restore.dump`]);
+    await dockerRunner([
+      "exec",
+      containerName,
+      "pg_restore",
+      "--no-owner",
+      "--no-acl",
+      "-U",
+      "pgg_restore",
+      "-d",
+      "pgg_restore",
+      "/tmp/restore.dump",
+    ]);
+    await checkSchema(databaseUrl, { dockerRunner, containerName });
+  } catch (error) {
+    operationError = error;
+  } finally {
+    const cleanupErrors = [];
+    if (containerCreated) {
+      try {
+        await dockerRunner(["rm", "-f", containerName]);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (volumeCreated) {
+      try {
+        await dockerRunner(["volume", "rm", volumeName]);
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
+    if (cleanupErrors.length) {
+      throw new AggregateError(
+        [operationError, ...cleanupErrors].filter(Boolean),
+        "restore cleanup failed",
+      );
+    }
+  }
+  if (operationError) throw operationError;
+  console.log("Restore rehearsal completed; temporary container and volume removed");
 }
 
 async function sha256File(filePath) {
@@ -187,6 +414,9 @@ async function main() {
   try {
     if (process.argv[2] === "backup") await backup();
     else if (process.argv[2] === "prune") await prune();
+    else if (process.argv[2] === "check") await checkDatabase();
+    else if (process.argv[2] === "restore-verify")
+      await restoreVerify({ dumpPath: process.argv[3] });
     else throw new Error("unsupported database operation");
   } catch (error) {
     console.error(`Database operation failed: ${error.message}`);

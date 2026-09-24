@@ -14,6 +14,9 @@ import {
 } from "../scripts/persistence/backup-utils.mjs";
 import {
   backup,
+  checkDatabase,
+  defaultRunner,
+  restoreVerify,
   runCompose,
   validateBackupDirectory,
   verifyBackupManifest,
@@ -89,6 +92,160 @@ describe("persistence backup artifacts", () => {
 
     expect(() => buildManifest({ ...base, sizeBytes: -1 })).toThrow(TypeError);
     expect(() => buildManifest({ ...base, sha256: "not-a-hash" })).toThrow(TypeError);
+  });
+});
+
+describe("persistence health and restore rehearsal", () => {
+  const dumpName = "pgg-postgres-20260923-080910.dump";
+
+  it("passes an ephemeral secret to the spawned process without adding it to argv", async () => {
+    const secret = "temporary-test-secret";
+    const result = await defaultRunner(
+      process.execPath,
+      [
+        "-e",
+        "process.stdout.write(JSON.stringify({argv:process.argv.slice(1),secret:process.env.PGG_TEST_SECRET}))",
+        "safe",
+      ],
+      { env: { PGG_TEST_SECRET: secret } },
+    );
+    expect(JSON.parse(result)).toEqual({ argv: ["safe"], secret });
+  });
+
+  async function withVerifiedDump(test: (dumpPath: string) => Promise<void>) {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "pgg-restore-test-"));
+    const dumpPath = path.join(directory, dumpName);
+    const bytes = "test dump bytes";
+    try {
+      await writeFile(dumpPath, bytes);
+      await writeFile(
+        `${dumpPath}.sha256`,
+        buildManifest({
+          dumpName,
+          sizeBytes: Buffer.byteLength(bytes),
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          database: "prometheus",
+          schema: "public",
+          createdAt: "2026-09-23T08:09:10.000Z",
+        }),
+      );
+      await test(dumpPath);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  it("fails health checks when a required table is missing", async () => {
+    const calls: string[][] = [];
+    await expect(
+      checkDatabase({
+        composeRunner: async (args: string[]) => {
+          calls.push(args);
+          if (args.includes("run")) return "Database schema is up to date";
+          if (args.some((arg) => arg.includes("public.ai_messages"))) return "f\n";
+          return "t\n";
+        },
+      }),
+    ).rejects.toThrow(/ai_messages/);
+    expect(calls.some((args) => args.includes("run") && args.includes("web"))).toBe(true);
+  });
+
+  it("fails health checks for unavailable database, absent migration history, or pending migrations", async () => {
+    for (const failure of ["connection", "history", "pending"] as const) {
+      await expect(
+        checkDatabase({
+          composeRunner: async (args: string[]) => {
+            if (failure === "connection" && args.includes("exec")) throw new Error("unavailable");
+            if (failure === "history" && args.some((arg) => arg.includes("_prisma_migrations")))
+              return "f\n";
+            if (args.includes("run"))
+              return failure === "pending"
+                ? "1 migration pending"
+                : "Database schema is up to date";
+            return "t\n";
+          },
+        }),
+      ).rejects.toThrow();
+    }
+  });
+
+  it("rejects a bad checksum before any Docker command", async () => {
+    await withVerifiedDump(async (dumpPath) => {
+      await writeFile(dumpPath, "corrupt dump");
+      const calls: string[][] = [];
+      await expect(
+        restoreVerify({
+          dumpPath,
+          dockerRunner: async (args: string[]) => {
+            calls.push(args);
+            return "";
+          },
+        }),
+      ).rejects.toThrow(/checksum|size/i);
+      expect(calls).toEqual([]);
+    });
+  });
+
+  it("restores only to a temporary container and volume, then cleans both", async () => {
+    await withVerifiedDump(async (dumpPath) => {
+      const calls: string[][] = [];
+      const dockerRunner = async (args: string[]) => {
+        calls.push(args);
+        if (args[0] === "compose" && args.includes("config"))
+          return JSON.stringify({ name: "pgg-test" });
+        if (args[0] === "compose" && args.includes("run")) return "Database schema is up to date";
+        if (args[0] === "exec" && args.some((arg) => arg.includes("pg_isready"))) return "";
+        if (args[0] === "exec" && args.includes("psql")) return "t\n";
+        return "";
+      };
+      await restoreVerify({ dumpPath, dockerRunner });
+      const create = calls.find(
+        (args) => args[0] === "create" && args.includes("postgres:16-alpine"),
+      );
+      expect(create).toBeDefined();
+      const name = create?.[create.indexOf("--name") + 1];
+      const volume = calls.find((args) => args[0] === "volume" && args[1] === "create")?.at(-1);
+      expect(name).toMatch(/^pgg-restore-/);
+      expect(name).not.toBe("prometheus-global-guardian-db-1");
+      expect(create).toContain("pgg-test_default");
+      expect(create).toContain("POSTGRES_PASSWORD");
+      expect(create?.some((arg) => arg.startsWith("POSTGRES_PASSWORD="))).toBe(false);
+      const migrate = calls.find((args) => args[0] === "compose" && args.includes("run"));
+      expect(migrate).toContain("DATABASE_URL");
+      expect(migrate?.some((arg) => arg.startsWith("DATABASE_URL="))).toBe(false);
+      expect(
+        calls.some((args) => args[0] === "cp" && args.includes(`${name}:/tmp/restore.dump`)),
+      ).toBe(true);
+      expect(
+        calls.some(
+          (args) =>
+            args.includes("pg_restore") && args.includes("--no-owner") && args.includes("--no-acl"),
+        ),
+      ).toBe(true);
+      expect(calls.some((args) => args[0] === "rm" && args.includes(name!))).toBe(true);
+      expect(
+        calls.some((args) => args[0] === "volume" && args[1] === "rm" && args.includes(volume!)),
+      ).toBe(true);
+      expect(calls.flat().join(" ")).not.toMatch(/\b(dropdb|DROP|TRUNCATE|--clean)\b/);
+    });
+  });
+
+  it("propagates cleanup failure", async () => {
+    await withVerifiedDump(async (dumpPath) => {
+      await expect(
+        restoreVerify({
+          dumpPath,
+          dockerRunner: async (args: string[]) => {
+            if (args[0] === "compose" && args.includes("config"))
+              return JSON.stringify({ name: "pgg-test" });
+            if (args[0] === "rm") throw new Error("container cleanup failed");
+            if (args[0] === "compose" && args.includes("run"))
+              return "Database schema is up to date";
+            return "t\n";
+          },
+        }),
+      ).rejects.toThrow(/cleanup/i);
+    });
   });
 });
 

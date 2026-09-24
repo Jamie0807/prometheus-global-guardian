@@ -1,10 +1,14 @@
 services:
+  web:
+    environment:
+      DATABASE_URL: postgresql://pgg_auth_test:pgg_auth_test@db:5432/pgg_auth_test?schema=public
+
   db:
     environment:
       POSTGRES_DB: pgg_auth_test
       POSTGRES_USER: pgg_auth_test
       POSTGRES_PASSWORD: pgg_auth_test
-    ports:
+    ports: !override
       - "127.0.0.1:55439:5432"
     volumes:
       - postgres-auth-test-data:/var/lib/postgresql/data
