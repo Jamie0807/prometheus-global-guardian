@@ -6,24 +6,25 @@
 
 ## 命令分层
 
-| 命令                      | 类型             | 当前职责                                                                     |
-| ------------------------- | ---------------- | ---------------------------------------------------------------------------- |
-| `pnpm test`               | 单元测试别名     | 等价于 `pnpm run test:unit`                                                  |
-| `pnpm run test:unit`      | 单元测试         | 串行执行 BFF Node 原生测试和前端 Service Vitest 测试                         |
-| `pnpm run test:bff`       | BFF 单元测试     | 编译服务端测试产物，再运行 Node 原生测试                                     |
-| `pnpm run test:services`  | Service 单元测试 | 运行 `tests/service-*.test.ts` 的 Vitest 测试                                |
-| `pnpm run test:component` | React 组件测试   | 使用 Vitest、React Testing Library 和 jsdom 测试用户可观察的组件行为         |
-| `pnpm run test:e2e`       | 浏览器冒烟测试   | 构建并启动本地生产服务，用 Playwright 验证 `tests/e2e` 中的关键流程          |
-| `pnpm run test:python`    | Python API 测试  | 运行分析服务 `tests/test_*.py` 的 unittest 测试集                            |
-| `pnpm run test:baseline`  | 完整 Node 基线   | 依次执行 lint、格式、客户端/服务端/契约类型检查、unit、component、E2E 和构建 |
+| 命令                          | 类型             | 当前职责                                                                               |
+| ----------------------------- | ---------------- | -------------------------------------------------------------------------------------- |
+| `pnpm test`                   | 单元测试别名     | 等价于 `pnpm run test:unit`                                                            |
+| `pnpm run test:unit`          | 单元测试         | 串行执行 BFF Node 原生测试和前端 Service Vitest 测试                                   |
+| `pnpm run test:bff`           | BFF 单元测试     | 编译服务端测试产物，再运行 Node 原生测试                                               |
+| `pnpm run test:services`      | Service 单元测试 | 运行 `tests/service-*.test.ts` 的 Vitest 测试                                          |
+| `pnpm run test:component`     | React 组件测试   | 使用 Vitest、React Testing Library 和 jsdom 测试用户可观察的组件行为                   |
+| `pnpm run test:e2e`           | 浏览器冒烟测试   | 构建并启动本地生产服务，用 Playwright 验证 `tests/e2e` 中的关键流程                    |
+| `pnpm run test:python`        | Python API 测试  | 运行分析服务 `tests/test_*.py` 的 unittest 测试集                                      |
+| `pnpm run check:architecture` | 架构边界检查     | 检查共享包元数据、根目录契约残留和包与运行单元的相对导入方向                           |
+| `pnpm run test:baseline`      | 完整 Node 基线   | 依次执行 lint、格式、客户端/服务端/契约类型检查、架构检查、unit、component、E2E 和构建 |
 
-`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`，但不包含 Python 测试。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
+`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts` 和 `check:architecture`，但不包含 Python 测试。`check:architecture` 拒绝共享包反向导入 `src/`、`server/`、`apps/`、`services/`、`python-analytics-service/`，以及生产代码直接导入 `packages/hazard-domain/src/` 内部模块；仅 `shared/hazards/hazard-event.ts` 和 `shared/hazards/hazard-layer-registry.ts` 的兼容转导出暂时例外。Web、BFF 和 Analytics 目前仍位于现有目录，目标运行单元目录尚未完成物理迁移。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
 
 持久化运维命令不包含在 `test:baseline` 中。`pnpm db:check` 检查当前 Compose 数据库与 Prisma migration status；`pnpm db:backup` 生成 dump 和 SHA-256 manifest；`pnpm db:restore:verify` 在临时 PostgreSQL 容器及独立卷中校验并演练恢复；`pnpm db:backup:prune` 清理超过 7 个本地自然日窗口的匹配工件；`pnpm db:migrate:deploy` 手动应用前向 migration。命令顺序、数据保护和失败处理见 `docs/OPERATIONS_PERSISTENCE.md`。
 
 ## 当前数量
 
-2026-09-21 在账号与 AI 持久化分支重跑自动化验证。Node 数量只指 `test:baseline` 覆盖的 BFF、Service、组件和 E2E 测试，不计独立 Python job。
+以下表格保留 2026-09-21 账号与 AI 持久化分支的完整历史基线。Node 数量只指 `test:baseline` 覆盖的 BFF、Service、组件和 E2E 测试，不计独立 Python job。
 
 | 范围             | 已配置的测试文件或用例 | 本次结果     |
 | ---------------- | ---------------------- | ------------ |
@@ -37,6 +38,12 @@
 
 2026-09-20 Orbital 地图升级的历史基线为：BFF 92/92、Service 245/245、组件 105/105、E2E 1/1、Python 56/56。
 
+## 2026-09-24 架构治理第一阶段验证
+
+`pnpm run check:architecture`、`pnpm run lint`、`pnpm run format:check`、客户端/服务端/契约类型检查、`pnpm run test:python`、`pnpm run test:component`、`pnpm run build` 和 `git diff --check` 均退出 0。架构检查包含在 `test:baseline` 中，也由 CI 的 Node job 显式运行。Service 测试在设置测试占位 `DATABASE_URL` 并使用 `pnpm exec vitest run --pool=forks --maxWorkers=1` 后为 22 个文件、287/287 通过；组件为 19 个文件、108/108 通过；Python 为 57/57 通过。占位 `DATABASE_URL` 只用于不连接数据库的检查，不能替代 PostgreSQL 集成测试所需的隔离测试库和 migration。
+
+本机 `pnpm test` 在 38 项 BFF 测试通过后，三个需要认证/持久化的测试文件以 `SIGSEGV` 退出；单独调用项目 Node 20 下的 `argon2.hash()` 也会触发相同段错误，说明该结果受本机原生依赖环境阻断。Service 默认并行池在本机另出现 `ERR_IPC_CHANNEL_CLOSED`，故上述全量 Service 结果使用单 worker。`pnpm run test:e2e` 已尝试，但 Playwright 的 WebServer 在项目 Node 20 中调用本机全局 pnpm 时遇到 `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite`，服务未启动。这一轮不能据此声称 BFF 集成测试或 E2E 已通过；完整 Node 基线仍需在匹配运行时和隔离 PostgreSQL 的环境中执行。
+
 ## 测试边界
 
 单元测试验证 BFF provider、AI 路由和流式转换、DisasterAware 代理边界，以及前端 HTTP、灾害数据适配、地图 GeoJSON/LOD、灾害强度字段读取、Analytics 结果展示适配和 AI Service。BFF 边界覆盖路由白名单、编码路径绕过、请求体、query、请求头、限流、超时、token 缓存和错误脱敏。组件测试覆盖状态面板与图例折叠、默认 2D/3D 切换、DEM 生命周期及失败降级、外部 Tiles 回退、地图标签和 Mapbox/Worker mock 下的热力图切换。E2E 验证生产构建首页、灾害筛选、AI 助手、2D/3D 控件状态，以及桌面和 390px 窄屏的浮层视口与重叠边界。
@@ -49,7 +56,7 @@ E2E 通过 Playwright route mock 隔离认证会话、DisasterAware、分析端�
 
 2026-09-24 已在独立 `pgg-persistence-test` Compose 项目中完成真实 Docker 验证：准备 `web` 镜像后，从空测试卷依次执行 migration、`db:check`、`db:backup`、`db:restore:verify` 和 `db:backup:prune`，全部退出 0；恢复演练的关键表与 Prisma migration status 检查通过，临时容器、卷和测试网络已清理。该证据只覆盖本地隔离流程，不代表公网生产备份或正式数据库恢复已验收。
 
-Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。`test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。
+Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。TypeScript 与 Python 测试共同读取 `packages/contracts/` 中语言无关的 JSON 契约样本。`test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。
 
 当前尚未纳入完整 Node 基线的范围包括 Python 核心算法测试、基于截图差异的桌面与移动端视觉回归、所有弹窗和路由流程，以及真实外部服务集成测试。质量工作流在各自的触发条件下分别运行 `pnpm run test:baseline` 与 `pnpm run test:python`；这描述工作流配置，不表示分支保护已将它们设为 required checks。
 

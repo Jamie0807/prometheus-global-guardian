@@ -13,6 +13,12 @@
     "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": ["server.ts", "server/**/*.ts", "server/**/*.d.ts", "shared/**/*.ts"],
+  "include": [
+    "server.ts",
+    "server/**/*.ts",
+    "server/**/*.d.ts",
+    "shared/**/*.ts",
+    "packages/**/*.ts"
+  ],
   "exclude": ["node_modules", "dist", "dist-server"]
 }

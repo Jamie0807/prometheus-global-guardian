@@ -25,11 +25,14 @@ type CanonicalHazardFixture = {
 };
 
 const fixture = JSON.parse(
-  readFileSync(new URL("../contracts/analytics-hazard-data.json", import.meta.url), "utf8"),
+  readFileSync(
+    new URL("../packages/contracts/analytics-hazard-data.json", import.meta.url),
+    "utf8",
+  ),
 ) as AnalyticsHazardFixture;
 
 const canonicalFixture = JSON.parse(
-  readFileSync(new URL("../contracts/hazard-event.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../packages/contracts/hazard-event.json", import.meta.url), "utf8"),
 ) as CanonicalHazardFixture;
 
 function toAnalyticsHazard(event: Record<string, unknown>): Record<string, unknown> {

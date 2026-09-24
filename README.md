@@ -358,7 +358,7 @@ It listens on `http://localhost:8080` by default. `pnpm run start:static` serves
 | Quality and unified model | `POST /api/v1/quality/assess`, `GET /api/v1/quality/thresholds`, `GET /api/v1/quality/history`, `POST /api/v1/unified-model/transform`, `/api/v1/unified-model/merge` |
 | Pivot workflows           | `POST /api/v1/pivot/create`, `/query`, `/trend-analysis`, `/risk-score`, `/summary`                                                                                   |
 
-All `/api/v1` business endpoints return a versioned response envelope. Successful responses include `schemaVersion`, `requestId`, `generatedAt`, `modelVersion`, `inputSnapshotId`, `warnings`, `processingTime`, and the compatibility alias `timestamp`; validation and internal failures use the stable `ANALYTICS_VALIDATION_ERROR` or `ANALYTICS_INTERNAL_ERROR` error envelope. Shared examples live in `contracts/analytics-response-envelope.json` and `contracts/analytics-error-envelope.json`.
+All `/api/v1` business endpoints return a versioned response envelope. Successful responses include `schemaVersion`, `requestId`, `generatedAt`, `modelVersion`, `inputSnapshotId`, `warnings`, `processingTime`, and the compatibility alias `timestamp`; validation and internal failures use the stable `ANALYTICS_VALIDATION_ERROR` or `ANALYTICS_INTERNAL_ERROR` error envelope. Shared examples live in `packages/contracts/analytics-response-envelope.json` and `packages/contracts/analytics-error-envelope.json`.
 
 ### Data Sources
 
@@ -408,6 +408,10 @@ prometheus-global-guardian/
 │   ├── app/                     # FastAPI factory, routes, schemas, and services
 │   ├── analytics/               # Statistics, prediction, risk, quality, ETL, and pivot logic
 │   └── tests/                   # Python unittest suite
+├── packages/
+│   ├── contracts/               # Language-neutral JSON contracts shared by TypeScript and Python
+│   └── hazard-domain/           # Runtime-independent TypeScript hazard model and registry
+├── shared/hazards/              # Compatibility re-exports for existing consumers
 ├── tests/                       # BFF, Service, component, and E2E tests
 ├── prisma/                      # PostgreSQL schema and explicit migrations
 ├── docs/                        # Governance, test baseline, plans, and specifications
@@ -416,6 +420,8 @@ prometheus-global-guardian/
 ├── docker-compose.yml           # Local complete-stack startup
 └── AGENTS.md                    # Development, worktree, TDD, and validation conventions
 ```
+
+The first architecture stage moved shared contracts and hazard-domain code into `packages/` and added `pnpm run check:architecture`. The Web, BFF, and Analytics runtime units still live in `src/`, `server/` plus `server.ts`, and `python-analytics-service/`. Their target directories are `apps/web/`, `apps/bff/`, and `services/analytics/`; physical moves and removal of the `shared/hazards/` compatibility re-exports belong to a later stage.
 
 ---
 
@@ -792,7 +798,7 @@ pnpm start
 | 质量与统一模型 | `POST /api/v1/quality/assess`、`GET /api/v1/quality/thresholds`、`GET /api/v1/quality/history`、`POST /api/v1/unified-model/transform`、`/api/v1/unified-model/merge` |
 | 透视分析       | `POST /api/v1/pivot/create`、`/query`、`/trend-analysis`、`/risk-score`、`/summary`                                                                                   |
 
-所有 `/api/v1` 业务接口都返回版本化响应信封。成功响应包含 `schemaVersion`、`requestId`、`generatedAt`、`modelVersion`、`inputSnapshotId`、`warnings`、`processingTime` 和兼容字段 `timestamp`；校验失败和内部失败分别使用稳定的 `ANALYTICS_VALIDATION_ERROR`、`ANALYTICS_INTERNAL_ERROR` 错误信封。共享样本位于 `contracts/analytics-response-envelope.json` 和 `contracts/analytics-error-envelope.json`。
+所有 `/api/v1` 业务接口都返回版本化响应信封。成功响应包含 `schemaVersion`、`requestId`、`generatedAt`、`modelVersion`、`inputSnapshotId`、`warnings`、`processingTime` 和兼容字段 `timestamp`；校验失败和内部失败分别使用稳定的 `ANALYTICS_VALIDATION_ERROR`、`ANALYTICS_INTERNAL_ERROR` 错误信封。共享样本位于 `packages/contracts/analytics-response-envelope.json` 和 `packages/contracts/analytics-error-envelope.json`。
 
 ### 数据源
 
@@ -839,6 +845,10 @@ prometheus-global-guardian/
 │   ├── app/                     # FastAPI 工厂、路由、Schema 和服务
 │   ├── analytics/               # 统计、预测、风险、质量、ETL 和透视逻辑
 │   └── tests/                   # Python unittest 套件
+├── packages/
+│   ├── contracts/               # TypeScript 与 Python 共用的语言无关 JSON 契约
+│   └── hazard-domain/           # 不依赖具体运行时的 TypeScript 灾害模型与注册表
+├── shared/hazards/              # 供现有调用方使用的兼容转导出
 ├── tests/                       # BFF、Service、组件和 E2E 测试
 ├── docs/                        # 治理、测试基线、计划和规格
 ├── scripts/                     # Node 版本、Python 测试和服务启动脚本
@@ -846,3 +856,5 @@ prometheus-global-guardian/
 ├── docker-compose.yml           # 本地完整栈启动
 └── AGENTS.md                    # 开发、worktree、TDD 和验证约定
 ```
+
+第一阶段已将共享契约和灾害领域代码收敛到 `packages/`，并加入 `pnpm run check:architecture`。Web、BFF、Analytics 运行单元目前仍分别位于 `src/`、`server/` 加 `server.ts`、`python-analytics-service/`。`apps/web/`、`apps/bff/` 和 `services/analytics/` 是后续物理迁移的目标目录；`shared/hazards/` 兼容转导出会在现有调用方迁移完成后移除。

@@ -74,3 +74,11 @@
 - [x] Task 3：恢复演练与数据库健康检查；提交 `8781584..c26c392`，三轮任务级复核收敛后通过，定向测试 27/27。
 - [x] Task 4：运维手册、测试基线和优化清单更新；提交 `37a9174`，格式检查和差异检查通过。
 - [x] Task 5：最终整体验证与代码复核；客户端/服务端/契约类型检查、构建、格式、lint、Service 272/272、持久化定向 30/30 及隔离 Docker 全流程通过，最终复核问题已修正。
+
+## 2026-09-24 运行单元与共享包架构治理
+
+- [x] Task 1：建立 pnpm workspace 和共享包骨架；新增 `@pgg/contracts`、`@pgg/hazard-domain`、架构检查器基础入口和边界测试，任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 2：迁移四个跨语言 JSON 契约到 `packages/contracts/`；内容哈希保持一致，TypeScript 47/47、Python 57/57、格式检查和差异检查通过，任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 3：迁移灾害领域实现到 `packages/hazard-domain/`，旧 `shared/hazards/` 保留兼容 re-export；受影响服务测试 84/84、组件测试 31/31、类型检查、lint、格式检查、架构检查和构建通过，任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 4：扩展 `check:architecture`，加入共享包依赖方向、兼容入口和元数据错误检查，并接入 baseline 与 CI；架构测试 9/9、架构检查、类型检查、格式检查和 lint 通过，任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 5：README、优化清单和测试基线已对齐第一阶段实际结构；Task 5 阶段的架构检查、lint、格式、三项类型检查、Service 287/287（单 worker）、组件 108/108、Python 57/57、构建及差异检查通过。最终复核又补强了根 BFF 扫描和 TypeScript AST 导入解析，最新架构边界测试 14/14、四个定向测试文件 64/64、架构检查、格式和差异检查通过。BFF 全量测试受本机 `argon2` 段错误阻断，E2E 受全局 pnpm 与 Node 20 版本冲突阻断，证据及分类见 `task-5-report.md`。临时 `.venv` 链接已移除；第二阶段 Web/BFF/Python 物理迁移及兼容入口移除仍待完成，所有实现保持未提交。

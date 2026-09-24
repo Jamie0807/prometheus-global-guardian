@@ -22,7 +22,7 @@ describe("analytics response contracts", () => {
   it("parses the shared versioned response envelope and preserves metadata", () => {
     const fixture = JSON.parse(
       readFileSync(
-        new URL("../contracts/analytics-response-envelope.json", import.meta.url),
+        new URL("../packages/contracts/analytics-response-envelope.json", import.meta.url),
         "utf8",
       ),
     ) as unknown;
@@ -39,7 +39,7 @@ describe("analytics response contracts", () => {
 
   it("parses the shared error envelope without exposing service details", () => {
     const fixture = JSON.parse(
-      readFileSync("contracts/analytics-error-envelope.json", "utf8"),
+      readFileSync("packages/contracts/analytics-error-envelope.json", "utf8"),
     ) as unknown;
 
     expect(() => parseAnalyticsSuccess(fixture, () => ({}))).toThrowError(

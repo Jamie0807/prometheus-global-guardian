@@ -16,10 +16,10 @@ from app.schemas.requests import AnalysisRequest, HazardData
 
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parents[2] / "contracts" / "analytics-hazard-data.json"
+    Path(__file__).resolve().parents[2] / "packages" / "contracts" / "analytics-hazard-data.json"
 )
 CANONICAL_FIXTURE_PATH = (
-    Path(__file__).resolve().parents[2] / "contracts" / "hazard-event.json"
+    Path(__file__).resolve().parents[2] / "packages" / "contracts" / "hazard-event.json"
 )
 
 

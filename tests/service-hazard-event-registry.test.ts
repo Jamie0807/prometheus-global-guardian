@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import * as hazardDomain from "../packages/hazard-domain/src/index";
+import * as legacyHazardEvent from "../shared/hazards/hazard-event";
+import * as legacyHazardLayerRegistry from "../shared/hazards/hazard-layer-registry";
 import { createHazardEventId } from "../shared/hazards/hazard-event";
 import { resolveHazardLayerId } from "../shared/hazards/hazard-layer-registry";
 
@@ -16,10 +19,52 @@ type HazardEventContractFixture = {
 };
 
 const fixture = JSON.parse(
-  readFileSync(new URL("../contracts/hazard-event.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../packages/contracts/hazard-event.json", import.meta.url), "utf8"),
 ) as HazardEventContractFixture;
 
 describe("shared hazard event registry", () => {
+  it("exports the hazard event factory from the package entrypoint", () => {
+    expect(hazardDomain.createHazardEventId("usgs", "event-1")).toBe("usgs:event-1");
+    expect(legacyHazardEvent.createHazardEventId).toBe(hazardDomain.createHazardEventId);
+  });
+
+  it("exports the same hazard layer registry through the package and compatibility entrypoints", () => {
+    expect(legacyHazardLayerRegistry.HAZARD_LAYER_REGISTRY).toBe(
+      hazardDomain.HAZARD_LAYER_REGISTRY,
+    );
+    expect(legacyHazardLayerRegistry.resolveHazardLayerId).toBe(hazardDomain.resolveHazardLayerId);
+    expect(hazardDomain.resolveHazardLayerId("FLOOD")).toBe("hydrological");
+    expect(hazardDomain.resolveHazardLayerId("UNRECOGNIZED")).toBe("unknown");
+  });
+
+  it("keeps the implementation in the package and legacy modules as re-exports", () => {
+    const eventImplementation = readFileSync(
+      new URL("../packages/hazard-domain/src/hazard-event.ts", import.meta.url),
+      "utf8",
+    );
+    const layerImplementation = readFileSync(
+      new URL("../packages/hazard-domain/src/hazard-layer-registry.ts", import.meta.url),
+      "utf8",
+    );
+    const legacyEvent = readFileSync(
+      new URL("../shared/hazards/hazard-event.ts", import.meta.url),
+      "utf8",
+    );
+    const legacyLayers = readFileSync(
+      new URL("../shared/hazards/hazard-layer-registry.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(eventImplementation).toContain("export function createHazardEventId");
+    expect(layerImplementation).toContain("export const HAZARD_LAYER_REGISTRY");
+    expect(legacyEvent.trim()).toBe(
+      'export * from "../../packages/hazard-domain/src/hazard-event.js";',
+    );
+    expect(legacyLayers.trim()).toBe(
+      'export * from "../../packages/hazard-domain/src/hazard-layer-registry.js";',
+    );
+  });
+
   it("uses source and upstream event ID to construct a stable canonical ID", () => {
     expect(createHazardEventId("usgs", "abc")).toBe("usgs:abc");
   });

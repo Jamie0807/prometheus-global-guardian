@@ -16,7 +16,7 @@ from app.schemas.responses import AnalyticsErrorResponse, AnalyticsSuccessRespon
 
 class CrossLanguageAnalyticsResponseTests(unittest.TestCase):
     def test_shared_fixture_matches_versioned_success_response(self):
-        fixture_path = SERVICE_ROOT.parent / "contracts" / "analytics-response-envelope.json"
+        fixture_path = SERVICE_ROOT.parent / "packages" / "contracts" / "analytics-response-envelope.json"
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
         response = AnalyticsSuccessResponse.model_validate(fixture)
@@ -27,7 +27,7 @@ class CrossLanguageAnalyticsResponseTests(unittest.TestCase):
         self.assertEqual(response.warnings, [])
 
     def test_shared_error_fixture_matches_versioned_error_response(self):
-        fixture_path = SERVICE_ROOT.parent / "contracts" / "analytics-error-envelope.json"
+        fixture_path = SERVICE_ROOT.parent / "packages" / "contracts" / "analytics-error-envelope.json"
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
         response = AnalyticsErrorResponse.model_validate(fixture)
