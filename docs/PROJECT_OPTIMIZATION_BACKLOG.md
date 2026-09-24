@@ -18,7 +18,7 @@
 - 地图与 UI 导航状态已分别由 `MapStateProvider` 和 `UIStateProvider` 归属；组件局部状态与跨实例持久化仍不在本轮范围内。
 - 统一灾害事件与图层注册表已落地：`eventId`、`sourceEventId`、`sourceId`、`layerId`、观测/更新时间和 `[0, 1]` 置信度由共享模型、BFF/浏览器/Python 边界共同校验；未知来源或图层回退为 `unknown`，旧字段保留兼容解析。
 - 数据源健康检查已落地：四个来源的 `meta.sources[]` 在现有状态旁返回固定五分钟的进程内快照。仅真实 `load()` 尝试计数，空数组计成功，缓存、`stale` 和 fallback 占位不计数；错误只返回稳定枚举，进程重启会清空窗口。
-- 本地/私有单机持久化运维已加入手动数据库检查、备份、7 个自然日保留清理、隔离恢复演练与运行手册；正式公网生产运维仍需单独设计。当前本机真实 Docker 演练的 Prisma migration status 步骤受首次 `web` 镜像构建和依赖下载耗时影响，尚未完整完成。
+- 本地/私有单机持久化运维已加入手动数据库检查、备份、7 个自然日保留清理、隔离恢复演练与运行手册；2026-09-24 已在独立 `pgg-persistence-test` Compose 项目中完成真实 Docker 全流程验证。正式公网生产运维仍需单独设计。
 - 质量门禁包含 lint、格式、三项 TypeScript 类型检查、BFF/Service/组件/E2E 测试、构建及 Python unittest；AGENTS.md 已固化需求拆解、TDD、提交和自主验收约束。GitHub Actions 分别运行前端/BFF 基线和 Python 测试。
 - 受限沙箱中运行 `pnpm test` 的 BFF 监听用例会出现 `listen EPERM`；这是运行环境限制。在具备本地端口权限的环境中，BFF 与 Service 测试均可完整通过。
 - 已完成全球灾害可视化开源项目调研，技术栈、架构对比和优化建议记录在 `docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md`；本清单只同步其中的下一步高优先级事项。
@@ -27,7 +27,7 @@
 
 账号与 AI 持久化已合并到 `main`，包括 PostgreSQL/Prisma、账号注册/登录/退出/会话恢复、全站 API 会话门禁、Analytics BFF 服务间认证、用户隔离的对话及消息、上下文裁剪和摘要、用户确认的长期记忆管理与账号删除。该实现面向本地或私有自托管，尚未部署，也未完成公网生产运维准备。
 
-合并前验收已完成：旧 AI/BFF/API 与组件测试已迁到登录态和持久化会话契约；PostgreSQL 集成测试覆盖重复消息幂等、生成前取消和重试；本地隔离 Compose 迁移、Node 基线、Python 3.13 测试及 CI PostgreSQL 配置均已验证。代码已合入 `main`。当前工作区已补齐本地/私有单机持久化运维命令与文档；其本机真实 Docker 全流程演练仍待完成，公网能力独立评估。
+合并前验收已完成：旧 AI/BFF/API 与组件测试已迁到登录态和持久化会话契约；PostgreSQL 集成测试覆盖重复消息幂等、生成前取消和重试；本地隔离 Compose 迁移、Node 基线、Python 3.13 测试及 CI PostgreSQL 配置均已验证。代码已合入 `main`。当前工作区已补齐本地/私有单机持久化运维命令、文档和独立 Docker 全流程验证，公网能力独立评估。
 
 后续优先事项：
 
@@ -54,7 +54,7 @@
 | SSE 断连自动恢复与会话续传     | BFF 为 AI 流分配受约束的请求 ID 和递增事件序号，并在单实例有界内存窗口内缓存转换后的事件；浏览器最多进行三次指数退避重连，携带 `Last-Event-ID` 恢复并去重。恢复计时仅在订阅者断开或会话终态后启动，单帧限制为 64 KiB；过期后回到安全错误和手动重试。       |
 | 用户注册、全站认证与 AI 持久化 | 已合并到 `main`：PostgreSQL/Prisma、HttpOnly 服务端会话、登录门禁、账号隔离的对话/消息、48 KiB 上下文裁剪与摘要、用户确认的长期记忆管理及账号数据删除；AI 数据不会写入浏览器持久存储。已完成本地 Docker 验证，尚未部署公网。                               |
 | 账号与 AI 持久化分支验收       | 已合并到 `main` 并完成验收：登录/恢复/退出、重复生成、完成响应重放、生成前取消及重试复用测试通过；CI 使用一次性 PostgreSQL 并应用 migration。公网生产运维仍未完成。                                                                                        |
-| 本地/私有单机持久化运维        | 已实现 `db:check`、`db:backup`、`db:backup:prune`、`db:restore:verify` 与手动前向 migration 流程，见 `docs/OPERATIONS_PERSISTENCE.md`。本机隔离 Docker 全流程演练仍待完成，不含公网生产恢复、对象存储或集中告警。                                          |
+| 本地/私有单机持久化运维        | 已实现 `db:check`、`db:backup`、`db:backup:prune`、`db:restore:verify` 与手动前向 migration 流程，并在独立 `pgg-persistence-test` Compose 项目完成 Docker 全流程验证，见 `docs/OPERATIONS_PERSISTENCE.md`。不含公网生产恢复、对象存储或集中告警。          |
 | 前端状态归属梳理               | 地图数据、筛选、样式、刷新、热力图开关与来源元信息收口到地图状态域；页面、弹窗收口到 UI 状态域，App 仅保留授权和组合。                                                                                                                                     |
 | 前端输出安全                   | 地图 Popup 用本地 DOM 与 `textContent` 渲染外部字段，不使用 `setHTML()`。                                                                                                                                                                                  |
 | 最小 CI 与测试入口             | `.github/workflows/quality.yml` 使用 Node 20、pnpm 10 与 Python 3.13；`pnpm run test:python` 优先使用项目 `.venv`，CI 回退 `python3`。                                                                                                                     |
@@ -131,7 +131,7 @@
 ## 后续执行原则
 
 - 新增接口时，先定义输入/输出契约、失败语义和测试，再接入页面或路由。
-- SSE 恢复、统一事件/图层注册表、数据源健康检查，以及账号/全站认证/AI 持久化实现已完成并合入 `main`。本地/私有单机持久化运维已在当前工作区实现；下一步补完本机隔离 Docker 演练，并按公网计划单独评估账号验证、共享限流、异地备份和告警。PostgreSQL/PostGIS 灾害历史数据设计保持独立。
+- SSE 恢复、统一事件/图层注册表、数据源健康检查，以及账号/全站认证/AI 持久化实现已完成并合入 `main`。本地/私有单机持久化运维及其隔离 Docker 演练已完成；按公网计划单独评估账号验证、共享限流、异地备份和告警。PostgreSQL/PostGIS 灾害历史数据设计保持独立。
 - 对外部数据、浏览器事件和 JSON 响应保持 `unknown` 边界，解析成功后再进入领域类型。
 - 服务端凭据只在 BFF 或 Python 服务端读取；不将模型 Key、DisasterAware 凭据或 Python 凭据打入前端构建产物。
 - 不部署阶段优先保持测试可复现和提交边界清晰；发布相关的身份、共享限流与告警按实际发布计划单独立项。

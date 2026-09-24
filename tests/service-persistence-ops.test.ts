@@ -162,6 +162,46 @@ describe("persistence health and restore rehearsal", () => {
     ).rejects.toThrow(/users/);
   });
 
+  it("fails when a required table cannot be read", async () => {
+    await expect(
+      checkDatabase({
+        composeRunner: async (args: string[]) => {
+          if (args.includes("run")) return "Database schema is up to date";
+          if (args.some((arg) => arg.includes("FROM public.ai_messages LIMIT 1"))) {
+            throw new Error("permission denied");
+          }
+          return "t\n";
+        },
+      }),
+    ).rejects.toThrow(/ai_messages/);
+  });
+
+  it("passes a container-addressed database URL only through the Compose runner environment", async () => {
+    const calls: Array<{ args: string[]; options?: { env?: { DATABASE_URL?: string } } }> = [];
+    const hostUrl =
+      "postgresql://check_user:check_secret@localhost:5432/check_db?schema=public&connect_timeout=5";
+    await checkDatabase({
+      databaseUrl: hostUrl,
+      composeRunner: async (args: string[], options?: { env?: { DATABASE_URL?: string } }) => {
+        calls.push({ args, options });
+        if (args.includes("run")) return "Database schema is up to date";
+        return "t\n";
+      },
+    });
+    const status = calls.find((call) => call.args.includes("run"));
+    expect(status?.args).toContain("DATABASE_URL");
+    expect(status?.args.join(" ")).not.toContain("check_secret");
+    expect(status?.args.join(" ")).not.toContain(hostUrl);
+    const routed = new URL(status?.options?.env?.DATABASE_URL ?? "");
+    expect(routed.hostname).toBe("db");
+    expect(routed.port).toBe("5432");
+    expect(routed.username).toBe("check_user");
+    expect(routed.password).toBe("check_secret");
+    expect(routed.pathname).toBe("/check_db");
+    expect(routed.searchParams.get("schema")).toBe("public");
+    expect(routed.searchParams.get("connect_timeout")).toBe("5");
+  });
+
   it("fails health checks for unavailable database, absent migration history, or pending migrations", async () => {
     for (const failure of ["connection", "history", "pending"] as const) {
       await expect(
@@ -571,6 +611,22 @@ describe("persistence command boundaries", () => {
         ],
       },
     ]);
+  });
+
+  it("passes an environment override to the Docker runner without adding it to argv", async () => {
+    const calls: Array<{ args: string[]; options: { env?: { DATABASE_URL?: string } } }> = [];
+    await runCompose(["run", "web"], {
+      env: { DATABASE_URL: "postgresql://user:secret@db:5432/database" },
+      runner: async (
+        _command: string,
+        args: string[],
+        options: { env?: { DATABASE_URL?: string } },
+      ) => {
+        calls.push({ args, options });
+      },
+    });
+    expect(calls[0].args.join(" ")).not.toContain("secret");
+    expect(calls[0].options.env?.DATABASE_URL).toContain("@db:5432/database");
   });
 
   it("lets Docker parse COMPOSE_FILE while passing the persistence project", async () => {

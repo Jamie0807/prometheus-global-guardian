@@ -81,6 +81,7 @@ function composeCommand(args, options = {}) {
 export async function runCompose(args, options = {}) {
   return (options.runner ?? defaultRunner)("docker", composeCommand(args, options), {
     stdoutPath: options.stdoutPath,
+    env: options.env,
   });
 }
 
@@ -117,24 +118,32 @@ async function checkSchema(query, { composeRunner, dockerRunner, containerName }
           `psql -X -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "${sql}"`,
         ]);
 
-  for (const [label, sql] of [
+  const checks = [
     ["connection", "SELECT true"],
     ["public schema", "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'public')"],
     ...[...requiredTables, "_prisma_migrations"].map((table) => [
       table,
       `SELECT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relname = '${table}' AND c.relkind = 'r')`,
     ]),
+    ...requiredTables.map((table) => [
+      `${table} read`,
+      `SELECT 1 FROM public.${table} LIMIT 1`,
+      "read",
+    ]),
     [
       "migration history",
       "SELECT EXISTS (SELECT 1 FROM public._prisma_migrations WHERE finished_at IS NOT NULL)",
     ],
-  ]) {
+  ];
+  for (const [label, sql, mode] of checks) {
     try {
-      if ((await runQuery(sql)).trim() !== "t") failures.push(label);
+      const result = await runQuery(sql);
+      if (mode !== "read" && result.trim() !== "t") failures.push(label);
     } catch {
       failures.push(label);
     }
   }
+  const statusDatabaseUrl = containerName ? query : routeDatabaseUrl(query);
   try {
     const status = await (containerName
       ? dockerRunner(
@@ -151,19 +160,23 @@ async function checkSchema(query, { composeRunner, dockerRunner, containerName }
             "migrate",
             "status",
           ]),
-          { env: { DATABASE_URL: query } },
+          { env: { DATABASE_URL: statusDatabaseUrl } },
         )
-      : composeRunner([
-          "run",
-          "--rm",
-          "--no-deps",
-          "web",
-          "pnpm",
-          "exec",
-          "prisma",
-          "migrate",
-          "status",
-        ]));
+      : composeRunner(
+          [
+            "run",
+            "--rm",
+            "--no-deps",
+            ...(statusDatabaseUrl ? ["-e", "DATABASE_URL"] : []),
+            "web",
+            "pnpm",
+            "exec",
+            "prisma",
+            "migrate",
+            "status",
+          ],
+          statusDatabaseUrl ? { env: { DATABASE_URL: statusDatabaseUrl } } : undefined,
+        ));
     if (!status.includes("Database schema is up to date")) failures.push("Prisma migration status");
   } catch {
     failures.push("Prisma migration status");
@@ -172,8 +185,19 @@ async function checkSchema(query, { composeRunner, dockerRunner, containerName }
   console.log(`Verified public schema, ${requiredTables.join(", ")}, and Prisma migrations`);
 }
 
-export async function checkDatabase({ composeRunner = runCompose } = {}) {
-  await checkSchema(undefined, { composeRunner });
+function routeDatabaseUrl(databaseUrl) {
+  if (!databaseUrl) return undefined;
+  const routed = new URL(databaseUrl);
+  routed.hostname = "db";
+  routed.port = "5432";
+  return routed.toString();
+}
+
+export async function checkDatabase({
+  composeRunner = runCompose,
+  databaseUrl = process.env.DATABASE_URL,
+} = {}) {
+  await checkSchema(databaseUrl, { composeRunner });
 }
 
 async function selectBackup(backupDirectory) {

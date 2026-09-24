@@ -47,7 +47,7 @@ E2E 通过 Playwright route mock 隔离认证会话、DisasterAware、分析端�
 
 持久化运维的真实 Docker 验证应使用 `docker-compose.yml` 与 `docker-compose.test.yml` 叠加、独立 Compose 项目名、测试专用 `DATABASE_URL` 和 `127.0.0.1:55439` 端口，从空测试卷依次执行 migration、`db:check`、`db:backup`、`db:restore:verify` 与 `db:backup:prune`。验收时确认 dump 非空且校验通过、过期工件被清理而窗口内工件保留、恢复演练只使用临时容器与卷、正式数据库卷和数据未被修改。`down -v` 只可用于已确认的隔离测试项目，不适用于正式 Compose 项目。
 
-本轮本机真实 Docker 演练仍在进行：`web` 镜像首次构建和依赖下载过慢，导致依赖该镜像的 Prisma migration status 步骤尚未在本机完整完成。因此不能把 `db:check` 或完整恢复演练记为本机通过；需在镜像准备好后补跑并记录实际输出。纯逻辑和 CLI 自动化测试的结果也不能替代这项隔离 PostgreSQL 验证。
+2026-09-24 已在独立 `pgg-persistence-test` Compose 项目中完成真实 Docker 验证：准备 `web` 镜像后，从空测试卷依次执行 migration、`db:check`、`db:backup`、`db:restore:verify` 和 `db:backup:prune`，全部退出 0；恢复演练的关键表与 Prisma migration status 检查通过，临时容器、卷和测试网络已清理。该证据只覆盖本地隔离流程，不代表公网生产备份或正式数据库恢复已验收。
 
 Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。`test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。
 
