@@ -20,11 +20,11 @@ import {
   processETL,
   transformToUnifiedModel,
   type AnalysisRequest,
-} from "../src/services/analytics/analyticsService";
+} from "../apps/web/src/services/analytics/analyticsService";
 import {
   AnalyticsBusinessError,
   AnalyticsContractError,
-} from "../src/services/analytics/contracts/common";
+} from "../apps/web/src/services/analytics/contracts/common";
 
 afterEach(() => {
   vi.restoreAllMocks();

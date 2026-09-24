@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requestJsonMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../src/services/http/httpClient", () => ({ requestJson: requestJsonMock }));
+vi.mock("../apps/web/src/services/http/httpClient", () => ({ requestJson: requestJsonMock }));
 
 describe("authorization service", () => {
   beforeEach(() => {
@@ -13,7 +13,7 @@ describe("authorization service", () => {
 
   it("sets the BFF-managed access token for an authorized response", async () => {
     requestJsonMock.mockResolvedValue({ authorized: true });
-    const { authorize, getAccessToken } = await import("../src/services/auth/authService");
+    const { authorize, getAccessToken } = await import("../apps/web/src/services/auth/authService");
 
     await authorize();
 
@@ -22,8 +22,8 @@ describe("authorization service", () => {
 
   it("rejects a syntactically valid but invalid authorize response", async () => {
     requestJsonMock.mockResolvedValue({ authorized: false });
-    const { ServiceError } = await import("../src/services/http/serviceError");
-    const { authorize, getAccessToken } = await import("../src/services/auth/authService");
+    const { ServiceError } = await import("../apps/web/src/services/http/serviceError");
+    const { authorize, getAccessToken } = await import("../apps/web/src/services/auth/authService");
 
     const authorization = authorize();
 
@@ -38,8 +38,8 @@ describe("authorization service", () => {
 
   it("rejects an authorize response with a missing authorization field", async () => {
     requestJsonMock.mockResolvedValue({});
-    const { ServiceError } = await import("../src/services/http/serviceError");
-    const { authorize } = await import("../src/services/auth/authService");
+    const { ServiceError } = await import("../apps/web/src/services/http/serviceError");
+    const { authorize } = await import("../apps/web/src/services/auth/authService");
 
     const authorization = authorize();
 
@@ -53,8 +53,8 @@ describe("authorization service", () => {
 
   it("rejects a non-object authorize response", async () => {
     requestJsonMock.mockResolvedValue("authorized");
-    const { ServiceError } = await import("../src/services/http/serviceError");
-    const { authorize } = await import("../src/services/auth/authService");
+    const { ServiceError } = await import("../apps/web/src/services/http/serviceError");
+    const { authorize } = await import("../apps/web/src/services/auth/authService");
 
     const authorization = authorize();
 

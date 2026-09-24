@@ -3,10 +3,10 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import DISPLAYED_TYPES from "../../src/config/displayedTypes";
-import { HAZARD_COLORS } from "../../src/config/hazardColors";
-import LegendPanel from "../../src/components/LegendPanel";
-import StatusPanel from "../../src/components/StatusPanel";
+import DISPLAYED_TYPES from "../../apps/web/src/config/displayedTypes";
+import { HAZARD_COLORS } from "../../apps/web/src/config/hazardColors";
+import LegendPanel from "../../apps/web/src/components/LegendPanel";
+import StatusPanel from "../../apps/web/src/components/StatusPanel";
 
 const mapStateMocks = vi.hoisted(() => ({
   hazards: [{ id: "hazard-1" }, { id: "hazard-2" }],
@@ -15,7 +15,7 @@ const mapStateMocks = vi.hoisted(() => ({
   setFilter: vi.fn<(filter: string) => void>(),
 }));
 
-vi.mock("../../src/features/map/state/MapStateContext", () => ({
+vi.mock("../../apps/web/src/features/map/state/MapStateContext", () => ({
   useMapState: () => mapStateMocks,
 }));
 

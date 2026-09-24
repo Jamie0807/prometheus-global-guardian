@@ -4,10 +4,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { UIStateProvider, useUIState } from "../../src/state/UIStateContext";
-import SettingsModal from "../../src/components/SettingsModal";
+import { UIStateProvider, useUIState } from "../../apps/web/src/state/UIStateContext";
+import SettingsModal from "../../apps/web/src/components/SettingsModal";
 
-vi.mock("../../src/state/AuthContext", () => ({
+vi.mock("../../apps/web/src/state/AuthContext", () => ({
   useAuth: () => ({
     status: "authenticated",
     user: { id: "test-user", email: "test@example.com" },
@@ -24,7 +24,7 @@ const mapStateMocks = {
   setMapStyle: () => undefined,
 };
 
-vi.mock("../../src/features/map/state/MapStateContext", () => ({
+vi.mock("../../apps/web/src/features/map/state/MapStateContext", () => ({
   useMapState: () => mapStateMocks,
 }));
 

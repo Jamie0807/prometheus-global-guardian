@@ -45,7 +45,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 | BFF              | Express 服务。负责静态客户端、用户会话、API 登录门禁、DisasterAware 受限代理、灾害聚合、Analytics 代理和 AI Provider 路由/持久化。                                   |
 | Analytics        | 独立 FastAPI 服务及其分析算法。浏览器经同源 `/api/analytics` 访问 BFF，再由 BFF 以服务间令牌代理。                                                                   |
 | Hazard           | 地图、分析、AI 上下文和报告流程共同消费的灾害领域记录。                                                                                                              |
-| Service 边界     | `src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                                                                                     |
+| Service 边界     | `apps/web/src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                                                                            |
 | Provider         | BFF 调用的 AI 上游；当前实现支持 ai-workflow 与 Volcengine Ark。                                                                                                     |
 | 共享契约工件     | `packages/contracts/analytics-hazard-data.json` 与 `packages/contracts/hazard-event.json`，供 TypeScript 与 Python 测试共同读取的 Analytics 输入和统一灾害事件样本。 |
 | 管理接口         | FastAPI 的 `/metrics` 与 `/cache/clear`；启用后要求静态管理令牌。                                                                                                    |
@@ -98,34 +98,37 @@ flowchart LR
 
 ## 6. 目录地图
 
-| 路径                                  | 责任                                                                        |
-| ------------------------------------- | --------------------------------------------------------------------------- |
-| `src/App.tsx`                         | 客户端组合根、Provider 装配、视图选择和组件懒加载。                         |
-| `src/features/`                       | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。 |
-| `src/components/`                     | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。         |
-| `src/hooks/`                          | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                        |
-| `src/config/`、`src/utils/`           | 浏览器公开配置、日志、通知和无业务归属的纯工具。                            |
-| `src/state/`                          | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                   |
-| `src/state/AuthContext.tsx`           | 恢复服务端用户会话、CSRF token 和认证操作。                                 |
-| `src/services/`                       | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。    |
-| `src/types/`                          | 客户端共享领域类型。                                                        |
-| `src/workers/`                        | 浏览器 Worker 数据处理。                                                    |
-| `server.ts`                           | Express 应用装配、授权、灾害 API、静态资源和监听入口。                      |
-| `server/ai/`                          | AI Provider 配置、路由判定、请求处理和流协议转换。                          |
-| `server/auth/`                        | 密码哈希、服务端会话、CSRF 校验和用户认证路由。                             |
-| `server/db/`                          | Prisma/PostgreSQL 客户端初始化。                                            |
-| `server/analytics/`                   | 认证后的 Analytics allowlist BFF 代理。                                     |
-| `server/hazards/`                     | 公共灾害源获取、适配、缓存和聚合。                                          |
-| `server/security/`                    | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                      |
-| `shared/hazards/`                     | 旧导入路径的兼容转导出，指向灾害领域共享包中的实现。                        |
-| `python-analytics-service/app/`       | FastAPI 应用工厂、core、routes、schemas 和应用服务。                        |
-| `python-analytics-service/analytics/` | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                       |
-| `packages/contracts/`                 | Analytics 与统一灾害事件的跨语言契约样本。                                  |
-| `packages/hazard-domain/`             | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
-| `tests/`                              | BFF、前端 Service、组件、契约和 E2E 自动化测试。                            |
-| `python-analytics-service/tests/`     | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
-| `.github/workflows/`                  | 当前 GitHub Actions 质量工作流。                                            |
-| `docs/`                               | 当前测试基线、优化清单、本规格书和历史过程记录。                            |
+| 路径                                                     | 责任                                                                        |
+| -------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `apps/web/index.html`                                    | Vite 浏览器 HTML 入口。                                                     |
+| `apps/web/src/App.tsx`                                   | 客户端组合根、Provider 装配、视图选择和组件懒加载。                         |
+| `apps/web/src/features/`                                 | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。 |
+| `apps/web/src/components/`                               | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。         |
+| `apps/web/src/hooks/`                                    | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                        |
+| `apps/web/src/config/`、`apps/web/src/utils/`            | 浏览器公开配置、日志、通知和无业务归属的纯工具。                            |
+| `apps/web/src/state/`                                    | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                   |
+| `apps/web/src/state/AuthContext.tsx`                     | 恢复服务端用户会话、CSRF token 和认证操作。                                 |
+| `apps/web/src/services/`                                 | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。    |
+| `apps/web/src/types/`                                    | 客户端共享领域类型。                                                        |
+| `apps/web/src/workers/`                                  | 浏览器 Worker 数据处理。                                                    |
+| `server.ts`                                              | Express 应用装配、授权、灾害 API、静态资源和监听入口。                      |
+| `server/ai/`                                             | AI Provider 配置、路由判定、请求处理和流协议转换。                          |
+| `server/auth/`                                           | 密码哈希、服务端会话、CSRF 校验和用户认证路由。                             |
+| `server/db/`                                             | Prisma/PostgreSQL 客户端初始化。                                            |
+| `server/analytics/`                                      | 认证后的 Analytics allowlist BFF 代理。                                     |
+| `server/hazards/`                                        | 公共灾害源获取、适配、缓存和聚合。                                          |
+| `server/security/`                                       | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                      |
+| `shared/hazards/`                                        | BFF 迁移期旧导入路径的兼容转导出，指向灾害领域共享包中的实现。              |
+| `python-analytics-service/app/`                          | FastAPI 应用工厂、core、routes、schemas 和应用服务。                        |
+| `python-analytics-service/analytics/`                    | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                       |
+| `packages/contracts/`                                    | Analytics 与统一灾害事件的跨语言契约样本。                                  |
+| `packages/hazard-domain/`                                | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
+| `package.json`、`vite.config.ts`                         | 仓库脚本、Web 构建入口和根 `dist/` 产物配置。                               |
+| `vitest.config.ts`、`playwright.config.ts`、`Dockerfile` | 仓库级测试与容器编排入口。                                                  |
+| `tests/`                                                 | BFF、前端 Service、组件、契约和 E2E 自动化测试。                            |
+| `python-analytics-service/tests/`                        | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
+| `.github/workflows/`                                     | 当前 GitHub Actions 质量工作流。                                            |
+| `docs/`                                                  | 当前测试基线、优化清单、本规格书和历史过程记录。                            |
 
 ## 7. 运行单元与职责边界
 
@@ -142,7 +145,7 @@ React 组件消费经过 Service 或 feature adapter 转换的领域数据。组
 
 ### 7.2 浏览器 Service 层
 
-`src/services/http/httpClient.ts` 提供通用超时、取消、有限重试和 `ServiceError` 归一化。业务 Service 负责端点、请求体、运行时契约解析和业务错误语义。
+`apps/web/src/services/http/httpClient.ts` 提供通用超时、取消、有限重试和 `ServiceError` 归一化。业务 Service 负责端点、请求体、运行时契约解析和业务错误语义。
 
 网络 JSON 在边界处先作为 `unknown` 读取。Hazard 与 Analytics Service 必须通过对应 parser 验证成功后，才能把数据交给状态、Hook 或组件。网络错误、超时、HTTP 错误、无效 JSON 和无效响应会归一化为 `ServiceError`；调用方主动取消原样传播且不重试。默认 HTTP 超时为 30 秒，重试次数由调用方指定，网络错误、超时、429 和 5xx 才属于可重试范围。
 
@@ -214,19 +217,19 @@ FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `
 
 分层用于约束依赖方向，而不是为每个目录引入额外抽象。新增代码应落在最接近其责任的层，且只能依赖表中左侧允许的下游能力。
 
-| 层                        | 可以依赖                                                                          | 不得承担或依赖                                                        |
-| ------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| React 页面与组件          | feature Hook、状态 Provider、Service 暴露的领域结果、纯展示工具                   | `fetch`、外部 JSON 结构、服务端凭据、BFF/Python 内部实现              |
-| Feature Hook 与状态域     | Service、领域类型、Worker、通知等 UI 基础设施                                     | 直接拼接外部 API 协议、跨 feature 写入彼此的领域状态                  |
-| `src/services/`           | HTTP client、运行时 parser、领域类型、端点配置                                    | React 组件、Mapbox 实例、全局 UI 状态；未验证的 JSON 不得越过 Service |
-| `src/services/http/`      | `fetch`、超时/取消、错误归一化与基础响应处理                                      | 业务端点、Analytics 或 Hazard 的领域解释                              |
-| Express 路由与 handler    | 安全边界、AI/Hazard 领域模块、服务端配置与日志                                    | 浏览器 `VITE_*` 秘密、任意 URL 透传、将上游原始错误暴露给浏览器       |
-| BFF 领域模块              | 明确的上游 adapter、服务端安全策略、共享日志                                      | React、浏览器状态、未受限的路径或方法转发                             |
-| FastAPI route             | Pydantic schema、依赖注入的应用服务                                               | 直接编排底层算法对象、绕过请求模型读取未验证 body                     |
-| Python 应用服务           | schema、应用状态、缓存、`analytics/` 算法模块                                     | HTTP 框架对象和浏览器语义                                             |
-| `analytics/` 算法         | Python 标准库与数据科学依赖                                                       | FastAPI request/response、环境变量读取、路由鉴权逻辑                  |
-| `packages/contracts/`     | 语言无关的 JSON 工件                                                              | 某一端的编译产物或运行时实现代码                                      |
-| `packages/hazard-domain/` | 纯 TypeScript 灾害领域类型、事件 ID 和图层注册表；公共入口为 `@pgg/hazard-domain` | React、Express、HTTP、环境变量、数据库和运行单元内部实现              |
+| 层                            | 可以依赖                                                                          | 不得承担或依赖                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| React 页面与组件              | feature Hook、状态 Provider、Service 暴露的领域结果、纯展示工具                   | `fetch`、外部 JSON 结构、服务端凭据、BFF/Python 内部实现              |
+| Feature Hook 与状态域         | Service、领域类型、Worker、通知等 UI 基础设施                                     | 直接拼接外部 API 协议、跨 feature 写入彼此的领域状态                  |
+| `apps/web/src/services/`      | HTTP client、运行时 parser、领域类型、端点配置                                    | React 组件、Mapbox 实例、全局 UI 状态；未验证的 JSON 不得越过 Service |
+| `apps/web/src/services/http/` | `fetch`、超时/取消、错误归一化与基础响应处理                                      | 业务端点、Analytics 或 Hazard 的领域解释                              |
+| Express 路由与 handler        | 安全边界、AI/Hazard 领域模块、服务端配置与日志                                    | 浏览器 `VITE_*` 秘密、任意 URL 透传、将上游原始错误暴露给浏览器       |
+| BFF 领域模块                  | 明确的上游 adapter、服务端安全策略、共享日志                                      | React、浏览器状态、未受限的路径或方法转发                             |
+| FastAPI route                 | Pydantic schema、依赖注入的应用服务                                               | 直接编排底层算法对象、绕过请求模型读取未验证 body                     |
+| Python 应用服务               | schema、应用状态、缓存、`analytics/` 算法模块                                     | HTTP 框架对象和浏览器语义                                             |
+| `analytics/` 算法             | Python 标准库与数据科学依赖                                                       | FastAPI request/response、环境变量读取、路由鉴权逻辑                  |
+| `packages/contracts/`         | 语言无关的 JSON 工件                                                              | 某一端的编译产物或运行时实现代码                                      |
+| `packages/hazard-domain/`     | 纯 TypeScript 灾害领域类型、事件 ID 和图层注册表；公共入口为 `@pgg/hazard-domain` | React、Express、HTTP、环境变量、数据库和运行单元内部实现              |
 
 以下规则在新增功能时必须保持：
 
@@ -236,7 +239,7 @@ FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `
 - BFF 当前对路径、方法和转发 header 使用 allowlist，query 仅限制形状、数量和长度并会原样转发；AI 请求会校验已知字段但尚不拒绝所有未知字段。新增上游能力必须明确输入限制、超时、响应上限、错误契约与测试；
 - Python 新接口按 `schema -> route -> service -> analytics` 方向接入。算法函数不能因 HTTP 需求改变为读取 request、环境变量或全局应用对象；
 - 共享输入变化先更新 `packages/contracts/` 工件与双端测试，再调整 TypeScript Service 和 Python schema；不得只修改一端以维持表面兼容；
-- `packages/*` 不能用相对路径反向导入 `src/`、`server/`、`apps/`、`services/` 或 `python-analytics-service/`；`src/`、`server/`、`shared/` 的生产代码不能直接导入 `packages/hazard-domain/src/` 内部模块。仅 `shared/hazards/hazard-event.ts` 和 `shared/hazards/hazard-layer-registry.ts` 的兼容转导出是迁移期例外；
+- `packages/*` 不能用相对路径反向导入 `apps/web/src/`、`server/`、`apps/`、`services/` 或 `python-analytics-service/`；`apps/web/src/`、`server/`、`shared/` 的生产代码不能直接导入 `packages/hazard-domain/src/` 内部模块。Web 应通过 `@pgg/hazard-domain` 公共入口使用该包。仅 `shared/hazards/hazard-event.ts` 和 `shared/hazards/hazard-layer-registry.ts` 的 BFF 兼容转导出是迁移期例外；
 - 同一业务语义在不同层可有不同数据表示，但转换只能在边界 adapter、parser 或 schema 中发生，不能散落在 UI 和路由条件分支中。
 
 ### 7.6 类型、错误和日志细则
@@ -363,7 +366,7 @@ Compose 中：
 | `pnpm run test:baseline`           | lint、格式、三项类型检查、架构检查、unit、component、E2E 和构建的完整 Node 基线。 |
 | `pnpm run build`                   | 客户端生产构建与 BFF 编译。                                                       |
 
-`test:baseline` 不包含 Python 测试。CI 的 `frontend-bff` job 安装锁定 pnpm 依赖后显式运行 `check:architecture`，安装 Chromium 后运行 `test:baseline`；独立 `python` job 使用 Python 3.13 安装 requirements 后运行 `test:python`。Quality Gate 在 pull request 和对 `main` 的 push 上触发，权限为只读仓库内容。当前工作流没有 Docker build、镜像发布或部署步骤。Web、BFF 和 Analytics 目前仍使用现有运行目录，`apps/web`、`apps/bff`、`services/analytics` 的物理迁移尚未完成。
+`test:baseline` 不包含 Python 测试。CI 的 `frontend-bff` job 安装锁定 pnpm 依赖后显式运行 `check:architecture`，安装 Chromium 后运行 `test:baseline`；独立 `python` job 使用 Python 3.13 安装 requirements 后运行 `test:python`。Quality Gate 在 pull request 和对 `main` 的 push 上触发，权限为只读仓库内容。当前工作流没有 Docker build、镜像发布或部署步骤。Web 已迁至 `apps/web/`；Vite 从 `apps/web/index.html` 构建，客户端产物仍位于根 `dist/` 并由 Express 提供。BFF 的 `server/` 与 `server.ts`、Python 的 `python-analytics-service/` 将在后续阶段分别迁至 `apps/bff/` 和 `services/analytics/`。
 
 测试责任按边界分配：
 
@@ -463,7 +466,7 @@ Compose 中：
 本规格的当前事实来自以下可复核位置：
 
 - 运行与构建：`package.json`、`.nvmrc`、`vite.config.ts`、`Dockerfile`、`docker-compose.yml`、`.github/workflows/quality.yml`；
-- React 与 Service：`src/App.tsx`、`src/state/`、`src/features/`、`src/services/`、`src/hooks/useAIChatSession.ts`；
+- React 与 Service：`apps/web/src/App.tsx`、`apps/web/src/state/`、`apps/web/src/features/`、`apps/web/src/services/`、`apps/web/src/hooks/useAIChatSession.ts`；
 - Express BFF：`server.ts`、`server/ai/`、`server/hazards/`、`server/security/`、`shared/logging.ts`；
 - Python：`python-analytics-service/app/`、`python-analytics-service/analytics/`、`python-analytics-service/security.py`、`python-analytics-service/log_config.py`；
 - 契约与测试：`packages/hazard-domain/`、`shared/hazards/` 兼容入口、`packages/contracts/analytics-hazard-data.json`、`packages/contracts/hazard-event.json`、`tests/`、`python-analytics-service/tests/`；

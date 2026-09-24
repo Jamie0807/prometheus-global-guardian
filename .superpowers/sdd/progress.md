@@ -82,3 +82,11 @@
 - [x] Task 3：迁移灾害领域实现到 `packages/hazard-domain/`，旧 `shared/hazards/` 保留兼容 re-export；受影响服务测试 84/84、组件测试 31/31、类型检查、lint、格式检查、架构检查和构建通过，任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
 - [x] Task 4：扩展 `check:architecture`，加入共享包依赖方向、兼容入口和元数据错误检查，并接入 baseline 与 CI；架构测试 9/9、架构检查、类型检查、格式检查和 lint 通过，任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
 - [x] Task 5：README、优化清单和测试基线已对齐第一阶段实际结构；Task 5 阶段的架构检查、lint、格式、三项类型检查、Service 287/287（单 worker）、组件 108/108、Python 57/57、构建及差异检查通过。最终复核又补强了根 BFF 扫描和 TypeScript AST 导入解析，最新架构边界测试 14/14、四个定向测试文件 64/64、架构检查、格式和差异检查通过。BFF 全量测试受本机 `argon2` 段错误阻断，E2E 受全局 pnpm 与 Node 20 版本冲突阻断，证据及分类见 `task-5-report.md`。临时 `.venv` 链接已移除；第二阶段 Web/BFF/Python 物理迁移及兼容入口移除仍待完成，所有实现保持未提交。
+
+## 2026-09-24 Web 运行单元物理迁移
+
+- [x] Task 1：新增 `apps/web` 入口、Vite root/output、根 `src` 清理和 Web 依赖方向的迁移前 RED 测试；任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 2：将根 `index.html` 与 `src/` 迁移到 `apps/web/`，更新 Vite 根输出、共享领域包导入、TypeScript/ESLint/type-test 范围和 lockfile；客户端类型检查、构建、lint、格式及差异检查通过，任务级复核 Spec ✅、Task quality Approved；架构扫描与测试导入留给后续任务；实现保持未提交。
+- [x] Task 3：将 34 个 Service/组件测试文件中的 168 处浏览器实现引用迁移到 `apps/web/src`，保留根 tests、BFF 路径和测试命令；组件 108/108、契约类型检查、lint、格式和差异检查通过，任务级复核 Spec ✅、Task quality Approved；Service 剩余 Prisma 生成文件和 Task 4 架构门禁阻塞已记录；实现保持未提交。
+- [x] Task 4：扩展 `check:architecture` 扫描 `apps/web`，拒绝服务端/Python/数据库/共享包内部路径并检查根 `src` 残留；架构边界 36/36、架构检查、服务端类型检查、完整构建和差异检查通过，任务级复核 Spec ✅、Task quality Approved；兼容 re-export 测试仍有既有断言覆盖不足的 Minor，已记录待最终复核；实现保持未提交。
+- [x] Task 5：同步 README、项目规格、测试基线和待优化清单，完成 Web 迁移整体验收；lint、格式、三项类型检查、架构 36/36、组件 108/108、Service 310/310 已收集用例和构建通过；E2E/BFF 收集受未设置 `DATABASE_URL` 阻断，本机 Python 受依赖缺失阻断，均已记录；最终复核发现并修复 Vite 根 `.env` 读取的 `envDir` 回归，复核最终 Ready to merge；实现保持未提交。

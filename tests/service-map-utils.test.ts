@@ -1,12 +1,12 @@
 /** 验证地图灾害 GeoJSON 转换和缩放级别可见性计算。 */
 import { describe, expect, it } from "vitest";
 
-import type { Hazard } from "../src/types";
+import type { Hazard } from "../apps/web/src/types";
 import {
   createHeatmapFeatureCollection,
   createLodFeatureCollection,
-} from "../src/features/map/utils/hazardGeojson";
-import { getMapLodVisibility } from "../src/features/map/utils/mapLod";
+} from "../apps/web/src/features/map/utils/hazardGeojson";
+import { getMapLodVisibility } from "../apps/web/src/features/map/utils/mapLod";
 
 const validHazard: Hazard = {
   schemaVersion: "1",

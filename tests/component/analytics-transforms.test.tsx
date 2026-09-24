@@ -6,8 +6,8 @@ import {
   buildIntensitySeries,
   buildSeverityDistribution,
   buildTimelineData,
-} from "../../src/features/analytics/utils/analyticsTransforms";
-import type { AnalyticsHazard } from "../../src/features/analytics/types";
+} from "../../apps/web/src/features/analytics/utils/analyticsTransforms";
+import type { AnalyticsHazard } from "../../apps/web/src/features/analytics/types";
 
 function createHazard(overrides: Partial<AnalyticsHazard> = {}): AnalyticsHazard {
   return {

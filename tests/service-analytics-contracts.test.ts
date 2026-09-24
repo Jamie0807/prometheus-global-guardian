@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import type {
   AnalyticsResponse,
   LegacyAnalyticsResponse,
-} from "../src/services/analytics/analyticsTypes";
+} from "../apps/web/src/services/analytics/analyticsTypes";
 
 import {
   AnalyticsContractError,
@@ -16,7 +16,7 @@ import {
   parseRecord,
   parseString,
   parseStringArray,
-} from "../src/services/analytics/contracts/common";
+} from "../apps/web/src/services/analytics/contracts/common";
 
 describe("analytics response contracts", () => {
   it("parses the shared versioned response envelope and preserves metadata", () => {

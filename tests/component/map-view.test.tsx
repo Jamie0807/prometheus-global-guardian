@@ -67,7 +67,7 @@ class WorkerMock {
 
 vi.stubGlobal("Worker", WorkerMock);
 
-vi.mock("../../src/state/AuthContext", () => ({
+vi.mock("../../apps/web/src/state/AuthContext", () => ({
   useAuth: () => ({
     status: "authenticated",
     user: { id: "test-user", email: "test@example.com" },
@@ -157,7 +157,7 @@ vi.mock("mapbox-gl", () => ({
   },
 }));
 
-vi.mock("../../src/services/hazards/hazardService", () => ({
+vi.mock("../../apps/web/src/services/hazards/hazardService", () => ({
   fetchHazardFeed: mapMocks.fetchHazardFeed,
   fetchHazardsActive: mapMocks.fetchHazardsActive,
   fetchUSGSEarthquakes: mapMocks.fetchUSGSEarthquakes,
@@ -165,10 +165,13 @@ vi.mock("../../src/services/hazards/hazardService", () => ({
   fetchGDACS: mapMocks.fetchGDACS,
 }));
 
-import MapView from "../../src/features/map/MapView";
-import Header from "../../src/components/Header";
-import { MapStateProvider, useMapState } from "../../src/features/map/state/MapStateContext";
-import { UIStateProvider } from "../../src/state/UIStateContext";
+import MapView from "../../apps/web/src/features/map/MapView";
+import Header from "../../apps/web/src/components/Header";
+import {
+  MapStateProvider,
+  useMapState,
+} from "../../apps/web/src/features/map/state/MapStateContext";
+import { UIStateProvider } from "../../apps/web/src/state/UIStateContext";
 
 function pendingHazardFeed() {
   let resolve: (value: unknown) => void = () => undefined;

@@ -2,8 +2,7 @@
  * 提供灾害数据适配与规范化工具。
  */
 import type { Hazard } from "../../types";
-import { createHazardEventId } from "../../../shared/hazards/hazard-event";
-import { resolveHazardLayerId } from "../../../shared/hazards/hazard-layer-registry";
+import { createHazardEventId, resolveHazardLayerId } from "@pgg/hazard-domain";
 import {
   asRecord,
   asRecordArray,

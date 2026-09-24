@@ -2,8 +2,8 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LineChart, ProgressBar } from "../../src/components/DataVisualization";
-import { getXAxisLabelIndexes } from "../../src/utils/chartLabels";
+import { LineChart, ProgressBar } from "../../apps/web/src/components/DataVisualization";
+import { getXAxisLabelIndexes } from "../../apps/web/src/utils/chartLabels";
 
 describe("LineChart X-axis labels", () => {
   it("keeps all labels for small datasets and samples large datasets evenly", () => {

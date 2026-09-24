@@ -3,16 +3,16 @@ import React, { type ReactNode } from "react";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import ChartsPanel from "../../src/components/ChartsPanel";
-import DataQualityMonitor from "../../src/components/DataQualityMonitor";
-import OverviewTab from "../../src/features/analytics/components/tabs/OverviewTab";
-import { useAnalyticsData } from "../../src/features/analytics/hooks/useAnalyticsData";
-import { readChartEvent } from "../../src/features/analytics/utils/chartEventAdapter";
-import { AnalyticsContractError } from "../../src/services/analytics/contracts/common";
-import { parsePredictions } from "../../src/services/analytics/contracts/predictions";
-import { parseRiskAssessment } from "../../src/services/analytics/contracts/risk";
-import { parseStatistics } from "../../src/services/analytics/contracts/statistics";
-import type { AnalyticsHazard } from "../../src/features/analytics/types";
+import ChartsPanel from "../../apps/web/src/components/ChartsPanel";
+import DataQualityMonitor from "../../apps/web/src/components/DataQualityMonitor";
+import OverviewTab from "../../apps/web/src/features/analytics/components/tabs/OverviewTab";
+import { useAnalyticsData } from "../../apps/web/src/features/analytics/hooks/useAnalyticsData";
+import { readChartEvent } from "../../apps/web/src/features/analytics/utils/chartEventAdapter";
+import { AnalyticsContractError } from "../../apps/web/src/services/analytics/contracts/common";
+import { parsePredictions } from "../../apps/web/src/services/analytics/contracts/predictions";
+import { parseRiskAssessment } from "../../apps/web/src/services/analytics/contracts/risk";
+import { parseStatistics } from "../../apps/web/src/services/analytics/contracts/statistics";
+import type { AnalyticsHazard } from "../../apps/web/src/features/analytics/types";
 
 const serviceMocks = vi.hoisted(() => ({
   analyze4DTrends: vi.fn(),
@@ -26,12 +26,12 @@ const serviceMocks = vi.hoisted(() => ({
   getStatistics: vi.fn(),
 }));
 
-vi.mock("../../src/services/analytics/analyticsService", () => serviceMocks);
-vi.mock("../../src/utils/notifications", () => ({
+vi.mock("../../apps/web/src/services/analytics/analyticsService", () => serviceMocks);
+vi.mock("../../apps/web/src/utils/notifications", () => ({
   notify: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
-vi.mock("../../src/components/DataVisualization", () => ({ LineChart: () => null }));
-vi.mock("../../src/components/ChartDrilldownModal", () => ({
+vi.mock("../../apps/web/src/components/DataVisualization", () => ({ LineChart: () => null }));
+vi.mock("../../apps/web/src/components/ChartDrilldownModal", () => ({
   default: () => <div>drilldown open</div>,
 }));
 vi.mock("recharts", () => ({

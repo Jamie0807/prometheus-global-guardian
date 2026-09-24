@@ -1,8 +1,8 @@
 /** 验证灾害地图弹窗对外部字段的转义和安全文本渲染。 */
 import { describe, expect, it } from "vitest";
 
-import type { Hazard } from "../../src/types";
-import { createHazardPopupContent } from "../../src/features/map/utils/hazardPopupContent";
+import type { Hazard } from "../../apps/web/src/types";
+import { createHazardPopupContent } from "../../apps/web/src/features/map/utils/hazardPopupContent";
 
 const maliciousHazard: Hazard = {
   id: "hazard-1",

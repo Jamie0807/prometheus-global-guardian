@@ -2,12 +2,12 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import AnalyticsPage from "../../src/features/analytics/AnalyticsPage";
-import LegacyAnalyticsPage from "../../src/components/AnalyticsPage";
-import { parseStatistics } from "../../src/services/analytics/contracts/statistics";
-import { parsePredictions } from "../../src/services/analytics/contracts/predictions";
-import { parseRiskAssessment } from "../../src/services/analytics/contracts/risk";
-import { UIStateProvider } from "../../src/state/UIStateContext";
+import AnalyticsPage from "../../apps/web/src/features/analytics/AnalyticsPage";
+import LegacyAnalyticsPage from "../../apps/web/src/components/AnalyticsPage";
+import { parseStatistics } from "../../apps/web/src/services/analytics/contracts/statistics";
+import { parsePredictions } from "../../apps/web/src/services/analytics/contracts/predictions";
+import { parseRiskAssessment } from "../../apps/web/src/services/analytics/contracts/risk";
+import { UIStateProvider } from "../../apps/web/src/state/UIStateContext";
 
 const mapStateMocks = vi.hoisted(() => ({
   hazards: [
@@ -54,12 +54,14 @@ const analyticsServiceMocks = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("../../src/services/analytics/analyticsService", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/services/analytics/analyticsService")>()),
+vi.mock("../../apps/web/src/services/analytics/analyticsService", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../../apps/web/src/services/analytics/analyticsService")
+  >()),
   ...analyticsServiceMocks,
 }));
 
-vi.mock("../../src/features/analytics/hooks/useAnalyticsData", () => ({
+vi.mock("../../apps/web/src/features/analytics/hooks/useAnalyticsData", () => ({
   useAnalyticsData: () => ({
     serviceStatus: "online",
     predictions: {
@@ -118,15 +120,15 @@ vi.mock("../../src/features/analytics/hooks/useAnalyticsData", () => ({
   }),
 }));
 
-vi.mock("../../src/features/map/state/MapStateContext", () => ({
+vi.mock("../../apps/web/src/features/map/state/MapStateContext", () => ({
   useMapState: () => mapStateMocks,
 }));
 
-vi.mock("../../src/components/ChartsPanel", () => ({
+vi.mock("../../apps/web/src/components/ChartsPanel", () => ({
   default: () => <div>图表内容</div>,
 }));
 
-vi.mock("../../src/components/DataVisualization", () => ({
+vi.mock("../../apps/web/src/components/DataVisualization", () => ({
   AlertBox: () => <div>提示内容</div>,
   LineChart: () => <div>折线图内容</div>,
   LoadingSpinner: () => <div>加载内容</div>,

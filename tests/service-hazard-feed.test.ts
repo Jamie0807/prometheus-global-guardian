@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { requestJsonMock } = vi.hoisted(() => ({ requestJsonMock: vi.fn() }));
 
-vi.mock("../src/services/http/httpClient", () => ({ requestJson: requestJsonMock }));
+vi.mock("../apps/web/src/services/http/httpClient", () => ({ requestJson: requestJsonMock }));
 
-import { fetchHazardFeed } from "../src/services/hazards/hazardService";
-import { parseHazardFeed } from "../src/services/hazards/contracts/hazardFeed";
-import type { HazardFeedResponse } from "../src/types";
+import { fetchHazardFeed } from "../apps/web/src/services/hazards/hazardService";
+import { parseHazardFeed } from "../apps/web/src/services/hazards/contracts/hazardFeed";
+import type { HazardFeedResponse } from "../apps/web/src/types";
 
 const feed = {
   hazards: [

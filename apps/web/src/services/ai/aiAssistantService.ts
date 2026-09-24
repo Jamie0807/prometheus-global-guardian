@@ -5,7 +5,7 @@
  * 仅在特定服务端配置错误时返回并持久化本地演示回复。
  */
 
-import type { HazardLayerId, HazardSourceId } from "../../../shared/hazards/hazard-event";
+import type { HazardLayerId, HazardSourceId } from "@pgg/hazard-domain";
 import { getAuthCsrfToken } from "../auth/csrfToken";
 import { requestRaw } from "../http/httpClient";
 

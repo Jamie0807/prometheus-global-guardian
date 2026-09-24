@@ -1,8 +1,8 @@
 /**
  * 提供客户端日志记录器创建工具。
  */
-import { createLogger, resolveLogLevel } from "../../shared/logging.js";
-import type { LogLevel, Logger } from "../../shared/logging.js";
+import { createLogger, resolveLogLevel } from "../../../../shared/logging.js";
+import type { LogLevel, Logger } from "../../../../shared/logging.js";
 
 export function getClientLogLevel(value: string | undefined, isProduction: boolean): LogLevel {
   return resolveLogLevel(value, isProduction ? "warn" : "debug");

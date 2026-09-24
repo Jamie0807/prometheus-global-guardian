@@ -9,8 +9,7 @@ import type {
   HazardSourceState,
   HazardSourceStatus,
 } from "../../../types";
-import { createHazardEventId } from "../../../../shared/hazards/hazard-event";
-import { resolveHazardLayerId } from "../../../../shared/hazards/hazard-layer-registry";
+import { createHazardEventId, resolveHazardLayerId } from "@pgg/hazard-domain";
 import {
   HazardContractError,
   parseCoordinates,

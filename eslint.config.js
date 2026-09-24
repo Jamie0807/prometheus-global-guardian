@@ -28,12 +28,12 @@ export default defineConfig([
   },
   {
     files: [
-      "src/services/analytics/contracts/**/*.ts",
-      "src/services/analytics/analyticsService.ts",
-      "src/features/analytics/**/*.{ts,tsx}",
-      "src/components/ChartsPanel.tsx",
-      "src/components/InsightsPanel.tsx",
-      "src/components/DataQualityMonitor.tsx",
+      "apps/web/src/services/analytics/contracts/**/*.ts",
+      "apps/web/src/services/analytics/analyticsService.ts",
+      "apps/web/src/features/analytics/**/*.{ts,tsx}",
+      "apps/web/src/components/ChartsPanel.tsx",
+      "apps/web/src/components/InsightsPanel.tsx",
+      "apps/web/src/components/DataQualityMonitor.tsx",
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "error",

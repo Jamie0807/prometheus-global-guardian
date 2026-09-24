@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Hazard, HazardFeedResponse } from "../../src/types";
+import type { Hazard, HazardFeedResponse } from "../../apps/web/src/types";
 
 const mapStateMocks = vi.hoisted(() => ({
   refresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -13,7 +13,7 @@ const mapStateMocks = vi.hoisted(() => ({
   notifyInfo: vi.fn(),
 }));
 
-vi.mock("../../src/features/map/hooks/useHazardData", () => ({
+vi.mock("../../apps/web/src/features/map/hooks/useHazardData", () => ({
   useHazardData: () => ({
     disasters: mapStateMocks.hazards,
     sourceMeta: mapStateMocks.sourceMeta,
@@ -21,13 +21,16 @@ vi.mock("../../src/features/map/hooks/useHazardData", () => ({
   }),
 }));
 
-vi.mock("../../src/utils/notifications", () => ({
+vi.mock("../../apps/web/src/utils/notifications", () => ({
   notify: {
     info: mapStateMocks.notifyInfo,
   },
 }));
 
-import { MapStateProvider, useMapState } from "../../src/features/map/state/MapStateContext";
+import {
+  MapStateProvider,
+  useMapState,
+} from "../../apps/web/src/features/map/state/MapStateContext";
 
 function MapStateProbe() {
   const { filter, setFilter, viewMode, setViewMode } = useMapState();

@@ -1,11 +1,17 @@
 /**
  * 定义 Vite 开发服务器、构建分块与插件配置。
  */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const repositoryRoot = fileURLToPath(new URL(".", import.meta.url));
+
 // Vite 配置文档：https://vite.dev/config/
 export default defineConfig({
+  root: "apps/web",
+  envDir: repositoryRoot,
   plugins: [react()],
   server: {
     proxy: {
@@ -22,6 +28,8 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: path.resolve(repositoryRoot, "dist"),
+    emptyOutDir: true,
     rollupOptions: {
       output: {
         // 手动配置代码分块策略

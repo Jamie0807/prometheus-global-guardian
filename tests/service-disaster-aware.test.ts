@@ -1,7 +1,7 @@
 /** 验证 DisasterAWARE 客户端的授权、请求和故障处理。 */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ActiveHazard } from "../src/types";
+import type { ActiveHazard } from "../apps/web/src/types";
 
 const { authFetchMock, authorizeMock, getAccessTokenMock, warnMock } = vi.hoisted(() => ({
   authFetchMock: vi.fn(),
@@ -10,13 +10,13 @@ const { authFetchMock, authorizeMock, getAccessTokenMock, warnMock } = vi.hoiste
   warnMock: vi.fn(),
 }));
 
-vi.mock("../src/services/auth/authService", () => ({
+vi.mock("../apps/web/src/services/auth/authService", () => ({
   authFetch: authFetchMock,
   authorize: authorizeMock,
   getAccessToken: getAccessTokenMock,
 }));
 
-vi.mock("../src/utils/logger", () => ({
+vi.mock("../apps/web/src/utils/logger", () => ({
   createClientLogger: () => ({ warn: warnMock }),
 }));
 
@@ -24,11 +24,11 @@ import {
   fetchActiveHazardsByCategory,
   fetchHazardsActive,
   fetchHazardTypes,
-} from "../src/services/hazards/hazardService";
+} from "../apps/web/src/services/hazards/hazardService";
 import {
   parseActiveHazards,
   parseHazardTypes,
-} from "../src/services/hazards/contracts/disasterAware";
+} from "../apps/web/src/services/hazards/contracts/disasterAware";
 
 const activeHazard = {
   app_ID: 1,

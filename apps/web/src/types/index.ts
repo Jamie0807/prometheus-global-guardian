@@ -1,9 +1,9 @@
 /**
  * 定义应用共享的领域数据类型。
  */
-import type { HazardEvent, HazardSourceId } from "../../shared/hazards/hazard-event";
+import type { HazardEvent, HazardSourceId } from "@pgg/hazard-domain";
 
-export type { HazardLayerId, HazardSourceId } from "../../shared/hazards/hazard-event";
+export type { HazardLayerId, HazardSourceId } from "@pgg/hazard-domain";
 
 export interface Hazard extends HazardEvent {
   id: string;

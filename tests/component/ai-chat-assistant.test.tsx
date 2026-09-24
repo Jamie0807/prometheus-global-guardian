@@ -3,9 +3,12 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AIStreamOutcome, StreamChatOptions } from "../../src/services/ai/aiAssistantService";
-import AIChatAssistant from "../../src/components/AIChatAssistant";
-import { UIStateProvider, useUIState } from "../../src/state/UIStateContext";
+import type {
+  AIStreamOutcome,
+  StreamChatOptions,
+} from "../../apps/web/src/services/ai/aiAssistantService";
+import AIChatAssistant from "../../apps/web/src/components/AIChatAssistant";
+import { UIStateProvider, useUIState } from "../../apps/web/src/state/UIStateContext";
 
 const serviceMocks = vi.hoisted(() => ({
   streamChatMessage: vi.fn(),
@@ -23,14 +26,14 @@ const conversationMocks = vi.hoisted(() => ({
   deleteAIConversation: vi.fn(async () => undefined),
 }));
 
-vi.mock("../../src/services/ai/aiAssistantService", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/services/ai/aiAssistantService")>()),
+vi.mock("../../apps/web/src/services/ai/aiAssistantService", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/web/src/services/ai/aiAssistantService")>()),
   streamChatMessage: serviceMocks.streamChatMessage,
 }));
 
-vi.mock("../../src/services/ai/conversationService", () => conversationMocks);
+vi.mock("../../apps/web/src/services/ai/conversationService", () => conversationMocks);
 
-vi.mock("../../src/features/map/state/MapStateContext", () => ({
+vi.mock("../../apps/web/src/features/map/state/MapStateContext", () => ({
   useMapState: () => ({ hazards: [] }),
 }));
 

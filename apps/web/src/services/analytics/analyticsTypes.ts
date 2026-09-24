@@ -2,7 +2,7 @@
  * 定义分析服务的数据类型及兼容类型。
  */
 import type { AnalyticsSuccess } from "./contracts/common";
-import type { HazardLayerId, HazardSourceId } from "../../../shared/hazards/hazard-event";
+import type { HazardLayerId, HazardSourceId } from "@pgg/hazard-domain";
 
 export type {
   AnalyticsErrorEnvelope,

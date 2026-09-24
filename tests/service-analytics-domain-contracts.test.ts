@@ -1,40 +1,40 @@
 /** 验证分析服务各领域响应契约的解析和失败语义。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AnalyticsContractError } from "../src/services/analytics/contracts/common";
-import { parseComprehensiveAnalysis } from "../src/services/analytics/contracts/comprehensive";
-import { parsePredictions } from "../src/services/analytics/contracts/predictions";
-import { parseRiskAssessment } from "../src/services/analytics/contracts/risk";
-import { parseStatistics } from "../src/services/analytics/contracts/statistics";
-import { parseETLProcess } from "../src/services/analytics/contracts/etl";
+import { AnalyticsContractError } from "../apps/web/src/services/analytics/contracts/common";
+import { parseComprehensiveAnalysis } from "../apps/web/src/services/analytics/contracts/comprehensive";
+import { parsePredictions } from "../apps/web/src/services/analytics/contracts/predictions";
+import { parseRiskAssessment } from "../apps/web/src/services/analytics/contracts/risk";
+import { parseStatistics } from "../apps/web/src/services/analytics/contracts/statistics";
+import { parseETLProcess } from "../apps/web/src/services/analytics/contracts/etl";
 import {
   parseUnifiedMerge,
   parseUnifiedTransform,
-} from "../src/services/analytics/contracts/unified";
+} from "../apps/web/src/services/analytics/contracts/unified";
 import {
   parseAnalyticsJsonRecord,
   parseAnalyticsJsonRecords,
-} from "../src/services/analytics/contracts/records";
-import { parseAnalyticsServiceInfo } from "../src/services/analytics/contracts/serviceInfo";
-import { parseQualityHistory } from "../src/services/analytics/contracts/qualityHistory";
+} from "../apps/web/src/services/analytics/contracts/records";
+import { parseAnalyticsServiceInfo } from "../apps/web/src/services/analytics/contracts/serviceInfo";
+import { parseQualityHistory } from "../apps/web/src/services/analytics/contracts/qualityHistory";
 import {
   parseQualityReport,
   parseQualityThresholds,
-} from "../src/services/analytics/contracts/quality";
+} from "../apps/web/src/services/analytics/contracts/quality";
 import {
   parsePivotTable,
   parsePivotRiskScores,
   parsePivotTrends,
-} from "../src/services/analytics/contracts/pivot";
-import { parsePivotQuery } from "../src/services/analytics/contracts/pivotQuery";
-import { parsePivotSummary } from "../src/services/analytics/contracts/pivotSummary";
+} from "../apps/web/src/services/analytics/contracts/pivot";
+import { parsePivotQuery } from "../apps/web/src/services/analytics/contracts/pivotQuery";
+import { parsePivotSummary } from "../apps/web/src/services/analytics/contracts/pivotSummary";
 import {
   analyze4DTrends,
   assessDataQuality,
   calculate4DRiskScores,
   create4DPivotTable,
   getQualityThresholds,
-} from "../src/services/analytics/analyticsService";
+} from "../apps/web/src/services/analytics/analyticsService";
 
 afterEach(() => {
   vi.unstubAllGlobals();

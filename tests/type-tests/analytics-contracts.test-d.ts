@@ -1,11 +1,11 @@
 /** 验证分析领域契约的 TypeScript 类型兼容性和收窄要求。 */
-import type { AnalyticsSuccess } from "../../src/services/analytics/contracts/common";
-import type { HazardData } from "../../src/services/analytics/analyticsTypes";
-import type { PivotTrendsData } from "../../src/services/analytics/contracts/pivot";
-import type { PivotQueryData } from "../../src/services/analytics/contracts/pivotQuery";
-import type { PivotSummaryData } from "../../src/services/analytics/contracts/pivotSummary";
-import type { RiskAssessmentData } from "../../src/services/analytics/contracts/risk";
-import type { StatisticsData } from "../../src/services/analytics/contracts/statistics";
+import type { AnalyticsSuccess } from "../../apps/web/src/services/analytics/contracts/common";
+import type { HazardData } from "../../apps/web/src/services/analytics/analyticsTypes";
+import type { PivotTrendsData } from "../../apps/web/src/services/analytics/contracts/pivot";
+import type { PivotQueryData } from "../../apps/web/src/services/analytics/contracts/pivotQuery";
+import type { PivotSummaryData } from "../../apps/web/src/services/analytics/contracts/pivotSummary";
+import type { RiskAssessmentData } from "../../apps/web/src/services/analytics/contracts/risk";
+import type { StatisticsData } from "../../apps/web/src/services/analytics/contracts/statistics";
 
 const validStatistics = {
   success: true,

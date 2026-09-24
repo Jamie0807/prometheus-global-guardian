@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.app.json",
-  "include": ["src", "packages", "tests/type-tests/**/*.test-d.ts"],
+  "include": ["apps/web", "packages", "tests/type-tests/**/*.test-d.ts"],
   "exclude": ["node_modules", "dist", "dist-server"]
 }

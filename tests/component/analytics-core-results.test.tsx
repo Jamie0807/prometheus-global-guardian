@@ -2,19 +2,19 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import OverviewTab from "../../src/features/analytics/components/tabs/OverviewTab";
-import PredictionsTab from "../../src/features/analytics/components/tabs/PredictionsTab";
-import RiskTab from "../../src/features/analytics/components/tabs/RiskTab";
-import InsightsPanel from "../../src/components/InsightsPanel";
-import ChartsPanel from "../../src/components/ChartsPanel";
-import { parseStatistics } from "../../src/services/analytics/contracts/statistics";
-import { parsePredictions } from "../../src/services/analytics/contracts/predictions";
-import { parseRiskAssessment } from "../../src/services/analytics/contracts/risk";
-import type { AnalyticsHazard } from "../../src/features/analytics/types";
+import OverviewTab from "../../apps/web/src/features/analytics/components/tabs/OverviewTab";
+import PredictionsTab from "../../apps/web/src/features/analytics/components/tabs/PredictionsTab";
+import RiskTab from "../../apps/web/src/features/analytics/components/tabs/RiskTab";
+import InsightsPanel from "../../apps/web/src/components/InsightsPanel";
+import ChartsPanel from "../../apps/web/src/components/ChartsPanel";
+import { parseStatistics } from "../../apps/web/src/services/analytics/contracts/statistics";
+import { parsePredictions } from "../../apps/web/src/services/analytics/contracts/predictions";
+import { parseRiskAssessment } from "../../apps/web/src/services/analytics/contracts/risk";
+import type { AnalyticsHazard } from "../../apps/web/src/features/analytics/types";
 
 const serviceMocks = vi.hoisted(() => ({ getStatistics: vi.fn(), getRiskAssessment: vi.fn() }));
-vi.mock("../../src/services/analytics/analyticsService", () => serviceMocks);
-vi.mock("../../src/components/DataVisualization", () => ({ LineChart: () => <div /> }));
+vi.mock("../../apps/web/src/services/analytics/analyticsService", () => serviceMocks);
+vi.mock("../../apps/web/src/components/DataVisualization", () => ({ LineChart: () => <div /> }));
 vi.mock("recharts", () => ({
   ResponsiveContainer: () => null,
   PieChart: () => null,

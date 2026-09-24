@@ -3,16 +3,16 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Map } from "mapbox-gl";
 
-import { useDeck3DTiles } from "../../src/features/map/hooks/useDeck3DTiles";
-import { MAP_LAYER_IDS } from "../../src/features/map/utils/mapLayerIds";
-import { notify } from "../../src/utils/notifications";
+import { useDeck3DTiles } from "../../apps/web/src/features/map/hooks/useDeck3DTiles";
+import { MAP_LAYER_IDS } from "../../apps/web/src/features/map/utils/mapLayerIds";
+import { notify } from "../../apps/web/src/utils/notifications";
 
 const tileConfig = vi.hoisted(() => ({
   enabled: true,
   url: "https://tiles.example.test/tileset.json",
 }));
 
-vi.mock("../../src/config", () => ({
+vi.mock("../../apps/web/src/config", () => ({
   config: {
     tiles3d: tileConfig,
   },

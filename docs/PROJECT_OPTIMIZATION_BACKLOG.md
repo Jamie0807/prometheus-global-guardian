@@ -6,7 +6,7 @@
 
 项目已具备 React + Vite 前端、Express BFF、FastAPI 分析服务、多源灾害聚合、Mapbox 地图、Analytics 看板与 AI 助手。`main` 已加入 PostgreSQL 用户账号、全站登录门禁和账号隔离的 AI 会话/长期记忆持久化；仍以本地或私有自托管使用为目标，不代表已部署为公网服务。
 
-- 前端业务请求统一收敛在 `src/services/`；Analytics、Hazard 和通用 HTTP 数据在进入领域层前均从 `unknown` 经运行时解析器校验。
+- 前端业务请求统一收敛在 `apps/web/src/services/`；Analytics、Hazard 和通用 HTTP 数据在进入领域层前均从 `unknown` 经运行时解析器校验。
 - 浏览器业务 API 统一通过 Express BFF；Analytics BFF 使用服务间令牌代理到私有 FastAPI，数据库、会话密钥和模型凭据不进入浏览器构建。
 - `prisma/schema.prisma` 和版本化 migration 管理 PostgreSQL 用户、会话、AI 对话、消息及记忆；服务启动不会隐式执行数据库迁移。
 - Analytics 灾害请求使用 TypeScript 与 Python 共用的 JSON fixture；两端已对字段默认值、长度、二维/三维坐标、数值、未知字段和非有限数的接受边界对齐，质量评估输入也会先完成长度与空值规范化。
@@ -19,7 +19,7 @@
 - 统一灾害事件与图层注册表已落地：`eventId`、`sourceEventId`、`sourceId`、`layerId`、观测/更新时间和 `[0, 1]` 置信度由共享模型、BFF/浏览器/Python 边界共同校验；未知来源或图层回退为 `unknown`，旧字段保留兼容解析。
 - 数据源健康检查已落地：四个来源的 `meta.sources[]` 在现有状态旁返回固定五分钟的进程内快照。仅真实 `load()` 尝试计数，空数组计成功，缓存、`stale` 和 fallback 占位不计数；错误只返回稳定枚举，进程重启会清空窗口。
 - 本地/私有单机持久化运维已加入手动数据库检查、备份、7 个自然日保留清理、隔离恢复演练与运行手册；2026-09-24 已在独立 `pgg-persistence-test` Compose 项目中完成真实 Docker 全流程验证。正式公网生产运维仍需单独设计。
-- 运行单元与共享包架构治理的第一阶段已完成：四个跨语言 JSON 契约位于 `packages/contracts/`，灾害领域实现位于 `packages/hazard-domain/`，`shared/hazards/` 保留兼容转导出；`check:architecture` 已接入本地 Node 基线和 CI。Web、BFF 与 Analytics 的物理目录迁移仍待后续阶段。
+- 运行单元与共享包架构治理的第一阶段已完成：四个跨语言 JSON 契约位于 `packages/contracts/`，灾害领域实现位于 `packages/hazard-domain/`。本阶段 Web 已迁至 `apps/web/`，从 `apps/web/index.html` 构建到根 `dist/` 并由 Express 提供；Web 通过 `@pgg/hazard-domain` 公共入口依赖共享领域包，`check:architecture` 已覆盖 Web 依赖方向。Service、组件及类型测试引用已指向新位置，本阶段文档已同步。`shared/hazards/` 仍是 BFF 迁移期兼容入口；BFF 与 Python 物理目录迁移待后续阶段。
 - 质量门禁包含 lint、格式、三项 TypeScript 类型检查、BFF/Service/组件/E2E 测试、构建及 Python unittest；AGENTS.md 已固化需求拆解、TDD、提交和自主验收约束。GitHub Actions 分别运行前端/BFF 基线和 Python 测试。
 - 受限沙箱中运行 `pnpm test` 的 BFF 监听用例会出现 `listen EPERM`；这是运行环境限制。在具备本地端口权限的环境中，BFF 与 Service 测试均可完整通过。
 - 已完成全球灾害可视化开源项目调研，技术栈、架构对比和优化建议记录在 `docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md`；本清单只同步其中的下一步高优先级事项。
@@ -52,7 +52,8 @@
 | 外部灾害数据韧性                 | 多源聚合具备超时、一次重试、进程内缓存、陈旧标记与来源级状态；刷新请求具备取消、去重和竞态保护。                                                                                                                                                                                                             |
 | 数据源健康检查与新鲜度           | DisasterAware、USGS、NASA EONET 与 GDACS 的 `meta.sources[]` 可携带固定五分钟进程内健康快照：真实 `load()` 的尝试/成功/失败、成功率、延迟、最近尝试/成功时间、连续失败和稳定错误码；空数组计成功，缓存、`stale` 和 fallback 占位不计数，进程重启清空窗口。                                                   |
 | 统一灾害事件与图层注册表         | `packages/hazard-domain/` 与 `packages/contracts/hazard-event.json` 定义 canonical `eventId`、`sourceEventId`、`sourceId`、`layerId`、观测/更新时间和置信度边界；BFF、浏览器 Worker、地图、Analytics、质量、AI 与 Python 共用，旧 `shared/hazards/` 仅保留兼容转导出，旧字段兼容且未知类型回退为 `unknown`。 |
-| 运行单元与共享包架构治理第一阶段 | `packages/contracts/` 保存四个语言无关 JSON 契约，`packages/hazard-domain/` 保存 TypeScript 灾害领域实现；旧 `shared/hazards/` 仅作兼容转导出。`check:architecture` 检查包元数据、依赖方向和内部路径引用，并纳入 Node 基线与 CI；运行单元仍位于原目录。                                                      |
+| 运行单元与共享包架构治理第一阶段 | `packages/contracts/` 保存四个语言无关 JSON 契约，`packages/hazard-domain/` 保存 TypeScript 灾害领域实现；旧 `shared/hazards/` 仅作兼容转导出。`check:architecture` 检查包元数据、依赖方向和内部路径引用，并纳入 Node 基线与 CI。                                                                            |
+| Web 运行单元物理迁移             | Web 实现已位于 `apps/web/src/`，入口为 `apps/web/index.html`；Vite 保持根 `dist/` 产物供 Express 托管，Web 使用 `@pgg/hazard-domain` 公共入口；架构门禁覆盖 Web，Service、组件和类型测试路径及项目文档已同步。                                                                                               |
 | SSE 断连自动恢复与会话续传       | BFF 为 AI 流分配受约束的请求 ID 和递增事件序号，并在单实例有界内存窗口内缓存转换后的事件；浏览器最多进行三次指数退避重连，携带 `Last-Event-ID` 恢复并去重。恢复计时仅在订阅者断开或会话终态后启动，单帧限制为 64 KiB；过期后回到安全错误和手动重试。                                                         |
 | 用户注册、全站认证与 AI 持久化   | 已合并到 `main`：PostgreSQL/Prisma、HttpOnly 服务端会话、登录门禁、账号隔离的对话/消息、48 KiB 上下文裁剪与摘要、用户确认的长期记忆管理及账号数据删除；AI 数据不会写入浏览器持久存储。已完成本地 Docker 验证，尚未部署公网。                                                                                 |
 | 账号与 AI 持久化分支验收         | 已合并到 `main` 并完成验收：登录/恢复/退出、重复生成、完成响应重放、生成前取消及重试复用测试通过；CI 使用一次性 PostgreSQL 并应用 migration。公网生产运维仍未完成。                                                                                                                                          |
@@ -91,15 +92,15 @@
 
 项目当前不计划部署。矩阵按后续开发价值排序；发布前项仅在决定公网部署后进入实施范围。
 
-| 优先级 | 剩余优化范围                           | 建议时机           | 依赖与边界                                                                                                                                                                       |
-| ------ | -------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1     | PostgreSQL/PostGIS 灾害历史数据设计    | 历史需求确认前     | PostgreSQL 已用于账号和 AI 数据；灾害历史快照、分析运行和空间索引仍需单独定义需求及数据保留策略。                                                                                |
-| P2     | 前端包体积预算与分包治理               | 性能优化前         | Mapbox 生产 chunk 约 1.8 MB；先采集首屏与交互数据，再建立分包和预算。                                                                                                            |
-| P2     | 可访问性与多语言界面                   | UI 迭代时          | 补齐弹窗语义、焦点管理、键盘路径、locale 资源与移动端/视觉回归。                                                                                                                 |
-| P2     | 可观测性、集中错误上报和指标告警       | 需要持续运行服务时 | 已有安全日志；后续接入集中采集、错误聚合、指标、trace 与告警。                                                                                                                   |
-| P2     | Web/BFF/Python 运行单元物理迁移        | 后续架构阶段       | 第一阶段共享包与架构门禁已完成；后续将 `src/`、`server/`、`python-analytics-service/` 分别迁至 `apps/web/`、`apps/bff/`、`services/analytics/`，逐步迁移调用方后再移除兼容入口。 |
-| P2     | 仓库卫生与运行时无关文件               | 下次维护批次       | 明确 `.superpowers` 过程记录、历史副本、锁文件和临时产物的保留策略。                                                                                                             |
-| 发布前 | 公开服务的账号验证、共享限流与生产运维 | 决定公网部署前     | 当前单机备份和恢复演练不覆盖公网账号验证/找回、共享限流、异地或对象存储备份、集中告警及正式恢复预案。                                                                            |
+| 优先级 | 剩余优化范围                           | 建议时机           | 依赖与边界                                                                                                                                                                               |
+| ------ | -------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1     | PostgreSQL/PostGIS 灾害历史数据设计    | 历史需求确认前     | PostgreSQL 已用于账号和 AI 数据；灾害历史快照、分析运行和空间索引仍需单独定义需求及数据保留策略。                                                                                        |
+| P2     | 前端包体积预算与分包治理               | 性能优化前         | Mapbox 生产 chunk 约 1.8 MB；先采集首屏与交互数据，再建立分包和预算。                                                                                                                    |
+| P2     | 可访问性与多语言界面                   | UI 迭代时          | 补齐弹窗语义、焦点管理、键盘路径、locale 资源与移动端/视觉回归。                                                                                                                         |
+| P2     | 可观测性、集中错误上报和指标告警       | 需要持续运行服务时 | 已有安全日志；后续接入集中采集、错误聚合、指标、trace 与告警。                                                                                                                           |
+| P2     | BFF/Python 运行单元物理迁移            | 后续架构阶段       | Web 已迁至 `apps/web/`。后续将 `server/` 与 `server.ts` 迁至 `apps/bff/`，将 `python-analytics-service/` 迁至 `services/analytics/`；迁移调用方后再评估移除 `shared/hazards/` 兼容入口。 |
+| P2     | 仓库卫生与运行时无关文件               | 下次维护批次       | 明确 `.superpowers` 过程记录、历史副本、锁文件和临时产物的保留策略。                                                                                                                     |
+| 发布前 | 公开服务的账号验证、共享限流与生产运维 | 决定公网部署前     | 当前单机备份和恢复演练不覆盖公网账号验证/找回、共享限流、异地或对象存储备份、集中告警及正式恢复预案。                                                                                    |
 
 ## 关键边界与遗留风险
 

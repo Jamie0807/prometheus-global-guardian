@@ -1,8 +1,8 @@
 /** 验证 HTTP 服务客户端的 JSON、文本和流式请求处理。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { requestJson, requestStream, requestText } from "../src/services/http/httpClient";
-import { ServiceError } from "../src/services/http/serviceError";
+import { requestJson, requestStream, requestText } from "../apps/web/src/services/http/httpClient";
+import { ServiceError } from "../apps/web/src/services/http/serviceError";
 
 describe("HTTP service client", () => {
   afterEach(() => {

@@ -2,8 +2,7 @@
  * 定义分析服务的灾害输入契约。
  */
 import type { HazardData } from "../analyticsTypes";
-import type { HazardLayerId, HazardSourceId } from "../../../../shared/hazards/hazard-event";
-import { createHazardEventId } from "../../../../shared/hazards/hazard-event";
+import { createHazardEventId, type HazardLayerId, type HazardSourceId } from "@pgg/hazard-domain";
 import { AnalyticsContractError, parseFiniteNumber, parseRecord } from "./common";
 
 const allowedKeys = new Set([

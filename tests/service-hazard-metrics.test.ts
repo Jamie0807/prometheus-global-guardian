@@ -1,7 +1,7 @@
 /** 验证灾害强度指标从兼容数据字段中的提取规则。 */
 import { describe, expect, it } from "vitest";
 
-import { getHazardIntensity } from "../src/utils/hazardMetrics";
+import { getHazardIntensity } from "../apps/web/src/utils/hazardMetrics";
 
 describe("hazard intensity metrics", () => {
   it("prefers the normalized magnitude and preserves zero", () => {

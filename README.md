@@ -388,15 +388,15 @@ All `/api/v1` business endpoints return a versioned response envelope. Successfu
 
 ```text
 prometheus-global-guardian/
-├── src/
-│   ├── features/
-│   │   ├── map/                 # Map page, Mapbox hooks, worker, and MapStateProvider
-│   │   └── analytics/           # Analytics page, tabs, data hook, and transformations
-│   ├── state/                   # Authentication and UI state providers
-│   ├── services/                # Frontend HTTP, hazard, AI, auth, and analytics boundaries
-│   ├── components/              # Shared React components and modals
-│   ├── workers/                 # Hazard processing Web Worker
-│   └── App.tsx                  # Authentication gate and provider/view composition
+├── apps/web/
+│   ├── index.html              # Browser HTML entry
+│   └── src/
+│       ├── features/           # Map and Analytics features
+│       ├── state/              # Authentication and UI state providers
+│       ├── services/           # Frontend HTTP, hazard, AI, auth, and analytics boundaries
+│       ├── components/         # Shared React components and modals
+│       ├── workers/            # Hazard processing Web Worker
+│       └── App.tsx             # Authentication gate and provider/view composition
 ├── server/
 │   ├── ai/                      # Provider routing, persistent conversations, and memory
 │   ├── auth/                    # Account endpoints, password hashing, and sessions
@@ -416,12 +416,17 @@ prometheus-global-guardian/
 ├── prisma/                      # PostgreSQL schema and explicit migrations
 ├── docs/                        # Governance, test baseline, plans, and specifications
 ├── scripts/                     # Node-version, Python-test, and service-start scripts
+├── package.json                  # Repository scripts and workspace dependency orchestration
+├── vite.config.ts                # Web root and root dist/ output
+├── vitest.config.ts              # Service test configuration
+├── playwright.config.ts          # Browser test configuration
+├── Dockerfile                    # Local complete-stack image
 ├── server.ts                    # Express application entry
 ├── docker-compose.yml           # Local complete-stack startup
 └── AGENTS.md                    # Development, worktree, TDD, and validation conventions
 ```
 
-The first architecture stage moved shared contracts and hazard-domain code into `packages/` and added `pnpm run check:architecture`. The Web, BFF, and Analytics runtime units still live in `src/`, `server/` plus `server.ts`, and `python-analytics-service/`. Their target directories are `apps/web/`, `apps/bff/`, and `services/analytics/`; physical moves and removal of the `shared/hazards/` compatibility re-exports belong to a later stage.
+The Web runtime now lives in `apps/web/`, with implementation under `apps/web/src/`. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express continues to serve. The repository root retains the package scripts, Vite, Vitest, Playwright, and Dockerfile orchestration. Web code imports the hazard model through the public `@pgg/hazard-domain` entrypoint; `shared/hazards/` remains a compatibility entrypoint for BFF consumers. Moving the BFF from `server/` and `server.ts` to `apps/bff/`, moving the Python service from `python-analytics-service/` to `services/analytics/`, and removing compatibility imports are later stages.
 
 ---
 
@@ -828,15 +833,15 @@ pnpm start
 
 ```text
 prometheus-global-guardian/
-├── src/
-│   ├── features/
-│   │   ├── map/                 # 地图、Mapbox Hook、Worker 和 MapStateProvider
-│   │   └── analytics/           # 分析页面、Tab、数据 Hook 和转换
-│   ├── state/                   # UIStateProvider 和 UI 状态契约
-│   ├── services/                # 前端 HTTP、灾害、AI、鉴权和分析边界
-│   ├── components/              # 共享 React 组件和弹窗
-│   ├── workers/                 # 灾害处理 Web Worker
-│   └── App.tsx                  # 鉴权与 Provider/视图组合
+├── apps/web/
+│   ├── index.html              # 浏览器 HTML 入口
+│   └── src/
+│       ├── features/           # 地图与分析功能
+│       ├── state/              # 鉴权和 UI 状态 Provider
+│       ├── services/           # 前端 HTTP、灾害、AI、鉴权和分析边界
+│       ├── components/         # 共享 React 组件和弹窗
+│       ├── workers/            # 灾害处理 Web Worker
+│       └── App.tsx             # 鉴权与 Provider/视图组合
 ├── server/
 │   ├── ai/                      # Provider 选择、路由和流适配
 │   ├── hazards/                 # 公开数据聚合
@@ -852,9 +857,14 @@ prometheus-global-guardian/
 ├── tests/                       # BFF、Service、组件和 E2E 测试
 ├── docs/                        # 治理、测试基线、计划和规格
 ├── scripts/                     # Node 版本、Python 测试和服务启动脚本
+├── package.json                  # 仓库脚本与工作区依赖编排
+├── vite.config.ts                # Web root 与根目录 dist/ 输出
+├── vitest.config.ts              # Service 测试配置
+├── playwright.config.ts          # 浏览器测试配置
+├── Dockerfile                    # 本地完整栈镜像
 ├── server.ts                    # Express 应用入口
 ├── docker-compose.yml           # 本地完整栈启动
 └── AGENTS.md                    # 开发、worktree、TDD 和验证约定
 ```
 
-第一阶段已将共享契约和灾害领域代码收敛到 `packages/`，并加入 `pnpm run check:architecture`。Web、BFF、Analytics 运行单元目前仍分别位于 `src/`、`server/` 加 `server.ts`、`python-analytics-service/`。`apps/web/`、`apps/bff/` 和 `services/analytics/` 是后续物理迁移的目标目录；`shared/hazards/` 兼容转导出会在现有调用方迁移完成后移除。
+Web 运行单元已迁至 `apps/web/`，实现位于 `apps/web/src/`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest、Playwright 和 Dockerfile 编排入口。Web 通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；`shared/hazards/` 仍是 BFF 调用方的迁移期兼容入口。后续阶段再将 `server/` 与 `server.ts` 迁至 `apps/bff/`、将 `python-analytics-service/` 迁至 `services/analytics/`，并在调用方迁移完成后清理兼容入口。

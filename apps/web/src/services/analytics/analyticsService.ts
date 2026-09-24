@@ -11,7 +11,7 @@
 import { requestRaw } from "../http/httpClient";
 import type { Hazard } from "../../types";
 import type { AnalysisRequest, HazardData } from "./analyticsTypes";
-import type { HazardSourceId } from "../../../shared/hazards/hazard-event";
+import type { HazardSourceId } from "@pgg/hazard-domain";
 import type { AnalyticsSuccess } from "./contracts/common";
 import {
   AnalyticsBusinessError,

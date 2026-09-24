@@ -7,7 +7,7 @@ import {
   adaptUSGSResponse,
   detectHazardTypeFromTitle,
   mapNASACategoryToType,
-} from "../src/services/hazards/hazardAdapters";
+} from "../apps/web/src/services/hazards/hazardAdapters";
 
 describe("hazard adapters", () => {
   it("returns an empty list for non-object public source payloads", () => {

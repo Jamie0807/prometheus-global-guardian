@@ -23,6 +23,16 @@ function writeFixture(root: string, relativePath: string, contents: string) {
 }
 
 describe("workspace architecture", () => {
+  it("uses apps/web as the browser entrypoint", () => {
+    const viteConfig = readFileSync(path.join(repositoryRoot, "vite.config.ts"), "utf8");
+    expect(existsSync(path.join(repositoryRoot, "apps/web/index.html"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "apps/web/src/index.tsx"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "src"))).toBe(false);
+    expect(viteConfig).toContain('root: "apps/web"');
+    expect(viteConfig).toContain("envDir: repositoryRoot");
+    expect(viteConfig).toContain('outDir: path.resolve(repositoryRoot, "dist")');
+  });
+
   it("declares the package workspace and shared package entrypoints", () => {
     const workspace = readFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "utf8");
     const contracts = JSON.parse(
@@ -150,6 +160,104 @@ describe("workspace architecture", () => {
       writeFixture(root, "src/example.ts", 'export { x } from "../packages/hazard-domain/src/x";');
       expect(checkArchitecture(root)).toContain(
         "production code must use a package entrypoint: src/example.ts -> ../packages/hazard-domain/src/x",
+      );
+    });
+  });
+
+  it("rejects apps/web imports into the server runtime", () => {
+    withFixture((root) => {
+      writeFixture(root, "apps/web/src/forbidden.ts", 'import "../../../server/server.ts";');
+      expect(checkArchitecture(root)).toContain(
+        "apps/web must not import server runtime: apps/web/src/forbidden.ts -> ../../../server/server.ts",
+      );
+    });
+  });
+
+  it.each([
+    "server.ts",
+    "server.js",
+    "apps/bff/client.ts",
+    "services/analytics/app/main.py",
+    "python-analytics-service/app/main.py",
+    "server/db/client.ts",
+    "prisma.config.ts",
+    "prisma/client.ts",
+  ])("rejects apps/web imports into %s", (runtimePath) => {
+    withFixture((root) => {
+      const specifier = `../../../${runtimePath}`;
+      writeFixture(root, "apps/web/src/forbidden.ts", `import "${specifier}";`);
+      expect(checkArchitecture(root)).toContain(
+        `apps/web must not import server runtime: apps/web/src/forbidden.ts -> ${specifier}`,
+      );
+    });
+  });
+
+  it.each([
+    'export { server } from "../../../server/server.ts";',
+    'const server = import("../../../server/server.ts");',
+    'import /* server boundary */ "../../../server/server.ts";',
+  ])("checks apps/web module references: %s", (source) => {
+    withFixture((root) => {
+      writeFixture(root, "apps/web/src/forbidden.ts", source);
+      expect(checkArchitecture(root)).toContain(
+        "apps/web must not import server runtime: apps/web/src/forbidden.ts -> ../../../server/server.ts",
+      );
+    });
+  });
+
+  it("allows browser imports and ignores comments and strings in apps/web", () => {
+    withFixture((root) => {
+      writeFixture(
+        root,
+        "apps/web/src/allowed.ts",
+        [
+          'import "@pgg/hazard-domain";',
+          'import "./services/analytics/analyticsService";',
+          'import "../../../server-browser/utils";',
+          '// import "../../../server/server.ts";',
+          '/* export * from "../../../packages/hazard-domain/src/hazard-event"; */',
+          "export const example = 'import(\"../../../apps/bff/client.ts\")';",
+        ].join("\n"),
+      );
+      const violations = checkArchitecture(root).filter(
+        (error) => error.startsWith("apps/web") || error.startsWith("production code"),
+      );
+      expect(violations).toEqual([]);
+    });
+  });
+
+  it("reports a remaining root src directory with a stable rule", () => {
+    withFixture((root) => {
+      mkdirSync(path.join(root, "src"));
+      expect(checkArchitecture(root)).toContain(
+        "root src directory must be removed after web migration: src",
+      );
+    });
+  });
+
+  it.each([".git", ".venv", "__pycache__", "dist", "dist-server", "node_modules"])(
+    "ignores apps/web generated directory %s",
+    (directory) => {
+      withFixture((root) => {
+        writeFixture(
+          root,
+          `apps/web/${directory}/forbidden.ts`,
+          'import "../../../server/server.ts";',
+        );
+        expect(checkArchitecture(root).filter((error) => error.startsWith("apps/web"))).toEqual([]);
+      });
+    },
+  );
+
+  it("rejects apps/web imports into package internals", () => {
+    withFixture((root) => {
+      writeFixture(
+        root,
+        "apps/web/src/internal.ts",
+        'import "../../../packages/hazard-domain/src/hazard-event";',
+      );
+      expect(checkArchitecture(root)).toContain(
+        "production code must use a package entrypoint: apps/web/src/internal.ts -> ../../../packages/hazard-domain/src/hazard-event",
       );
     });
   });

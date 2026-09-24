@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { formatHazards } from "../src/services/analytics/analyticsService";
-import { AnalyticsContractError } from "../src/services/analytics/contracts/common";
+import { formatHazards } from "../apps/web/src/services/analytics/analyticsService";
+import { AnalyticsContractError } from "../apps/web/src/services/analytics/contracts/common";
 import {
   parseAnalyticsHazardData,
   parseAnalyticsHazardDataArray,
-} from "../src/services/analytics/contracts/hazardInput";
+} from "../apps/web/src/services/analytics/contracts/hazardInput";
 
 type AnalyticsHazardFixture = {
   valid: { complete: unknown; nullableOptionalValues: unknown; omittedDefaults: unknown };

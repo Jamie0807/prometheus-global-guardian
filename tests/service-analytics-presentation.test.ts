@@ -10,7 +10,7 @@ import {
   localizeAnalyticsMessage,
   normalizeQualityReport,
   normalizeQualityScore,
-} from "../src/services/analytics/analyticsPresentation";
+} from "../apps/web/src/services/analytics/analyticsPresentation";
 
 describe("analytics presentation semantics", () => {
   it("explains insufficient prediction data instead of showing N/A", () => {

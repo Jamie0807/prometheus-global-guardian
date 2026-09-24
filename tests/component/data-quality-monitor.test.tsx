@@ -2,16 +2,16 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import DataQualityMonitor from "../../src/components/DataQualityMonitor";
-import { AnalyticsContractError } from "../../src/services/analytics/contracts/common";
-import type { Hazard } from "../../src/types";
+import DataQualityMonitor from "../../apps/web/src/components/DataQualityMonitor";
+import { AnalyticsContractError } from "../../apps/web/src/services/analytics/contracts/common";
+import type { Hazard } from "../../apps/web/src/types";
 
 const serviceMocks = vi.hoisted(() => ({
   assessDataQuality: vi.fn(),
   getQualityThresholds: vi.fn(),
 }));
 
-vi.mock("../../src/services/analytics/analyticsService", () => ({
+vi.mock("../../apps/web/src/services/analytics/analyticsService", () => ({
   assessDataQuality: serviceMocks.assessDataQuality,
   getQualityThresholds: serviceMocks.getQualityThresholds,
 }));

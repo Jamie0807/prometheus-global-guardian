@@ -1,12 +1,12 @@
 /** 验证分析数据 Hook 的加载、错误处理和并发请求控制。 */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnalyticsHazard } from "../../src/features/analytics/types";
-import { useAnalyticsData } from "../../src/features/analytics/hooks/useAnalyticsData";
-import { AnalyticsContractError } from "../../src/services/analytics/contracts/common";
-import { parseStatistics } from "../../src/services/analytics/contracts/statistics";
-import { parsePredictions } from "../../src/services/analytics/contracts/predictions";
-import { parseRiskAssessment } from "../../src/services/analytics/contracts/risk";
+import type { AnalyticsHazard } from "../../apps/web/src/features/analytics/types";
+import { useAnalyticsData } from "../../apps/web/src/features/analytics/hooks/useAnalyticsData";
+import { AnalyticsContractError } from "../../apps/web/src/services/analytics/contracts/common";
+import { parseStatistics } from "../../apps/web/src/services/analytics/contracts/statistics";
+import { parsePredictions } from "../../apps/web/src/services/analytics/contracts/predictions";
+import { parseRiskAssessment } from "../../apps/web/src/services/analytics/contracts/risk";
 
 const serviceMocks = vi.hoisted(() => ({
   checkHealth: vi.fn(),
@@ -25,8 +25,8 @@ const notificationMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
-vi.mock("../../src/services/analytics/analyticsService", () => serviceMocks);
-vi.mock("../../src/utils/notifications", () => ({ notify: notificationMocks }));
+vi.mock("../../apps/web/src/services/analytics/analyticsService", () => serviceMocks);
+vi.mock("../../apps/web/src/utils/notifications", () => ({ notify: notificationMocks }));
 
 const hazards: AnalyticsHazard[] = [
   {

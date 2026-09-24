@@ -18,11 +18,11 @@ const appMocks = vi.hoisted(() => ({
   ],
 }));
 
-vi.mock("../../src/services/auth/authService", () => ({
+vi.mock("../../apps/web/src/services/auth/authService", () => ({
   authorize: appMocks.authorize,
 }));
 
-vi.mock("../../src/state/AuthContext", () => ({
+vi.mock("../../apps/web/src/state/AuthContext", () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
   useAuth: () => ({
     status: "authenticated",
@@ -35,7 +35,7 @@ vi.mock("../../src/state/AuthContext", () => ({
   }),
 }));
 
-vi.mock("../../src/features/map/hooks/useHazardData", () => ({
+vi.mock("../../apps/web/src/features/map/hooks/useHazardData", () => ({
   useHazardData: () => ({
     disasters: appMocks.hazards,
     sourceMeta: null,
@@ -43,26 +43,26 @@ vi.mock("../../src/features/map/hooks/useHazardData", () => ({
   }),
 }));
 
-vi.mock("../../src/utils/notifications", () => ({
+vi.mock("../../apps/web/src/utils/notifications", () => ({
   notify: {
     info: vi.fn(),
   },
 }));
 
-vi.mock("../../src/components/NotificationCenter", () => ({
+vi.mock("../../apps/web/src/components/NotificationCenter", () => ({
   default: () => null,
 }));
 
-vi.mock("../../src/components/StatusPanel", () => ({
+vi.mock("../../apps/web/src/components/StatusPanel", () => ({
   default: () => <div>status-panel</div>,
 }));
 
-vi.mock("../../src/components/LegendPanel", () => ({
+vi.mock("../../apps/web/src/components/LegendPanel", () => ({
   default: () => <div>legend-panel</div>,
 }));
 
-vi.mock("../../src/features/map/MapView", async () => {
-  const { useMapState } = await import("../../src/features/map/state/MapStateContext");
+vi.mock("../../apps/web/src/features/map/MapView", async () => {
+  const { useMapState } = await import("../../apps/web/src/features/map/state/MapStateContext");
   const MapViewMock = () => (
     <div data-testid="map-hazard-count">{useMapState().hazards.length}</div>
   );
@@ -72,9 +72,9 @@ vi.mock("../../src/features/map/MapView", async () => {
   };
 });
 
-vi.mock("../../src/components/AnalyticsPage", async () => {
-  const { useMapState } = await import("../../src/features/map/state/MapStateContext");
-  const { useUIState } = await import("../../src/state/UIStateContext");
+vi.mock("../../apps/web/src/components/AnalyticsPage", async () => {
+  const { useMapState } = await import("../../apps/web/src/features/map/state/MapStateContext");
+  const { useUIState } = await import("../../apps/web/src/state/UIStateContext");
   const AnalyticsPageMock = () => {
     const { closeView } = useUIState();
     return (
@@ -92,8 +92,8 @@ vi.mock("../../src/components/AnalyticsPage", async () => {
   };
 });
 
-vi.mock("../../src/components/SettingsModal", async () => {
-  const { useUIState } = await import("../../src/state/UIStateContext");
+vi.mock("../../apps/web/src/components/SettingsModal", async () => {
+  const { useUIState } = await import("../../apps/web/src/state/UIStateContext");
   const SettingsModalMock = () =>
     useUIState().activeModal === "settings" ? <div>地图设置</div> : null;
 
@@ -102,9 +102,9 @@ vi.mock("../../src/components/SettingsModal", async () => {
   };
 });
 
-vi.mock("../../src/components/AIChatAssistant", async () => {
-  const { useMapState } = await import("../../src/features/map/state/MapStateContext");
-  const { useUIState } = await import("../../src/state/UIStateContext");
+vi.mock("../../apps/web/src/components/AIChatAssistant", async () => {
+  const { useMapState } = await import("../../apps/web/src/features/map/state/MapStateContext");
+  const { useUIState } = await import("../../apps/web/src/state/UIStateContext");
   const AIChatAssistantMock = () => {
     const { hazards } = useMapState();
     const { activeModal } = useUIState();
@@ -116,7 +116,7 @@ vi.mock("../../src/components/AIChatAssistant", async () => {
   };
 });
 
-import App from "../../src/App";
+import App from "../../apps/web/src/App";
 
 describe("App state ownership", () => {
   it("provides one hazard domain to map, analytics, report, and AI consumers", async () => {

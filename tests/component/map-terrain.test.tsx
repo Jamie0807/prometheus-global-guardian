@@ -3,8 +3,8 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Map } from "mapbox-gl";
 
-import { notify } from "../../src/utils/notifications";
-import { useMapTerrain } from "../../src/features/map/hooks/useMapTerrain";
+import { notify } from "../../apps/web/src/utils/notifications";
+import { useMapTerrain } from "../../apps/web/src/features/map/hooks/useMapTerrain";
 
 function createMap(hasTerrainSource = false, pitch = 0) {
   const listeners = new Map<string, (event: unknown) => void>();

@@ -18,6 +18,14 @@ const ignoredDirectories = new Set([
 const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".ts", ".tsx"]);
 const runtimeDirectories = ["src", "server", "apps", "services", "python-analytics-service"];
 const runtimeEntryFiles = ["server.ts", "server.js"];
+const serverRuntimeDirectories = [
+  "server",
+  "apps/bff",
+  "services/analytics",
+  "python-analytics-service",
+  "prisma",
+];
+const serverRuntimeEntryFiles = [...runtimeEntryFiles, "prisma.config.ts", "prisma.config.js"];
 
 function listSourceFiles(directory) {
   if (!existsSync(directory)) return [];
@@ -108,6 +116,10 @@ export function checkArchitecture(rootDirectory) {
     errors.push("root contracts directory must be removed after migration: contracts");
   }
 
+  if (existsSync(path.join(root, "src"))) {
+    errors.push("root src directory must be removed after web migration: src");
+  }
+
   for (const file of listSourceFiles(path.join(root, "packages"))) {
     const source = readFileSync(file, "utf8");
     for (const specifier of readImportSpecifiers(source, file)) {
@@ -128,7 +140,7 @@ export function checkArchitecture(rootDirectory) {
   const productionFiles = runtimeEntryFiles
     .map((file) => path.join(root, file))
     .filter((file) => existsSync(file));
-  for (const directory of ["src", "server", "shared"]) {
+  for (const directory of ["src", "server", "shared", "apps"]) {
     productionFiles.push(...listSourceFiles(path.join(root, directory)));
   }
   for (const file of productionFiles) {
@@ -137,6 +149,17 @@ export function checkArchitecture(rootDirectory) {
     for (const specifier of readImportSpecifiers(source, file)) {
       if (!specifier.startsWith(".")) continue;
       const resolved = path.resolve(path.dirname(file), specifier);
+      if (
+        isInside(file, path.join(root, "apps/web")) &&
+        (serverRuntimeDirectories.some((directory) =>
+          isInside(resolved, path.join(root, directory)),
+        ) ||
+          serverRuntimeEntryFiles.some((entry) => resolved === path.join(root, entry)))
+      ) {
+        errors.push(
+          `apps/web must not import server runtime: ${path.relative(root, file)} -> ${specifier}`,
+        );
+      }
       if (isInside(resolved, path.join(root, "packages/hazard-domain/src"))) {
         errors.push(
           `production code must use a package entrypoint: ${path.relative(root, file)} -> ${specifier}`,

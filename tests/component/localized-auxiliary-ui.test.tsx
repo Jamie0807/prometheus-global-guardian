@@ -5,14 +5,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ChartCustomizationModal, {
   type ChartSettings,
-} from "../../src/components/ChartCustomizationModal";
-import ChartDrilldownModal from "../../src/components/ChartDrilldownModal";
-import CustomChartTooltip from "../../src/components/CustomChartTooltip";
-import MapError from "../../src/components/MapError";
-import NotificationCenter from "../../src/components/NotificationCenter";
-import type { Hazard } from "../../src/types";
-import { exportToCSV } from "../../src/utils/dataExport";
-import { notificationManager } from "../../src/utils/notifications";
+} from "../../apps/web/src/components/ChartCustomizationModal";
+import ChartDrilldownModal from "../../apps/web/src/components/ChartDrilldownModal";
+import CustomChartTooltip from "../../apps/web/src/components/CustomChartTooltip";
+import MapError from "../../apps/web/src/components/MapError";
+import NotificationCenter from "../../apps/web/src/components/NotificationCenter";
+import type { Hazard } from "../../apps/web/src/types";
+import { exportToCSV } from "../../apps/web/src/utils/dataExport";
+import { notificationManager } from "../../apps/web/src/utils/notifications";
 
 const chartSettings: ChartSettings = {
   colorScheme: "default",

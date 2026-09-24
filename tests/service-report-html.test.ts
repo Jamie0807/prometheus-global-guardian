@@ -1,7 +1,7 @@
 /** 验证灾害报告 HTML 的内容呈现、打印结构和转义处理。 */
 import { describe, expect, it } from "vitest";
 
-import { buildReportHtml } from "../src/utils/reportHtml";
+import { buildReportHtml } from "../apps/web/src/utils/reportHtml";
 
 describe("HTML report", () => {
   it("renders a readable, printable and escaped report", () => {
