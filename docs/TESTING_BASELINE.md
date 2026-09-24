@@ -19,6 +19,8 @@
 
 `test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`，但不包含 Python 测试。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
 
+持久化运维命令不包含在 `test:baseline` 中。`pnpm db:check` 检查当前 Compose 数据库与 Prisma migration status；`pnpm db:backup` 生成 dump 和 SHA-256 manifest；`pnpm db:restore:verify` 在临时 PostgreSQL 容器及独立卷中校验并演练恢复；`pnpm db:backup:prune` 清理超过 7 个本地自然日窗口的匹配工件；`pnpm db:migrate:deploy` 手动应用前向 migration。命令顺序、数据保护和失败处理见 `docs/OPERATIONS_PERSISTENCE.md`。
+
 ## 当前数量
 
 2026-09-21 在账号与 AI 持久化分支重跑自动化验证。Node 数量只指 `test:baseline` 覆盖的 BFF、Service、组件和 E2E 测试，不计独立 Python job。
@@ -42,6 +44,10 @@
 E2E 通过 Playwright route mock 隔离认证会话、DisasterAware、分析端点、公开灾害源、Mapbox 和 AI provider，检查已登录导航及 AI 会话请求，不访问真实第三方服务，也不要求本地配置真实账号或模型 Key。失败时保留截图，重试时保留 trace。
 
 本地可使用 `docker-compose.test.yml` 启动独立测试数据库，避免触碰开发 Compose 项目的数据卷。测试结束后可用同一组 Compose 文件执行 `down -v` 删除该临时数据库。
+
+持久化运维的真实 Docker 验证应使用 `docker-compose.yml` 与 `docker-compose.test.yml` 叠加、独立 Compose 项目名、测试专用 `DATABASE_URL` 和 `127.0.0.1:55439` 端口，从空测试卷依次执行 migration、`db:check`、`db:backup`、`db:restore:verify` 与 `db:backup:prune`。验收时确认 dump 非空且校验通过、过期工件被清理而窗口内工件保留、恢复演练只使用临时容器与卷、正式数据库卷和数据未被修改。`down -v` 只可用于已确认的隔离测试项目，不适用于正式 Compose 项目。
+
+本轮本机真实 Docker 演练仍在进行：`web` 镜像首次构建和依赖下载过慢，导致依赖该镜像的 Prisma migration status 步骤尚未在本机完整完成。因此不能把 `db:check` 或完整恢复演练记为本机通过；需在镜像准备好后补跑并记录实际输出。纯逻辑和 CLI 自动化测试的结果也不能替代这项隔离 PostgreSQL 验证。
 
 Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 契约、FastAPI 路由，以及预测、风险和质量结果语义；不需要启动服务，也不访问真实外部数据。`test_pivot_table.py` 是打印式透视与算法冒烟脚本，`test_service.py` 是依赖已启动服务的手工集成脚本；两者不是自动化测试套件。
 
