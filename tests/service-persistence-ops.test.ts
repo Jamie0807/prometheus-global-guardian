@@ -113,7 +113,7 @@ describe("persistence health and restore rehearsal", () => {
   });
 
   async function withVerifiedDump(test: (dumpPath: string) => Promise<void>) {
-    const directory = await mkdtemp(path.join(os.tmpdir(), "pgg-restore-test-"));
+    const directory = await mkdtemp(path.join(await realpath(os.tmpdir()), "pgg-restore-test-"));
     const dumpPath = path.join(directory, dumpName);
     const bytes = "test dump bytes";
     try {
@@ -188,6 +188,7 @@ describe("persistence health and restore rehearsal", () => {
       await expect(
         restoreVerify({
           dumpPath,
+          backupDirectory: path.dirname(dumpPath),
           dockerRunner: async (args: string[]) => {
             calls.push(args);
             return "";
@@ -199,7 +200,9 @@ describe("persistence health and restore rehearsal", () => {
   });
 
   it("rejects an empty dump with a matching manifest before Docker", async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), "pgg-empty-restore-test-"));
+    const directory = await mkdtemp(
+      path.join(await realpath(os.tmpdir()), "pgg-empty-restore-test-"),
+    );
     const dumpPath = path.join(directory, dumpName);
     const calls: string[][] = [];
     try {
@@ -218,12 +221,84 @@ describe("persistence health and restore rehearsal", () => {
       await expect(
         restoreVerify({
           dumpPath,
+          backupDirectory: directory,
           dockerRunner: async (args: string[]) => {
             calls.push(args);
             return "";
           },
         }),
       ).rejects.toThrow(/empty/i);
+      expect(calls).toEqual([]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a relative path that escapes the backup directory before Docker", async () => {
+    await withVerifiedDump(async (dumpPath) => {
+      const calls: string[][] = [];
+      await expect(
+        restoreVerify({
+          dumpPath: `../${dumpName}`,
+          backupDirectory: path.join(path.dirname(dumpPath), "backups"),
+          dockerRunner: async (args: string[]) => {
+            calls.push(args);
+            return "";
+          },
+        }),
+      ).rejects.toThrow(/backup directory/i);
+      expect(calls).toEqual([]);
+    });
+  });
+
+  it("rejects an absolute path outside the backup directory before Docker", async () => {
+    await withVerifiedDump(async (dumpPath) => {
+      const calls: string[][] = [];
+      await expect(
+        restoreVerify({
+          dumpPath,
+          backupDirectory: path.join(path.dirname(dumpPath), "backups"),
+          dockerRunner: async (args: string[]) => {
+            calls.push(args);
+            return "";
+          },
+        }),
+      ).rejects.toThrow(/backup directory/i);
+      expect(calls).toEqual([]);
+    });
+  });
+
+  it("rejects a custom dump filename before Docker", async () => {
+    const directory = await mkdtemp(
+      path.join(await realpath(os.tmpdir()), "pgg-custom-restore-test-"),
+    );
+    const customName = "manual.dump";
+    const dumpPath = path.join(directory, customName);
+    const bytes = "test dump bytes";
+    const calls: string[][] = [];
+    try {
+      await writeFile(dumpPath, bytes);
+      await writeFile(
+        `${dumpPath}.sha256`,
+        buildManifest({
+          dumpName: customName,
+          sizeBytes: Buffer.byteLength(bytes),
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          database: "prometheus",
+          schema: "public",
+          createdAt: "2026-09-23T08:09:10.000Z",
+        }),
+      );
+      await expect(
+        restoreVerify({
+          dumpPath: customName,
+          backupDirectory: directory,
+          dockerRunner: async (args: string[]) => {
+            calls.push(args);
+            return "";
+          },
+        }),
+      ).rejects.toThrow(/filename|name|pattern/i);
       expect(calls).toEqual([]);
     } finally {
       await rm(directory, { recursive: true, force: true });
@@ -242,7 +317,11 @@ describe("persistence health and restore rehearsal", () => {
         if (args[0] === "exec" && args.includes("psql")) return "t\n";
         return "";
       };
-      await restoreVerify({ dumpPath, dockerRunner });
+      await restoreVerify({
+        dumpPath: dumpName,
+        backupDirectory: path.dirname(dumpPath),
+        dockerRunner,
+      });
       const create = calls.find(
         (args) => args[0] === "create" && args.includes("postgres:16-alpine"),
       );
@@ -260,6 +339,7 @@ describe("persistence health and restore rehearsal", () => {
       expect(
         calls.some((args) => args[0] === "cp" && args.includes(`${name}:/tmp/restore.dump`)),
       ).toBe(true);
+      expect(calls.find((args) => args[0] === "cp")?.[1]).toBe(dumpPath);
       expect(
         calls.some(
           (args) =>
@@ -282,6 +362,7 @@ describe("persistence health and restore rehearsal", () => {
       try {
         await restoreVerify({
           dumpPath,
+          backupDirectory: path.dirname(dumpPath),
           dockerRunner: async (args: string[]) => {
             if (args[0] === "compose" && args.includes("config"))
               return JSON.stringify({ name: "pgg-test" });
@@ -312,6 +393,7 @@ describe("persistence health and restore rehearsal", () => {
       try {
         await restoreVerify({
           dumpPath,
+          backupDirectory: path.dirname(dumpPath),
           dockerRunner: async (args: string[]) => {
             calls.push(args);
             if (args.includes("config")) return JSON.stringify({ name: "pgg-custom" });

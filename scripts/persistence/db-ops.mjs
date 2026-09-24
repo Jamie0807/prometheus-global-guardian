@@ -196,12 +196,29 @@ async function selectBackup(backupDirectory) {
   throw new Error("no verified backup artifact found");
 }
 
+async function resolveRestoreDump(dumpPath, backupDirectory) {
+  const directory = await validateBackupDirectory(backupDirectory);
+  if (dumpPath === undefined) return selectBackup(directory);
+  if (typeof dumpPath !== "string" || dumpPath.length === 0) {
+    throw new TypeError("backup filename must be a nonempty string");
+  }
+  const resolved = path.resolve(directory, dumpPath);
+  if (path.dirname(resolved) !== directory) {
+    throw new Error("backup file must be directly inside the configured backup directory");
+  }
+  const name = path.basename(resolved);
+  if (parseBackupArtifact(name)?.dumpName !== name) {
+    throw new Error("backup filename must match pgg-postgres-YYYYMMDD-HHmmss.dump");
+  }
+  return resolved;
+}
+
 export async function restoreVerify({
   dumpPath,
   backupDirectory = resolveBackupDirectory(process.env.PERSISTENCE_BACKUP_DIR, projectRoot),
   dockerRunner = (args, options) => runDocker(args, options),
 } = {}) {
-  const verifiedDump = dumpPath ?? (await selectBackup(backupDirectory));
+  const verifiedDump = await resolveRestoreDump(dumpPath, backupDirectory);
   await verifyBackupManifest(verifiedDump);
 
   const suffix = randomBytes(12).toString("hex");
