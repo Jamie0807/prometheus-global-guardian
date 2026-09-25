@@ -15,6 +15,9 @@ dist-ssr
 *.local
 apps/bff/generated/prisma/
 packages/hazard-domain/dist/
+server/generated/prisma/
+python-analytics-service/.venv/
+python-analytics-service/**/__pycache__/
 playwright-report/
 test-results/
 backups/
