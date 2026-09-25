@@ -12,6 +12,11 @@ const repositoryRoot = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   root: "apps/web",
   envDir: repositoryRoot,
+  resolve: {
+    alias: {
+      "@pgg/hazard-domain": path.resolve(repositoryRoot, "packages/hazard-domain/src/index.ts"),
+    },
+  },
   plugins: [react()],
   server: {
     proxy: {

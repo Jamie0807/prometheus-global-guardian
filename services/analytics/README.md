@@ -27,7 +27,7 @@ Express BFF -- authorization, hazards, AI --> external providers
 或手动启动：
 
 ```bash
-cd python-analytics-service
+cd services/analytics
 python3.13 -m venv venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
@@ -118,7 +118,7 @@ Compose 不把分析服务映射到宿主机端口；Web BFF 通过 Compose 私�
 ## 目录结构
 
 ```text
-python-analytics-service/
+services/analytics/
 ├── main.py                 兼容入口和直接启动
 ├── app/
 │   ├── main.py             应用工厂和路由注册

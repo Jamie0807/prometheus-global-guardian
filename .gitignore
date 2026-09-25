@@ -13,7 +13,8 @@ dist
 dist-server
 dist-ssr
 *.local
-server/generated/prisma/
+apps/bff/generated/prisma/
+packages/hazard-domain/dist/
 playwright-report/
 test-results/
 backups/

@@ -11,6 +11,7 @@ RUN apt-get -o Acquire::Retries=5 update \
 
 COPY package.json pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
+COPY packages ./packages
 COPY prisma ./prisma
 COPY prisma.config.ts ./prisma.config.ts
 ENV DATABASE_URL=postgresql://generate:generate@127.0.0.1:5432/generate
@@ -46,12 +47,14 @@ RUN apt-get -o Acquire::Retries=5 update \
 
 COPY package.json pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
+COPY packages ./packages
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
 RUN node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); if (pkg.scripts) delete pkg.scripts.prepare; fs.writeFileSync('package.json', JSON.stringify(pkg));" \
     && npm install --global pnpm@10.15.1 \
     && pnpm install --prod --frozen-lockfile
 
 COPY --from=build /app/dist-server ./dist-server
+COPY --from=build /app/packages/hazard-domain/dist ./packages/hazard-domain/dist
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
@@ -59,4 +62,4 @@ COPY --from=build /app/.nvmrc ./.nvmrc
 COPY --from=build /app/scripts/with-node-version.sh ./scripts/with-node-version.sh
 
 EXPOSE 8080
-CMD ["node", "dist-server/server.js"]
+CMD ["node", "dist-server/apps/bff/index.js"]

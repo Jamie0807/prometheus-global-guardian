@@ -59,8 +59,8 @@ services:
 
   analytics:
     build:
-      context: ./python-analytics-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/analytics/Dockerfile
     environment:
       ANALYTICS_ADMIN_TOKEN: ${ANALYTICS_ADMIN_TOKEN:-}
       ANALYTICS_SERVICE_TOKEN: ${ANALYTICS_SERVICE_TOKEN:-}

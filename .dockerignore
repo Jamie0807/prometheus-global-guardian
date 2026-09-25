@@ -6,11 +6,12 @@
 node_modules
 dist
 dist-server
+packages/hazard-domain/dist
 coverage
 .pytest_cache
 __pycache__
 *.log
-python-analytics-service/venv
-python-analytics-service/.venv
-python-analytics-service/env
-python-analytics-service/ENV
+services/analytics/venv
+services/analytics/.venv
+services/analytics/env
+services/analytics/ENV

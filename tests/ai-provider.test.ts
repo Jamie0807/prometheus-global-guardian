@@ -12,8 +12,8 @@ import {
   resolveAIProviderMode,
   resolveAIRequestTimeoutMs,
   resolveServerAIProviderConfig,
-} from "../server/ai/ai-provider.js";
-import type { DisasterContext } from "../server/ai/ai-provider.js";
+} from "../apps/bff/ai/ai-provider.js";
+import type { DisasterContext } from "../apps/bff/ai/ai-provider.js";
 
 test("resolveServerAIProviderConfig reads server-side Volcengine Ark variables", () => {
   const config = resolveServerAIProviderConfig({

@@ -217,7 +217,7 @@ ANALYTICS_CORS_ORIGINS=
 APP_ENV=production
 ```
 
-`ANALYTICS_ADMIN_TOKEN` enables Python management routes and must stay server-side. `ANALYTICS_CORS_ORIGINS` is a comma-separated allowlist for non-local browser origins. See the [Python Analytics Service README](python-analytics-service/README.md) for the complete boundary and request contract.
+`ANALYTICS_ADMIN_TOKEN` enables Python management routes and must stay server-side. `ANALYTICS_CORS_ORIGINS` is a comma-separated allowlist for non-local browser origins. See the [Python Analytics Service README](services/analytics/README.md) for the complete boundary and request contract.
 
 #### Logging and diagnostic output
 
@@ -236,7 +236,7 @@ Start the Express BFF in one terminal:
 ```bash
 pnpm run build:server
 pnpm run db:migrate:deploy
-node dist-server/server.js
+node dist-server/apps/bff/index.js
 ```
 
 Start the frontend in another terminal:
@@ -305,7 +305,7 @@ Protect backup files as user data and store them separately from the Compose vol
 
 FastAPI is an internal analytics service. `/`, `/health`, `/docs`, and `/redoc` are available on its service network; business `/api/v1/*` requests require the BFF service token and are proxied through `/api/analytics`. `/metrics` and `/cache/clear` remain management endpoints and require `X-Analytics-Admin-Token` when enabled.
 
-Read [python-analytics-service/README.md](python-analytics-service/README.md) for startup instructions, request format, endpoint groups, analysis semantics, and the Python test suite.
+Read [services/analytics/README.md](services/analytics/README.md) for startup instructions, request format, endpoint groups, analysis semantics, and the Python test suite.
 
 ### AI Assistant Provider
 
@@ -397,14 +397,15 @@ prometheus-global-guardian/
 │       ├── components/         # Shared React components and modals
 │       ├── workers/            # Hazard processing Web Worker
 │       └── App.tsx             # Authentication gate and provider/view composition
-├── server/
+├── apps/bff/
+│   ├── index.ts                 # Express application entry
 │   ├── ai/                      # Provider routing, persistent conversations, and memory
 │   ├── auth/                    # Account endpoints, password hashing, and sessions
 │   ├── db/                      # Prisma/PostgreSQL client
 │   ├── analytics/               # Authenticated Analytics proxy
 │   ├── hazards/                 # Public-feed aggregation
 │   └── security/                # BFF request boundaries
-├── python-analytics-service/
+├── services/analytics/
 │   ├── app/                     # FastAPI factory, routes, schemas, and services
 │   ├── analytics/               # Statistics, prediction, risk, quality, ETL, and pivot logic
 │   └── tests/                   # Python unittest suite
@@ -421,12 +422,11 @@ prometheus-global-guardian/
 ├── vitest.config.ts              # Service test configuration
 ├── playwright.config.ts          # Browser test configuration
 ├── Dockerfile                    # Local complete-stack image
-├── server.ts                    # Express application entry
 ├── docker-compose.yml           # Local complete-stack startup
 └── AGENTS.md                    # Development, worktree, TDD, and validation conventions
 ```
 
-The Web runtime now lives in `apps/web/`, with implementation under `apps/web/src/`. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express continues to serve. The repository root retains the package scripts, Vite, Vitest, Playwright, and Dockerfile orchestration. Web code imports the hazard model through the public `@pgg/hazard-domain` entrypoint; `shared/hazards/` remains a compatibility entrypoint for BFF consumers. Moving the BFF from `server/` and `server.ts` to `apps/bff/`, moving the Python service from `python-analytics-service/` to `services/analytics/`, and removing compatibility imports are later stages.
+The Web runtime lives in `apps/web/`, with implementation under `apps/web/src/`. The BFF runtime lives in `apps/bff/`, with `apps/bff/index.ts` as its entrypoint. The Analytics runtime lives in `services/analytics/`, with `main.py` retained as its direct and Uvicorn entrypoint. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express serves. The repository root retains the package scripts, Vite, Vitest, Playwright, and Dockerfile orchestration. Web and BFF production code import the hazard model through the public `@pgg/hazard-domain` entrypoint; `shared/hazards/` remains a compatibility re-export.
 
 ---
 
@@ -651,7 +651,7 @@ ANALYTICS_CORS_ORIGINS=
 APP_ENV=production
 ```
 
-`ANALYTICS_ADMIN_TOKEN` 用于启用 Python 管理接口，必须只存在于服务端。`ANALYTICS_CORS_ORIGINS` 为非本地浏览器来源提供逗号分隔的显式允许列表。完整边界和请求约定见 [Python 分析服务 README](python-analytics-service/README.md)。
+`ANALYTICS_ADMIN_TOKEN` 用于启用 Python 管理接口，必须只存在于服务端。`ANALYTICS_CORS_ORIGINS` 为非本地浏览器来源提供逗号分隔的显式允许列表。完整边界和请求约定见 [Python 分析服务 README](services/analytics/README.md)。
 
 #### 日志与调试输出
 
@@ -670,7 +670,7 @@ pnpm install
 ```bash
 pnpm run build:server
 pnpm run db:migrate:deploy
-node dist-server/server.js
+node dist-server/apps/bff/index.js
 ```
 
 在另一个终端启动前端：
@@ -750,7 +750,7 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./pr
 
 FastAPI 是内部分析服务。`/`、`/health`、`/docs` 和 `/redoc` 可在服务网络中访问；业务 `/api/v1/*` 请求要求 BFF 服务令牌，并通过 `/api/analytics` 代理。`/metrics` 和 `/cache/clear` 仍是管理接口，启用后要求 `X-Analytics-Admin-Token`。
 
-请阅读 [python-analytics-service/README.md](python-analytics-service/README.md)，其中包含启动方法、请求结构、接口分组、分析语义和 Python 测试说明。
+请阅读 [services/analytics/README.md](services/analytics/README.md)，其中包含启动方法、请求结构、接口分组、分析语义和 Python 测试说明。
 
 ### AI 助手服务
 
@@ -842,11 +842,12 @@ prometheus-global-guardian/
 │       ├── components/         # 共享 React 组件和弹窗
 │       ├── workers/            # 灾害处理 Web Worker
 │       └── App.tsx             # 鉴权与 Provider/视图组合
-├── server/
+├── apps/bff/
+│   ├── index.ts                 # Express 应用入口
 │   ├── ai/                      # Provider 选择、路由和流适配
 │   ├── hazards/                 # 公开数据聚合
 │   └── security/                # BFF 请求边界
-├── python-analytics-service/
+├── services/analytics/
 │   ├── app/                     # FastAPI 工厂、路由、Schema 和服务
 │   ├── analytics/               # 统计、预测、风险、质量、ETL 和透视逻辑
 │   └── tests/                   # Python unittest 套件
@@ -862,9 +863,8 @@ prometheus-global-guardian/
 ├── vitest.config.ts              # Service 测试配置
 ├── playwright.config.ts          # 浏览器测试配置
 ├── Dockerfile                    # 本地完整栈镜像
-├── server.ts                    # Express 应用入口
 ├── docker-compose.yml           # 本地完整栈启动
 └── AGENTS.md                    # 开发、worktree、TDD 和验证约定
 ```
 
-Web 运行单元已迁至 `apps/web/`，实现位于 `apps/web/src/`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest、Playwright 和 Dockerfile 编排入口。Web 通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；`shared/hazards/` 仍是 BFF 调用方的迁移期兼容入口。后续阶段再将 `server/` 与 `server.ts` 迁至 `apps/bff/`、将 `python-analytics-service/` 迁至 `services/analytics/`，并在调用方迁移完成后清理兼容入口。
+Web 运行单元位于 `apps/web/`，实现位于 `apps/web/src/`；BFF 运行单元位于 `apps/bff/`，入口为 `apps/bff/index.ts`；Analytics 运行单元位于 `services/analytics/`，入口为 `main.py`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest、Playwright 和 Dockerfile 编排入口。Web 与 BFF 生产代码通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；`shared/hazards/` 保留兼容转导出。

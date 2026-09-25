@@ -4,13 +4,13 @@ import test from "node:test";
 import { PassThrough } from "node:stream";
 import type { Request, Response as ExpressResponse } from "express";
 import { Response } from "node-fetch";
-import { isValidAIRequest } from "../server/security/ai-request.js";
+import { isValidAIRequest } from "../apps/bff/security/ai-request.js";
 import {
   fetchWithTimeout,
   matchDisasterAwareRoute,
   validateQuery,
   createRateLimitMiddleware,
-} from "../server/security/request-boundaries.js";
+} from "../apps/bff/security/request-boundaries.js";
 
 test("category allowlist rejects encoded separators and dot segments", () => {
   for (const segment of [

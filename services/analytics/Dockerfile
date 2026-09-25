@@ -7,10 +7,11 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/analytics/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY services/analytics/ .
+COPY packages/contracts ./packages/contracts
 
 EXPOSE 8001
 

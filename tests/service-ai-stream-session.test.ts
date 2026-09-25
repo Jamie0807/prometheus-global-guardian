@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createAIStreamSessionRegistry,
   type AISessionSubscriber,
-} from "../server/ai/ai-stream-session";
+} from "../apps/bff/ai/ai-stream-session";
 
 function subscriber() {
   const events: string[] = [];

@@ -1,12 +1,7 @@
 {
   "version": "0.2",
   "language": "en,zh-CN",
-  "ignorePaths": [
-    "dist",
-    "node_modules",
-    "package-lock.json",
-    "python-analytics-service/.venv"
-  ],
+  "ignorePaths": ["dist", "node_modules", "package-lock.json", "services/analytics/.venv"],
   "words": [
     "DisasterAware",
     "EONET",

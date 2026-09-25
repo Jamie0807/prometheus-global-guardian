@@ -7,7 +7,7 @@ import {
   convertWorkflowSSEToChatCompletionsSSE,
   extractWorkflowResult,
   workflowResultToChatCompletionsSSE,
-} from "../server/ai/ai-stream.js";
+} from "../apps/bff/ai/ai-stream.js";
 
 test("convertResponsesSSEToChatCompletionsSSE converts output text deltas", () => {
   const converted = convertResponsesSSEToChatCompletionsSSE(

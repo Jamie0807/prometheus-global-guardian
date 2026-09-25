@@ -1,4 +1,4 @@
-import type { HazardSourceId } from "../../shared/hazards/hazard-event.js";
+import type { HazardSourceId } from "@pgg/hazard-domain";
 
 export type HazardSourceHealthErrorCode =
   | "TIMEOUT"

@@ -18,7 +18,7 @@
 | `pnpm run check:architecture` | 架构边界检查     | 检查共享包元数据、根目录契约残留和包与运行单元的相对导入方向                           |
 | `pnpm run test:baseline`      | 完整 Node 基线   | 依次执行 lint、格式、客户端/服务端/契约类型检查、架构检查、unit、component、E2E 和构建 |
 
-`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts` 和 `check:architecture`，但不包含 Python 测试。`check:architecture` 检查 `apps/web/src/` 的 Web 依赖方向、共享包反向导入运行单元，以及生产代码直接导入 `packages/hazard-domain/src/` 内部模块；Web 通过公共入口 `@pgg/hazard-domain` 使用共享领域包，仅 `shared/hazards/hazard-event.ts` 和 `shared/hazards/hazard-layer-registry.ts` 保留 BFF 迁移期兼容转导出。Web 实现已迁至 `apps/web/src/`，浏览器入口为 `apps/web/index.html`；根 `package.json`、Vite、Vitest、Playwright 和 Dockerfile 继续负责编排，Vite 产物仍输出至根 `dist/` 并由 Express 提供。BFF `server/` 与 `server.ts`、Python `python-analytics-service/` 的物理迁移将分别在后续阶段进入 `apps/bff/` 和 `services/analytics/`。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
+`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts` 和 `check:architecture`，但不包含 Python 测试。`check:architecture` 检查 Web、BFF、Analytics 三个运行单元入口、旧目录残留、依赖方向、共享包反向导入运行单元及生产代码对共享包内部模块的引用。Web 与 BFF 通过 `@pgg/hazard-domain` 公共入口使用共享领域包，`shared/hazards/` 保留兼容转导出。Web 入口为 `apps/web/index.html`，BFF 入口为 `apps/bff/index.ts`，Analytics 入口为 `services/analytics/main.py`；Vite 产物位于根 `dist/`，BFF 编译入口为 `dist-server/apps/bff/index.js`。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `scripts/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
 
 持久化运维命令不包含在 `test:baseline` 中。`pnpm db:check` 检查当前 Compose 数据库与 Prisma migration status；`pnpm db:backup` 生成 dump 和 SHA-256 manifest；`pnpm db:restore:verify` 在临时 PostgreSQL 容器及独立卷中校验并演练恢复；`pnpm db:backup:prune` 清理超过 7 个本地自然日窗口的匹配工件；`pnpm db:migrate:deploy` 手动应用前向 migration。命令顺序、数据保护和失败处理见 `docs/OPERATIONS_PERSISTENCE.md`。
 
@@ -38,9 +38,9 @@
 
 2026-09-20 Orbital 地图升级的历史基线为：BFF 92/92、Service 245/245、组件 105/105、E2E 1/1、Python 56/56。
 
-## 2026-09-24 架构治理第一阶段验证
+## 2026-09-25 运行单元架构治理验证
 
-`pnpm run check:architecture`、`pnpm run lint`、`pnpm run format:check`、客户端/服务端/契约类型检查、`pnpm run test:python`、`pnpm run test:component`、`pnpm run build` 和 `git diff --check` 均退出 0。架构检查包含在 `test:baseline` 中，也由 CI 的 Node job 显式运行。Service 测试在设置测试占位 `DATABASE_URL` 并使用 `pnpm exec vitest run --pool=forks --maxWorkers=1` 后为 22 个文件、287/287 通过；组件为 19 个文件、108/108 通过；Python 为 57/57 通过。占位 `DATABASE_URL` 只用于不连接数据库的检查，不能替代 PostgreSQL 集成测试所需的隔离测试库和 migration。
+`pnpm run check:architecture`、`pnpm run lint`、`pnpm run format:check`、客户端/服务端/契约类型检查、`pnpm run test:component`、`pnpm run build` 和 `git diff --check` 均退出 0。架构检查包含在 `test:baseline` 中，也由 CI 的 Node job 显式运行。Service 测试在设置测试占位 `DATABASE_URL` 并使用 `pnpm exec vitest run --pool=forks --maxWorkers=1` 后为 22 个文件、318/318 通过；组件为 19 个文件、108/108 通过。Python 迁移后应使用 `pnpm run test:python` 验证，当前测试命令保持相同语义。占位 `DATABASE_URL` 只用于不连接数据库的检查，不能替代 PostgreSQL 集成测试所需的隔离测试库和 migration。
 
 本机 `pnpm test` 在 38 项 BFF 测试通过后，三个需要认证/持久化的测试文件以 `SIGSEGV` 退出；单独调用项目 Node 20 下的 `argon2.hash()` 也会触发相同段错误，说明该结果受本机原生依赖环境阻断。Service 默认并行池在本机另出现 `ERR_IPC_CHANNEL_CLOSED`，故上述全量 Service 结果使用单 worker。`pnpm run test:e2e` 已尝试，但 Playwright 的 WebServer 在项目 Node 20 中调用本机全局 pnpm 时遇到 `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite`，服务未启动。这一轮不能据此声称 BFF 集成测试或 E2E 已通过；完整 Node 基线仍需在匹配运行时和隔离 PostgreSQL 的环境中执行。
 
@@ -62,7 +62,7 @@ Python unittest 覆盖应用工厂、跨语言灾害请求契约、Pydantic/API 
 
 ## 本次环境限制
 
-主机 Python 为 3.9，缺少项目依赖，不能直接运行面向 Python 3.13 的依赖集。Python CI 测试已在临时 Python 3.13 容器中安装 `python-analytics-service/requirements.txt` 并完成 57/57 测试；容器不保存进仓库的虚拟环境或依赖变更。前端/BFF 浏览器测试使用本地隔离 PostgreSQL 并通过关键流程。
+主机 Python 为 3.9，缺少项目依赖，不能直接运行面向 Python 3.13 的依赖集。Python CI 测试已在临时 Python 3.13 容器中安装 `services/analytics/requirements.txt` 并完成 57/57 测试；容器不保存进仓库的虚拟环境或依赖变更。前端/BFF 浏览器测试使用本地隔离 PostgreSQL 并通过关键流程。
 
 ## 已知非阻塞提示
 
@@ -80,6 +80,6 @@ pnpm run test:baseline
 pnpm run test:python
 ```
 
-GitHub Actions 的 `frontend-bff` job 使用 Node 20.19.0、pnpm 10.15.1 并安装 Chromium 后执行前一条命令；独立 `python` job 使用 Python 3.13、安装 `python-analytics-service/requirements.txt` 后执行后一条命令。
+GitHub Actions 的 `frontend-bff` job 使用 Node 20.19.0、pnpm 10.15.1 并安装 Chromium 后执行前一条命令；独立 `python` job 使用 Python 3.13、安装 `services/analytics/requirements.txt` 后执行后一条命令。
 
 提交代码仍需遵循项目约束：不自动提交；只有用户明确要求提交时，才使用 `pnpm commit` 并通过 commitlint 校验提交信息。
