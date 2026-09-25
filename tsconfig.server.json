@@ -14,9 +14,9 @@
     "sourceMap": true
   },
   "include": [
-    "server.ts",
-    "server/**/*.ts",
-    "server/**/*.d.ts",
+    "apps/bff/index.ts",
+    "apps/bff/**/*.ts",
+    "apps/bff/**/*.d.ts",
     "shared/**/*.ts",
     "packages/**/*.ts"
   ],

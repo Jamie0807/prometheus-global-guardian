@@ -19,7 +19,7 @@ PYTHON_VERSION=$(python3 --version)
 echo "✅ Found: $PYTHON_VERSION"
 echo ""
 
-cd "$PROJECT_ROOT/python-analytics-service"
+cd "$PROJECT_ROOT/services/analytics"
 
 if [ ! -d "venv" ]; then
     echo "📦 Creating virtual environment..."

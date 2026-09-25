@@ -1,5 +1,5 @@
 /** 解析 AI 提供商配置，并构造不同协议的请求与灾害上下文提示。 */
-import { HAZARD_LAYER_REGISTRY } from "../../shared/hazards/hazard-layer-registry.js";
+import { HAZARD_LAYER_REGISTRY } from "@pgg/hazard-domain";
 
 const DEFAULT_ARK_API_URL = "https://ark.cn-beijing.volces.com/api/plan/v3";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;

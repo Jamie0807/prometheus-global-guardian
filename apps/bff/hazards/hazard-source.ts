@@ -6,8 +6,8 @@ import {
   createHazardEventId,
   type HazardEvent,
   type HazardSourceId,
-} from "../../shared/hazards/hazard-event.js";
-import { resolveHazardLayerId } from "../../shared/hazards/hazard-layer-registry.js";
+  resolveHazardLayerId,
+} from "@pgg/hazard-domain";
 import type { HazardSourceHealth } from "./source-health.js";
 
 const USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson";
@@ -22,7 +22,7 @@ export interface ServerHazard extends HazardEvent {
   timestamp?: string;
 }
 
-export type { HazardSourceId } from "../../shared/hazards/hazard-event.js";
+export type { HazardSourceId } from "@pgg/hazard-domain";
 export type { HazardSourceHealth, HazardSourceHealthErrorCode } from "./source-health.js";
 
 export type HazardSourceState = "success" | "empty" | "unavailable" | "fallback" | "stale";

@@ -2,8 +2,12 @@ import { Response } from "node-fetch";
 
 import { describe, expect, it } from "vitest";
 
-import { adaptDisasterAwareHazards } from "../server";
-import { fetchGDACS, fetchNASAEONET, fetchUSGSEarthquakes } from "../server/hazards/hazard-source";
+import { adaptDisasterAwareHazards } from "../apps/bff/hazards/disasteraware-adapter";
+import {
+  fetchGDACS,
+  fetchNASAEONET,
+  fetchUSGSEarthquakes,
+} from "../apps/bff/hazards/hazard-source";
 
 function response(payload: unknown): Response {
   return new Response(JSON.stringify(payload), {

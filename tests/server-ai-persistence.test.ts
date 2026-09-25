@@ -6,9 +6,9 @@ import { Readable } from "node:stream";
 import test from "node:test";
 import { Response } from "node-fetch";
 
-import { createApp, type UpstreamFetch } from "../server.js";
-import * as conversationRepository from "../server/ai/conversation-repository.js";
-import { prisma } from "../server/db/prisma.js";
+import { createApp, type UpstreamFetch } from "../apps/bff/index.js";
+import * as conversationRepository from "../apps/bff/ai/conversation-repository.js";
+import { prisma } from "../apps/bff/db/prisma.js";
 
 const TEST_PASSWORD = "LocalTest-Password-2026!";
 

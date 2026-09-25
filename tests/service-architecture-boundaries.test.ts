@@ -23,6 +23,67 @@ function writeFixture(root: string, relativePath: string, contents: string) {
 }
 
 describe("workspace architecture", () => {
+  it("requires the BFF runtime entry under apps/bff", () => {
+    expect(existsSync(path.join(repositoryRoot, "apps/bff/index.ts"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "server.ts"))).toBe(false);
+    expect(existsSync(path.join(repositoryRoot, "server"))).toBe(false);
+    const rootPackage = JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8"));
+    expect(rootPackage.scripts.start).toContain("dist-server/apps/bff/index.js");
+    const bffSource = readFileSync(path.join(repositoryRoot, "apps/bff/index.ts"), "utf8");
+    expect(bffSource).toContain('path.resolve(__dirname, "../../..")');
+    expect(bffSource).toContain('path.join(repositoryRoot, "dist")');
+  });
+
+  it("requires the Analytics runtime entry under services/analytics", () => {
+    expect(existsSync(path.join(repositoryRoot, "services/analytics/main.py"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "python-analytics-service"))).toBe(false);
+    const pythonTestScript = readFileSync(
+      path.join(repositoryRoot, "scripts/test-python.sh"),
+      "utf8",
+    );
+    expect(pythonTestScript).toContain("services/analytics/tests");
+  });
+
+  it("builds a Node-loadable hazard package before runtime consumers", () => {
+    const rootPackage = JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8"));
+    const hazardPackage = JSON.parse(
+      readFileSync(path.join(repositoryRoot, "packages/hazard-domain/package.json"), "utf8"),
+    );
+    expect(hazardPackage.exports["."]).toMatchObject({
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js",
+      default: "./dist/index.js",
+    });
+    expect(existsSync(path.join(repositoryRoot, "packages/hazard-domain/tsconfig.json"))).toBe(
+      true,
+    );
+    for (const script of ["build:client", "build:server", "build:server:test"]) {
+      expect(rootPackage.scripts[script]).toContain("pnpm run build:hazard-domain");
+    }
+    expect(rootPackage.scripts["test:bff"]).toContain("pnpm run build:server:test");
+  });
+
+  it("includes workspace packages before Docker dependency installation", () => {
+    const dockerfile = readFileSync(path.join(repositoryRoot, "Dockerfile"), "utf8");
+    const stageSections = dockerfile.split("RUN npm install --global pnpm@10.15.1");
+    expect(stageSections).toHaveLength(2);
+    expect(stageSections[0]).toContain("COPY packages ./packages");
+    expect(dockerfile).toContain("COPY --from=build /app/packages/hazard-domain/dist");
+  });
+
+  it("reports legacy BFF locations and a missing entrypoint", () => {
+    withFixture((root) => {
+      writeFixture(root, "server.ts", "export const legacy = true;");
+      writeFixture(root, "server/legacy.ts", "export const legacy = true;");
+      expect(checkArchitecture(root)).toEqual(
+        expect.arrayContaining([
+          "BFF entrypoint is missing: apps/bff/index.ts",
+          "root BFF entrypoint must be removed: server.ts",
+          "root BFF directory must be removed: server",
+        ]),
+      );
+    });
+  });
   it("uses apps/web as the browser entrypoint", () => {
     const viteConfig = readFileSync(path.join(repositoryRoot, "vite.config.ts"), "utf8");
     expect(existsSync(path.join(repositoryRoot, "apps/web/index.html"))).toBe(true);

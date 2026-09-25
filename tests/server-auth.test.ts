@@ -7,9 +7,9 @@ import test from "node:test";
 
 import { Headers, Response, type HeadersInit } from "node-fetch";
 
-import { createApp, type UpstreamFetch } from "../server.js";
-import { prisma } from "../server/db/prisma.js";
-import { fetchAllHazards } from "../server/hazards/hazard-source.js";
+import { createApp, type UpstreamFetch } from "../apps/bff/index.js";
+import { prisma } from "../apps/bff/db/prisma.js";
+import { fetchAllHazards } from "../apps/bff/hazards/hazard-source.js";
 import {
   createForwardHeaders,
   createRateLimitMiddleware,
@@ -18,7 +18,7 @@ import {
   matchDisasterAwareRoute,
   RequestBoundaryError,
   validateQuery,
-} from "../server/security/request-boundaries.js";
+} from "../apps/bff/security/request-boundaries.js";
 
 const serverEnv = {
   AUTH_CSRF_SECRET: "server-auth-test-csrf-secret-at-least-32-bytes",

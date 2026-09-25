@@ -120,6 +120,24 @@ export function checkArchitecture(rootDirectory) {
     errors.push("root src directory must be removed after web migration: src");
   }
 
+  if (!existsSync(path.join(root, "apps/bff/index.ts"))) {
+    errors.push("BFF entrypoint is missing: apps/bff/index.ts");
+  }
+  if (existsSync(path.join(root, "server.ts"))) {
+    errors.push("root BFF entrypoint must be removed: server.ts");
+  }
+  if (existsSync(path.join(root, "server"))) {
+    errors.push("root BFF directory must be removed: server");
+  }
+
+  const analyticsEntry = "services/analytics/main.py";
+  if (!existsSync(path.join(root, analyticsEntry))) {
+    errors.push(`Analytics entrypoint is missing: ${analyticsEntry}`);
+  }
+  if (existsSync(path.join(root, "python-analytics-service"))) {
+    errors.push("legacy Analytics directory must be removed: python-analytics-service");
+  }
+
   for (const file of listSourceFiles(path.join(root, "packages"))) {
     const source = readFileSync(file, "utf8");
     for (const specifier of readImportSpecifiers(source, file)) {

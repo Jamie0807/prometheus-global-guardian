@@ -9,6 +9,9 @@ from pydantic import ValidationError
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = (
+    SERVICE_ROOT.parent.parent if SERVICE_ROOT.name == "analytics" else SERVICE_ROOT
+)
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
@@ -16,10 +19,10 @@ from app.schemas.requests import AnalysisRequest, HazardData
 
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parents[2] / "packages" / "contracts" / "analytics-hazard-data.json"
+    REPOSITORY_ROOT / "packages" / "contracts" / "analytics-hazard-data.json"
 )
 CANONICAL_FIXTURE_PATH = (
-    Path(__file__).resolve().parents[2] / "packages" / "contracts" / "hazard-event.json"
+    REPOSITORY_ROOT / "packages" / "contracts" / "hazard-event.json"
 )
 
 

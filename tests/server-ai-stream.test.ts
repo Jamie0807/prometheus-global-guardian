@@ -7,12 +7,12 @@ import { pipeline } from "node:stream/promises";
 import test from "node:test";
 import { Response } from "node-fetch";
 
-import { createApp, type UpstreamFetch } from "../server.js";
-import { prisma } from "../server/db/prisma.js";
+import { createApp, type UpstreamFetch } from "../apps/bff/index.js";
+import { prisma } from "../apps/bff/db/prisma.js";
 import {
   createResponsesToChatCompletionsStream,
   createWorkflowToChatCompletionsStream,
-} from "../server/ai/ai-stream.js";
+} from "../apps/bff/ai/ai-stream.js";
 
 const SSE_FRAME_LIMIT_BYTES = 64 * 1024;
 const TEST_PASSWORD = "LocalTest-Password-2026!";

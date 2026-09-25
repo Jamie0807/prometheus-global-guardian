@@ -7,6 +7,9 @@ from pathlib import Path
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = (
+    SERVICE_ROOT.parent.parent if SERVICE_ROOT.name == "analytics" else SERVICE_ROOT
+)
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
@@ -16,7 +19,7 @@ from app.schemas.responses import AnalyticsErrorResponse, AnalyticsSuccessRespon
 
 class CrossLanguageAnalyticsResponseTests(unittest.TestCase):
     def test_shared_fixture_matches_versioned_success_response(self):
-        fixture_path = SERVICE_ROOT.parent / "packages" / "contracts" / "analytics-response-envelope.json"
+        fixture_path = REPOSITORY_ROOT / "packages" / "contracts" / "analytics-response-envelope.json"
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
         response = AnalyticsSuccessResponse.model_validate(fixture)
@@ -27,7 +30,7 @@ class CrossLanguageAnalyticsResponseTests(unittest.TestCase):
         self.assertEqual(response.warnings, [])
 
     def test_shared_error_fixture_matches_versioned_error_response(self):
-        fixture_path = SERVICE_ROOT.parent / "packages" / "contracts" / "analytics-error-envelope.json"
+        fixture_path = REPOSITORY_ROOT / "packages" / "contracts" / "analytics-error-envelope.json"
         fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
         response = AnalyticsErrorResponse.model_validate(fixture)

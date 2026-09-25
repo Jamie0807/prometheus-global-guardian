@@ -2,8 +2,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { routeAIRequest } from "../server/ai/ai-router.js";
-import { buildProviderOrder } from "../server/ai/ai-chat-route.js";
+import { routeAIRequest } from "../apps/bff/ai/ai-router.js";
+import { buildProviderOrder } from "../apps/bff/ai/ai-chat-route.js";
 
 test("routes disaster knowledge and emergency-plan questions to workflow", () => {
   const decision = routeAIRequest([{ role: "user", content: "请根据历史案例给出地震应急预案" }]);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createHazardSourceHealthRegistry } from "../server/hazards/source-health";
+import { createHazardSourceHealthRegistry } from "../apps/bff/hazards/source-health";
 
 const at = (value: string) => new Date(value);
 

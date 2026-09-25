@@ -10,23 +10,21 @@ import {
   type HazardSourceLoadResult,
   type HazardSourceStatus,
   type ServerHazard,
-} from "./server/hazards/hazard-source.js";
+} from "./hazards/hazard-source.js";
 import {
   createHazardSourceHealthRegistry,
   type HazardSourceHealth,
   type HazardSourceHealthErrorCode,
-} from "./server/hazards/source-health.js";
-import { loadLocalEnv } from "./server/env.js";
-import { createServerLogger } from "./server/logging.js";
-import { createHazardEventId } from "./shared/hazards/hazard-event.js";
-import { resolveHazardLayerId } from "./shared/hazards/hazard-layer-registry.js";
-import { registerAIChatRoute } from "./server/ai/ai-chat-route.js";
-import { createAuthRouter } from "./server/auth/auth-routes.js";
-import { createRequireUser } from "./server/auth/require-user.js";
-import { recoverInterruptedAssistantMessages } from "./server/ai/conversation-repository.js";
-import { createConversationRouter } from "./server/ai/conversation-routes.js";
-import { createMemoryRouter } from "./server/ai/memory-routes.js";
-import { registerAnalyticsRoute } from "./server/analytics/analytics-route.js";
+} from "./hazards/source-health.js";
+import { loadLocalEnv } from "./env.js";
+import { createServerLogger } from "./logging.js";
+import { registerAIChatRoute } from "./ai/ai-chat-route.js";
+import { createAuthRouter } from "./auth/auth-routes.js";
+import { createRequireUser } from "./auth/require-user.js";
+import { recoverInterruptedAssistantMessages } from "./ai/conversation-repository.js";
+import { createConversationRouter } from "./ai/conversation-routes.js";
+import { createMemoryRouter } from "./ai/memory-routes.js";
+import { registerAnalyticsRoute } from "./analytics/analytics-route.js";
 import {
   createForwardHeaders,
   createRateLimitMiddleware,
@@ -36,14 +34,17 @@ import {
   RequestBoundaryError,
   type UpstreamFetch,
   validateQuery,
-} from "./server/security/request-boundaries.js";
+} from "./security/request-boundaries.js";
+import { adaptDisasterAwareHazards } from "./hazards/disasteraware-adapter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const clientDistPath = path.resolve(__dirname, "../dist");
+const repositoryRoot = path.resolve(__dirname, "../../..");
+const clientDistPath = path.join(repositoryRoot, "dist");
 const disasterAwareBaseUrl = "https://api.disasteraware.com";
 
-export type { UpstreamFetch } from "./server/security/request-boundaries.js";
+export type { UpstreamFetch } from "./security/request-boundaries.js";
+export { adaptDisasterAwareHazards } from "./hazards/disasteraware-adapter.js";
 
 interface CreateAppOptions {
   env?: NodeJS.ProcessEnv;
@@ -56,72 +57,6 @@ const HAZARD_SOURCE_CACHE_TTL_MS = 300_000;
 
 interface DisasterAwareTokenResponse {
   accessToken?: string;
-}
-
-type DisasterAwareHazard = Record<string, unknown>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readString(record: DisasterAwareHazard, key: string, fallback = ""): string {
-  const value = record[key];
-  return typeof value === "string" && value.length > 0 ? value : fallback;
-}
-
-function readFiniteNumber(record: DisasterAwareHazard, key: string): number | undefined {
-  const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function readStableHazardEventId(value: unknown): string | undefined {
-  if (typeof value === "string" && value.trim().length > 0) return value;
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return undefined;
-}
-
-export function adaptDisasterAwareHazards(payload: unknown): ServerHazard[] {
-  if (!Array.isArray(payload)) return [];
-
-  return payload.filter(isRecord).flatMap((hazard) => {
-    const latitude = readFiniteNumber(hazard, "latitude");
-    const longitude = readFiniteNumber(hazard, "longitude");
-    const sourceEventId = readStableHazardEventId(hazard.hazard_ID);
-    if (!sourceEventId) return [];
-
-    const eventId = createHazardEventId("disasteraware", sourceEventId);
-    const type = readString(hazard, "type_ID", "UNKNOWN");
-    const observedAt = readString(hazard, "create_Date");
-    const updatedAt = readString(hazard, "last_Update");
-    const severity = readString(hazard, "severity_ID");
-
-    return [
-      {
-        schemaVersion: "1",
-        eventId,
-        sourceEventId,
-        sourceId: "disasteraware",
-        layerId: resolveHazardLayerId(type),
-        id: eventId,
-        title: readString(hazard, "hazard_Name", "Unknown Hazard"),
-        type,
-        geometry: {
-          type: "Point",
-          coordinates:
-            latitude === undefined || longitude === undefined ? [0, 0] : [longitude, latitude],
-        },
-        description: readString(
-          hazard,
-          "description",
-          readString(hazard, "hazard_Name", "No description available"),
-        ),
-        source: readString(hazard, "creator", "DisasterAWARE"),
-        ...(severity ? { severity } : {}),
-        ...(observedAt ? { timestamp: observedAt, observedAt } : {}),
-        ...(updatedAt ? { updatedAt } : {}),
-      } satisfies ServerHazard,
-    ];
-  });
 }
 
 const fallbackSourceIds = ["usgs", "nasa-eonet", "gdacs"] as const;

@@ -22,7 +22,8 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "paths": { "@pgg/hazard-domain": ["./packages/hazard-domain/src/index.ts"] }
   },
   "include": ["apps/web", "shared", "packages"],
   "exclude": ["node_modules", "dist", "dist-server"]
