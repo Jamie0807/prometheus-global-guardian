@@ -286,13 +286,14 @@ pnpm run build
 Docker Compose is a **local complete-stack startup** path. It does not represent a deployment configuration.
 
 ```bash
+pnpm run check:docker
 docker compose up --build -d
 docker compose exec web pnpm run db:migrate:deploy
 ```
 
-Open `http://localhost:8080`. FastAPI and PostgreSQL are private Compose services; check them with `docker compose ps` and `docker compose logs -f analytics db`. Stop with `docker compose down`.
+`pnpm run check:docker` validates both Compose configurations without starting containers. Open `http://localhost:8080`. FastAPI stays private to the Compose network; PostgreSQL publishes `5432` for local tools such as DataGrip. The isolated test overlay uses `127.0.0.1:55439` and a separate volume. Check services with `docker compose ps` and `docker compose logs -f analytics db`. Stop with `docker compose down`.
 
-The web container exposes 8080; Analytics and PostgreSQL do not publish host ports. Analytics requests go through the authenticated BFF and its private service token. Compose passes public `VITE_*` build values to the client build; database, session, analytics service, DisasterAware and AI values remain server-side. The sample database password is for local use only. Back up the PostgreSQL volume before upgrades or maintenance; the migration command is explicit and is not run automatically by startup. For a local SQL backup and restore:
+The web container exposes 8080 and Analytics does not publish a host port. Analytics requests go through the authenticated BFF and its private service token. Compose passes public `VITE_*` build values to the client build; database, session, analytics service, DisasterAware and AI values remain server-side. The sample database password is for local use only. Back up the PostgreSQL volume before upgrades or maintenance; the migration command is explicit and is not run automatically by startup. For a local SQL backup and restore:
 
 ```bash
 docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
@@ -419,13 +420,16 @@ prometheus-global-guardian/
 ├── infra/persistence/tests/     # Persistence operations tests
 ├── prisma/                      # PostgreSQL schema and explicit migrations
 ├── docs/                        # Governance, test baseline, plans, and specifications
-├── tooling/                     # Node-version and architecture tools
+├── tooling/                     # Node-version, architecture, and Docker config tools
 ├── package.json                  # Repository scripts and workspace dependency orchestration
 ├── vite.config.ts                # Web root and root dist/ output
 ├── vitest.config.ts              # Service test configuration
 ├── playwright.config.ts          # Browser test configuration
 ├── Dockerfile                    # Local complete-stack image
+├── services/analytics/Dockerfile # Analytics service image
 ├── docker-compose.yml           # Local complete-stack startup
+├── docker-compose.test.yml      # Isolated test database overlay
+├── .dockerignore                # Build context exclusions
 └── AGENTS.md                    # Development, worktree, TDD, and validation conventions
 ```
 
@@ -723,13 +727,14 @@ pnpm run build
 Docker Compose 是**本地完整栈启动方式**，不代表部署配置。
 
 ```bash
+pnpm run check:docker
 docker compose up --build -d
 docker compose exec web pnpm run db:migrate:deploy
 ```
 
-访问 `http://localhost:8080`。FastAPI 和 PostgreSQL 是 Compose 私有服务；用 `docker compose ps` 查看状态，用 `docker compose logs -f analytics db` 查看日志，用 `docker compose down` 停止本地栈。
+`pnpm run check:docker` 会在不启动容器的情况下校验两套 Compose 配置。访问 `http://localhost:8080`。FastAPI 只在 Compose 私有网络中可用；PostgreSQL 默认发布 `5432`，可供 DataGrip 等本地工具连接。隔离测试覆盖使用 `127.0.0.1:55439` 和独立数据卷。用 `docker compose ps` 查看状态，用 `docker compose logs -f analytics db` 查看日志，用 `docker compose down` 停止本地栈。
 
-Web 容器暴露 8080；Analytics 和 PostgreSQL 不发布主机端口。分析请求经已鉴权的 BFF 和私有服务令牌转发。Compose 只将公开的 `VITE_*` 构建变量传入客户端构建；数据库、会话、分析服务、DisasterAware 和 AI 配置都保留在服务端。示例数据库密码仅供本地使用。升级或维护前先备份 PostgreSQL 数据卷；迁移命令需显式执行，不会随服务启动自动运行。
+Web 容器暴露 8080，Analytics 不发布主机端口。分析请求经已鉴权的 BFF 和私有服务令牌转发。Compose 只将公开的 `VITE_*` 构建变量传入客户端构建；数据库、会话、分析服务、DisasterAware 和 AI 配置都保留在服务端。示例数据库密码仅供本地使用。升级或维护前先备份 PostgreSQL 数据卷；迁移命令需显式执行，不会随服务启动自动运行。
 
 本地 SQL 备份与恢复示例：
 
@@ -863,13 +868,16 @@ prometheus-global-guardian/
 ├── tests/integration/           # 跨运行单元集成测试
 ├── infra/persistence/tests/     # 持久化运维测试
 ├── docs/                        # 治理、测试基线、计划和规格
-├── tooling/                     # Node 版本与架构工具
+├── tooling/                     # Node 版本、架构和 Docker 配置工具
 ├── package.json                  # 仓库脚本与工作区依赖编排
 ├── vite.config.ts                # Web root 与根目录 dist/ 输出
 ├── vitest.config.ts              # Service 测试配置
 ├── playwright.config.ts          # 浏览器测试配置
 ├── Dockerfile                    # 本地完整栈镜像
+├── services/analytics/Dockerfile # Analytics 服务镜像
 ├── docker-compose.yml           # 本地完整栈启动
+├── docker-compose.test.yml      # 隔离测试数据库覆盖
+├── .dockerignore                # 构建上下文排除项
 └── AGENTS.md                    # 开发、worktree、TDD 和验证约定
 ```
 

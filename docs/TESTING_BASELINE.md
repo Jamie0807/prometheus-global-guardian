@@ -16,9 +16,10 @@
 | `pnpm run test:e2e`           | 浏览器冒烟测试   | 构建并启动本地生产服务，用 Playwright 验证 `apps/web/tests/e2e` 中的关键流程           |
 | `pnpm run test:python`        | Python API 测试  | 运行分析服务 `tests/test_*.py` 的 unittest 测试集                                      |
 | `pnpm run check:architecture` | 架构边界检查     | 检查共享包元数据、根目录契约残留和包与运行单元的相对导入方向                           |
+| `pnpm run check:docker`       | Docker 配置检查  | 校验本地完整栈 Compose 与隔离测试数据库覆盖配置，不启动服务                            |
 | `pnpm run test:baseline`      | 完整 Node 基线   | 依次执行 lint、格式、客户端/服务端/契约类型检查、架构检查、unit、component、E2E 和构建 |
 
-`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts` 和 `check:architecture`，但不包含 Python 测试。`check:architecture` 检查 Web、BFF、Analytics 三个运行单元入口、旧目录残留、依赖方向、共享包反向导入运行单元及生产代码对共享包内部模块的引用。Web 与 BFF 通过 `@pgg/hazard-domain` 公共入口使用共享领域包。Web 入口为 `apps/web/index.html`，BFF 入口为 `apps/bff/index.ts`，Analytics 入口为 `services/analytics/main.py`；Vite 产物位于根 `dist/`，BFF 编译入口为 `dist-server/apps/bff/index.js`。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `tooling/node/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
+`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`、`check:architecture` 和 `check:docker`，但不包含 Python 测试。`check:architecture` 检查 Web、BFF、Analytics 三个运行单元入口、旧目录残留、依赖方向、共享包反向导入运行单元及生产代码对共享包内部模块的引用，同时检查 Docker 编排文件的归属入口。Web 与 BFF 通过 `@pgg/hazard-domain` 公共入口使用共享领域包。Web 入口为 `apps/web/index.html`，BFF 入口为 `apps/bff/index.ts`，Analytics 入口为 `services/analytics/main.py`；Vite 产物位于根 `dist/`，BFF 编译入口为 `dist-server/apps/bff/index.js`。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `tooling/node/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
 
 测试文件按边界归档：Web Service、组件和端到端测试位于 `apps/web/tests/`，BFF Node 与 Vitest 测试位于 `apps/bff/tests/`，契约类型测试位于 `packages/contracts/tests/type-tests/`，跨运行单元检查位于 `tests/integration/`，持久化运维测试位于 `infra/persistence/tests/`。
 
@@ -42,7 +43,7 @@
 
 ## 2026-09-25 运行单元架构治理验证
 
-`pnpm run check:architecture`、`pnpm run lint`、客户端/服务端/契约类型检查、`pnpm run test:component`、`pnpm run build` 和 `git diff --check` 均退出 0；`pnpm run format:check` 仅报告用户既有修改中的 `README.md` 格式告警，其他治理文件已通过格式检查。架构检查包含在 `test:baseline` 中，也由 CI 的 Node job 显式运行。Service 测试在设置测试占位 `DATABASE_URL` 后为 23 个文件、321/321 通过；组件为 19 个文件、108/108 通过。Python 迁移后应使用 `pnpm run test:python` 验证，当前测试命令保持相同语义。占位 `DATABASE_URL` 只用于不连接数据库的检查，不能替代 PostgreSQL 集成测试所需的隔离测试库和 migration。
+`pnpm run check:architecture`、`pnpm run check:docker`、`pnpm run lint`、`pnpm run format:check`、客户端/服务端/契约类型检查、`pnpm run test:component`、`pnpm run build` 和 `git diff --check` 均退出 0。架构检查包含在 `test:baseline` 中，也由 CI 的 Node job 显式运行。Service 测试在设置测试占位 `DATABASE_URL` 后为 23 个文件、323/323 通过；组件为 19 个文件、108/108 通过。Python 迁移后应使用 `pnpm run test:python` 验证，当前测试命令保持相同语义。占位 `DATABASE_URL` 只用于不连接数据库的检查，不能替代 PostgreSQL 集成测试所需的隔离测试库和 migration。
 
 本机 `pnpm test` 在 38 项 BFF 测试通过后，三个需要认证/持久化的测试文件以 `SIGSEGV` 退出；单独调用项目 Node 20 下的 `argon2.hash()` 也会触发相同段错误，说明该结果受本机原生依赖环境阻断。Service 默认并行池在本机另出现 `ERR_IPC_CHANNEL_CLOSED`，故上述全量 Service 结果使用单 worker。`pnpm run test:e2e` 已尝试，但 Playwright 的 WebServer 在项目 Node 20 中调用本机全局 pnpm 时遇到 `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite`，服务未启动。这一轮不能据此声称 BFF 集成测试或 E2E 已通过；完整 Node 基线仍需在匹配运行时和隔离 PostgreSQL 的环境中执行。
 

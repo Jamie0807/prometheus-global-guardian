@@ -125,6 +125,8 @@ flowchart LR
 | `packages/hazard-domain/`                                | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
 | `package.json`、`vite.config.ts`                         | 仓库脚本、Web 构建入口和根 `dist/` 产物配置。                               |
 | `vitest.config.ts`、`playwright.config.ts`、`Dockerfile` | 仓库级测试与容器编排入口。                                                  |
+| `docker-compose.yml`、`docker-compose.test.yml`          | 本地完整栈与隔离测试数据库的 Compose 编排入口。                             |
+| `tooling/docker/check-compose.sh`                        | 无需启动容器即可校验两套 Compose 配置的结构与覆盖关系。                     |
 | `tests/`                                                 | BFF、前端 Service、组件、契约和 E2E 自动化测试。                            |
 | `services/analytics/tests/`                              | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
 | `.github/workflows/`                                     | 当前 GitHub Actions 质量工作流。                                            |
@@ -339,34 +341,35 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 
 根 Dockerfile 使用 Node 20.19 的两阶段构建。构建阶段安装锁定依赖并生成 `dist` 与 `dist-server`；运行阶段只安装生产依赖并以 `node dist-server/apps/bff/index.js` 启动 8080。
 
-Python Dockerfile 基于 Python 3.13 slim，安装 requirements 并以 Uvicorn 在容器内 `0.0.0.0:8001` 启动。
+Python Dockerfile 基于 Python 3.13 slim，安装 requirements 并以 Uvicorn 在容器内 `0.0.0.0:8001` 启动。容器文件的归属边界固定为：根 `Dockerfile` 负责 Web/BFF 完整栈镜像，`services/analytics/Dockerfile` 只负责 Analytics 镜像；根 `docker-compose.yml` 是本地完整栈入口，`docker-compose.test.yml` 只覆盖隔离测试数据库；`tooling/docker/check-compose.sh` 负责无运行时副作用的配置校验。它们保留在根目录或服务目录是为了保持标准 Compose 命令和运行单元归属，不再新增平行的 `docker/` 副本。
 
 Compose 中：
 
 - `web` 发布 `8080:8080`，并等待 PostgreSQL 和 Analytics healthcheck 成功；
-- `db` 使用具名卷保存用户和 AI 持久化数据，不发布数据库端口；
+- `db` 使用具名卷保存用户和 AI 持久化数据，默认发布 `5432:5432` 供 DataGrip 等本地工具连接；测试覆盖会改用 `127.0.0.1:55439` 和独立卷；
 - `analytics` 不发布主机端口，只在私有 Compose 网络中接受 BFF 服务令牌；
 - 迁移使用 `docker compose exec web pnpm run db:migrate:deploy` 显式执行，不会自动在生产启动时执行；
 - Compose 没有定义镜像发布或部署过程，示例口令仅供本地使用。
 
 ## 12. 质量基线与测试分层
 
-| 命令                               | 责任                                                                              |
-| ---------------------------------- | --------------------------------------------------------------------------------- |
-| `pnpm run lint`                    | TypeScript、React、BFF 和配置 ESLint 检查。                                       |
-| `pnpm run format:check`            | 检查脚本清单中列出的 Markdown、JSON、TypeScript、测试和配置。                     |
-| `pnpm run typecheck:client`        | 客户端 TypeScript 类型检查。                                                      |
-| `pnpm run typecheck:server`        | Express BFF TypeScript 类型检查。                                                 |
-| `pnpm run typecheck:contracts`     | TypeScript 契约正反例类型检查。                                                   |
-| `pnpm run check:architecture`      | 检查共享包元数据、契约唯一目录和共享包与运行单元的导入方向。                      |
-| `pnpm test` / `pnpm run test:unit` | 串行执行 BFF Node 测试和前端 Service Vitest。                                     |
-| `pnpm run test:component`          | React Testing Library + jsdom 组件测试。                                          |
-| `pnpm run test:e2e`                | Playwright 本地生产构建关键流程冒烟。                                             |
-| `pnpm run test:python`             | Python unittest。                                                                 |
-| `pnpm run test:baseline`           | lint、格式、三项类型检查、架构检查、unit、component、E2E 和构建的完整 Node 基线。 |
-| `pnpm run build`                   | 客户端生产构建与 BFF 编译。                                                       |
+| 命令                               | 责任                                                                                               |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `pnpm run lint`                    | TypeScript、React、BFF 和配置 ESLint 检查。                                                        |
+| `pnpm run format:check`            | 检查脚本清单中列出的 Markdown、JSON、TypeScript、测试和配置。                                      |
+| `pnpm run typecheck:client`        | 客户端 TypeScript 类型检查。                                                                       |
+| `pnpm run typecheck:server`        | Express BFF TypeScript 类型检查。                                                                  |
+| `pnpm run typecheck:contracts`     | TypeScript 契约正反例类型检查。                                                                    |
+| `pnpm run check:architecture`      | 检查共享包元数据、契约唯一目录和共享包与运行单元的导入方向。                                       |
+| `pnpm run check:docker`            | 校验根 Compose 与测试覆盖 Compose 的配置结构，不启动服务或访问数据卷。                             |
+| `pnpm test` / `pnpm run test:unit` | 串行执行 BFF Node 测试和前端 Service Vitest。                                                      |
+| `pnpm run test:component`          | React Testing Library + jsdom 组件测试。                                                           |
+| `pnpm run test:e2e`                | Playwright 本地生产构建关键流程冒烟。                                                              |
+| `pnpm run test:python`             | Python unittest。                                                                                  |
+| `pnpm run test:baseline`           | lint、格式、三项类型检查、架构检查、Docker 配置检查、unit、component、E2E 和构建的完整 Node 基线。 |
+| `pnpm run build`                   | 客户端生产构建与 BFF 编译。                                                                        |
 
-`test:baseline` 不包含 Python 测试。CI 的 `frontend-bff` job 安装锁定 pnpm 依赖后显式运行 `check:architecture`，安装 Chromium 后运行 `test:baseline`；独立 `python` job 使用 Python 3.13 安装 requirements 后运行 `test:python`。Quality Gate 在 pull request 和对 `main` 的 push 上触发，权限为只读仓库内容。当前工作流没有 Docker build、镜像发布或部署步骤。Web 位于 `apps/web/`，Vite 从 `apps/web/index.html` 构建，客户端产物仍位于根 `dist/` 并由 Express 提供。BFF 位于 `apps/bff/`，入口为 `apps/bff/index.ts`，编译入口为 `dist-server/apps/bff/index.js`。Analytics 位于 `services/analytics/`，入口为 `main.py`，由独立 FastAPI 进程提供服务。
+`test:baseline` 不包含 Python 测试。CI 的 `frontend-bff` job 安装锁定 pnpm 依赖后显式运行 `check:architecture`，安装 Chromium 后运行 `test:baseline`；独立 `python` job 使用 Python 3.13 安装 requirements 后运行 `test:python`。Quality Gate 在 pull request 和对 `main` 的 push 上触发，权限为只读仓库内容。当前工作流没有 Docker build、镜像发布或部署步骤，但 Node 基线会运行 `check:docker` 校验两套 Compose 配置。Web 位于 `apps/web/`，Vite 从 `apps/web/index.html` 构建，客户端产物仍位于根 `dist/` 并由 Express 提供。BFF 位于 `apps/bff/`，入口为 `apps/bff/index.ts`，编译入口为 `dist-server/apps/bff/index.js`。Analytics 位于 `services/analytics/`，入口为 `main.py`，由独立 FastAPI 进程提供服务。
 
 测试责任按边界分配：
 
@@ -465,7 +468,7 @@ Compose 中：
 
 本规格的当前事实来自以下可复核位置：
 
-- 运行与构建：`package.json`、`.nvmrc`、`vite.config.ts`、`Dockerfile`、`docker-compose.yml`、`.github/workflows/quality.yml`；
+- 运行与构建：`package.json`、`.nvmrc`、`vite.config.ts`、`Dockerfile`、`docker-compose.yml`、`docker-compose.test.yml`、`tooling/docker/check-compose.sh`、`.github/workflows/quality.yml`；
 - React 与 Service：`apps/web/src/App.tsx`、`apps/web/src/state/`、`apps/web/src/features/`、`apps/web/src/services/`、`apps/web/src/hooks/useAIChatSession.ts`；
 - Express BFF：`apps/bff/index.ts`、`apps/bff/ai/`、`apps/bff/hazards/`、`apps/bff/security/`、`packages/logging/`；
 - Python：`services/analytics/app/`、`services/analytics/analytics/`、`services/analytics/security.py`、`services/analytics/log_config.py`；

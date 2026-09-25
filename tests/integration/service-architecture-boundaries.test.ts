@@ -71,6 +71,31 @@ describe("workspace architecture", () => {
     expect(dockerfile).toContain("COPY --from=build /app/packages/hazard-domain/dist");
   });
 
+  it("keeps container definitions at their runtime ownership boundaries", () => {
+    const compose = readFileSync(path.join(repositoryRoot, "docker-compose.yml"), "utf8");
+    const testCompose = readFileSync(path.join(repositoryRoot, "docker-compose.test.yml"), "utf8");
+    expect(existsSync(path.join(repositoryRoot, "Dockerfile"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, ".dockerignore"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "services/analytics/Dockerfile"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "tooling/docker/check-compose.sh"))).toBe(true);
+    expect(compose).toContain("dockerfile: services/analytics/Dockerfile");
+    expect(compose).toContain("db:");
+    expect(compose).toContain("analytics:");
+    expect(testCompose).toContain("postgres-auth-test-data");
+    expect(testCompose).toContain("127.0.0.1:55439:5432");
+    expect(checkArchitecture(repositoryRoot)).not.toContain(
+      "container governance entry is missing: Dockerfile",
+    );
+  });
+
+  it("reports a missing container governance entry", () => {
+    withFixture((root) => {
+      expect(checkArchitecture(root)).toContain(
+        "container governance entry is missing: Dockerfile",
+      );
+    });
+  });
+
   it("reports legacy BFF locations and a missing entrypoint", () => {
     withFixture((root) => {
       writeFixture(root, "server.ts", "export const legacy = true;");

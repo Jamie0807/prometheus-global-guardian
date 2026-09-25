@@ -21,6 +21,13 @@ const runtimeDirectories = ["src", "server", "apps", "services"];
 const runtimeEntryFiles = ["server.ts", "server.js"];
 const serverRuntimeDirectories = ["server", "apps/bff", "services/analytics", "prisma"];
 const serverRuntimeEntryFiles = [...runtimeEntryFiles, "prisma.config.ts", "prisma.config.js"];
+const containerGovernanceEntries = [
+  "Dockerfile",
+  ".dockerignore",
+  "docker-compose.yml",
+  "docker-compose.test.yml",
+  "services/analytics/Dockerfile",
+];
 
 function listSourceFiles(directory) {
   if (!existsSync(directory)) return [];
@@ -140,6 +147,7 @@ export function checkArchitecture(rootDirectory) {
 
   const requiredTooling = [
     "tooling/architecture/check.mjs",
+    "tooling/docker/check-compose.sh",
     "tooling/node/with-node-version.sh",
     "infra/persistence/db-ops.mjs",
     "infra/persistence/backup-utils.mjs",
@@ -161,6 +169,42 @@ export function checkArchitecture(rootDirectory) {
   for (const relativePath of legacyTooling) {
     if (existsSync(path.join(root, relativePath))) {
       errors.push(`legacy tooling path must be removed: ${relativePath}`);
+    }
+  }
+
+  for (const relativePath of containerGovernanceEntries) {
+    if (!existsSync(path.join(root, relativePath))) {
+      errors.push(`container governance entry is missing: ${relativePath}`);
+    }
+  }
+  const composePath = path.join(root, "docker-compose.yml");
+  const testComposePath = path.join(root, "docker-compose.test.yml");
+  if (existsSync(composePath)) {
+    const compose = readFileSync(composePath, "utf8");
+    const composeRules = [
+      ["  web:", "root Compose must define the web runtime: docker-compose.yml"],
+      ["  db:", "root Compose must define the database service: docker-compose.yml"],
+      ["  analytics:", "root Compose must define the Analytics service: docker-compose.yml"],
+      [
+        "dockerfile: Dockerfile",
+        "root Compose must build the root runtime from Dockerfile: docker-compose.yml",
+      ],
+      [
+        "dockerfile: services/analytics/Dockerfile",
+        "root Compose must keep the Analytics Dockerfile service-owned: docker-compose.yml",
+      ],
+    ];
+    for (const [marker, message] of composeRules) {
+      if (!compose.includes(marker)) errors.push(message);
+    }
+  }
+  if (existsSync(testComposePath)) {
+    const testCompose = readFileSync(testComposePath, "utf8");
+    if (!testCompose.includes("postgres-auth-test-data")) {
+      errors.push("test Compose must use an isolated PostgreSQL volume: docker-compose.test.yml");
+    }
+    if (!testCompose.includes("127.0.0.1:55439:5432")) {
+      errors.push("test Compose must expose the isolated database port: docker-compose.test.yml");
     }
   }
 
