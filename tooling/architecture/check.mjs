@@ -114,6 +114,26 @@ export function checkArchitecture(rootDirectory) {
     }
   }
 
+  const rootPackagePath = path.join(root, "package.json");
+  if (existsSync(rootPackagePath)) {
+    let rootPackage;
+    try {
+      rootPackage = JSON.parse(readFileSync(rootPackagePath, "utf8"));
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      rootPackage = null;
+    }
+    if (
+      rootPackage &&
+      typeof rootPackage === "object" &&
+      typeof rootPackage.packageManager === "string" &&
+      rootPackage.packageManager.startsWith("pnpm@") &&
+      existsSync(path.join(root, "package-lock.json"))
+    ) {
+      errors.push("npm lockfile must be removed from a pnpm workspace: package-lock.json");
+    }
+  }
+
   const hazardEntry = "packages/hazard-domain/src/index.ts";
   if (!existsSync(path.join(root, hazardEntry))) {
     errors.push(`hazard domain package entry is missing: ${hazardEntry}`);

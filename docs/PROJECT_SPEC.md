@@ -124,6 +124,8 @@ flowchart LR
 | `packages/contracts/`                                    | Analytics 与统一灾害事件的跨语言契约样本。                                  |
 | `packages/hazard-domain/`                                | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
 | `package.json`、`vite.config.ts`                         | 仓库脚本、Web 构建入口和根 `dist/` 产物配置。                               |
+| `prisma.config.ts`、`prisma/`                            | Prisma CLI 根配置、数据库 schema 与版本化 migration。                       |
+| `tsconfig*.json`、`eslint.config.js`                     | 跨 Web、BFF、契约和配置文件的 TypeScript/ESLint 编排边界。                  |
 | `vitest.config.ts`、`playwright.config.ts`、`Dockerfile` | 仓库级测试与容器编排入口。                                                  |
 | `docker-compose.yml`、`docker-compose.test.yml`          | 本地完整栈与隔离测试数据库的 Compose 编排入口。                             |
 | `tooling/docker/check-compose.sh`                        | 无需启动容器即可校验两套 Compose 配置的结构与覆盖关系。                     |
@@ -131,6 +133,8 @@ flowchart LR
 | `services/analytics/tests/`                              | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
 | `.github/workflows/`                                     | 当前 GitHub Actions 质量工作流。                                            |
 | `docs/`                                                  | 当前测试基线、优化清单、本规格书和历史过程记录。                            |
+
+根目录配置文件按“仓库编排入口”治理，不按业务功能拆散：`prisma.config.ts` 跟随 Prisma CLI 的默认发现规则，`playwright.config.ts` 负责跨 Web/BFF 的生产构建冒烟，`vite.config.ts`、`vitest*.config.ts` 和 `tsconfig*.json` 负责多运行单元的构建、测试和类型边界；`eslint.config.js`、`commitlint.config.cjs`、`cspell.json` 和 `.prettierrc.json` 是仓库级质量策略。依赖管理只保留 pnpm 的 `pnpm-workspace.yaml` 与 `pnpm-lock.yaml`，不保留平行 `package-lock.json`。
 
 ## 7. 运行单元与职责边界
 

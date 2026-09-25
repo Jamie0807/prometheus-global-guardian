@@ -138,6 +138,30 @@ describe("workspace architecture", () => {
     expect(existsSync(path.join(repositoryRoot, "packages/logging/package.json"))).toBe(true);
   });
 
+  it("keeps repository orchestration configs at the root with one package manager lockfile", () => {
+    const rootPackage = JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8"));
+    expect(rootPackage.packageManager).toMatch(/^pnpm@/);
+    expect(existsSync(path.join(repositoryRoot, "prisma.config.ts"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "playwright.config.ts"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "vite.config.ts"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "vitest.config.ts"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "pnpm-lock.yaml"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "package-lock.json"))).toBe(false);
+    expect(checkArchitecture(repositoryRoot)).not.toContain(
+      "npm lockfile must be removed from a pnpm workspace: package-lock.json",
+    );
+  });
+
+  it("reports a conflicting npm lockfile in a pnpm workspace", () => {
+    withFixture((root) => {
+      writeFixture(root, "package.json", JSON.stringify({ packageManager: "pnpm@10.15.1" }));
+      writeFixture(root, "package-lock.json", "{}");
+      expect(checkArchitecture(root)).toContain(
+        "npm lockfile must be removed from a pnpm workspace: package-lock.json",
+      );
+    });
+  });
+
   it("exports the existing hazard event and layer API", () => {
     expect(hazardDomain.createHazardEventId("usgs", "event-1")).toBe("usgs:event-1");
     expect(hazardDomain.resolveHazardLayerId("EARTHQUAKE")).toBe("earthquake");

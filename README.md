@@ -422,6 +422,8 @@ prometheus-global-guardian/
 ├── docs/                        # Governance, test baseline, plans, and specifications
 ├── tooling/                     # Node-version, architecture, and Docker config tools
 ├── package.json                  # Repository scripts and workspace dependency orchestration
+├── prisma.config.ts              # Prisma CLI root configuration
+├── tsconfig*.json                # TypeScript boundaries for Web, BFF, and contracts
 ├── vite.config.ts                # Web root and root dist/ output
 ├── vitest.config.ts              # Service test configuration
 ├── playwright.config.ts          # Browser test configuration
@@ -870,6 +872,8 @@ prometheus-global-guardian/
 ├── docs/                        # 治理、测试基线、计划和规格
 ├── tooling/                     # Node 版本、架构和 Docker 配置工具
 ├── package.json                  # 仓库脚本与工作区依赖编排
+├── prisma.config.ts              # Prisma CLI 根配置
+├── tsconfig*.json                # Web、BFF 和契约的 TypeScript 边界
 ├── vite.config.ts                # Web root 与根目录 dist/ 输出
 ├── vitest.config.ts              # Service 测试配置
 ├── playwright.config.ts          # 浏览器测试配置

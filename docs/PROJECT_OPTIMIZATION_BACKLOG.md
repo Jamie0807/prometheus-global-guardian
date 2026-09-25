@@ -22,6 +22,7 @@
 - 运行单元与共享包架构治理已完成：跨语言契约位于 `packages/contracts/`，灾害领域实现位于 `packages/hazard-domain/`；Web 位于 `apps/web/`，BFF 位于 `apps/bff/`，Analytics 位于 `services/analytics/`。Web 与 BFF 通过 `@pgg/hazard-domain` 公共入口使用共享领域包；日志能力由 `@pgg/logging` 提供。架构门禁会检查三个运行单元入口、共享包依赖方向、测试归档和旧目录残留。
 - 全项目架构治理已完成：共享日志与灾害兼容层已归档到 `packages/` 公共包；测试按 Web、BFF、契约、集成和持久化边界分布；Node/架构工具归入 `tooling/`，数据库运维归入 `infra/persistence/`，Analytics 启动与测试脚本归入 `services/analytics/`。根目录命令名称保持兼容，路径门禁会阻止旧脚本回流。
 - Docker 编排治理已完成：根 `Dockerfile` 与根 Compose 保留为项目级完整栈入口，`services/analytics/Dockerfile` 保持服务归属，`docker-compose.test.yml` 仅覆盖隔离测试数据库；`tooling/docker/check-compose.sh` 和架构门禁校验文件归属、服务入口、测试独立卷与端口覆盖，不新增平行 `docker/` 副本。
+- 根目录编排治理已完成：`prisma.config.ts`、`playwright.config.ts`、Vite/Vitest/TypeScript 配置和仓库质量策略文件保留在根目录作为跨运行单元入口；依赖管理统一使用 pnpm，已移除重复的 `package-lock.json`，架构门禁会阻止它回流。
 - 质量门禁包含 lint、格式、三项 TypeScript 类型检查、BFF/Service/组件/E2E 测试、构建及 Python unittest；AGENTS.md 已固化需求拆解、TDD、提交和自主验收约束。GitHub Actions 分别运行前端/BFF 基线和 Python 测试。
 - 受限沙箱中运行 `pnpm test` 的 BFF 监听用例会出现 `listen EPERM`；这是运行环境限制。在具备本地端口权限的环境中，BFF 与 Service 测试均可完整通过。
 - 已完成全球灾害可视化开源项目调研，技术栈、架构对比和优化建议记录在 `docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md`；本清单只同步其中的下一步高优先级事项。
@@ -81,7 +82,7 @@
 | `pnpm run typecheck:client`    | 前端 TypeScript 类型检查。                                                        |
 | `pnpm run typecheck:server`    | Express BFF TypeScript 类型检查。                                                 |
 | `pnpm run typecheck:contracts` | TypeScript 契约正反例类型检查。                                                   |
-| `pnpm run check:architecture`  | 共享包元数据、兼容入口和包与运行单元依赖方向检查。                                |
+| `pnpm run check:architecture`  | 共享包元数据、根目录编排文件、兼容入口和包与运行单元依赖方向检查。                |
 | `pnpm run check:docker`        | 根 Compose 与测试覆盖 Compose 的结构、服务归属、隔离卷和端口配置检查。            |
 | `pnpm run test:services`       | Service、解析器、请求边界、AI 流协议、统一灾害事件与 HTML 报告回归；本轮 323 项。 |
 | `pnpm run test:component`      | React Testing Library 组件回归；本轮 108 项。                                     |
