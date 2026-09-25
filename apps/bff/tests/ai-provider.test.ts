@@ -150,15 +150,36 @@ test("buildWorkflowPayload sends the latest user input and workflow context", ()
   });
 
   assert.deepEqual(Object.keys(payload), ["inputs"]);
-  assert.equal(payload.inputs.user_input, "用户：灾害种类地震12次,海啸10次");
+  assert.match(payload.inputs.user_input, /^用户：灾害种类地震12次,海啸10次/);
+  assert.match(payload.inputs.user_input, /全量事件总数：22/);
+  assert.match(payload.inputs.user_input, /EARTHQUAKE=12、TSUNAMI=10/);
   assert.deepEqual(payload.inputs.hazard_context, {
     total: 22,
     byType: { EARTHQUAKE: 12, TSUNAMI: 10 },
     recent: [],
-    persistentNotes: [],
   });
   assert.equal(payload.inputs.location, "全球");
   assert.equal(payload.inputs.language, "zh");
+});
+
+test("buildWorkflowPayload tells the workflow to use aggregate counts instead of recent samples", () => {
+  const payload = buildWorkflowPayload({
+    messages: [{ role: "user", content: "当前地震有多少条" }],
+    disasterContext: {
+      total: 730,
+      byType: { EARTHQUAKE: 362, FLOOD: 21 },
+      recent: [
+        { title: "M 5.2 earthquake", type: "EARTHQUAKE", severity: "WATCH" },
+        { title: "M 4.7 earthquake", type: "EARTHQUAKE", severity: "ADVISORY" },
+      ],
+    },
+    language: "zh",
+  });
+
+  assert.match(payload.inputs.user_input, /当前地震有多少条/);
+  assert.match(payload.inputs.user_input, /全量事件总数：730/);
+  assert.match(payload.inputs.user_input, /EARTHQUAKE=362/);
+  assert.match(payload.inputs.user_input, /recent 仅包含代表样本，不能用于统计总量/);
 });
 
 test("buildAIProviderRequest chooses workflow protocol for workflow provider", () => {
@@ -183,7 +204,6 @@ test("buildAIProviderRequest chooses workflow protocol for workflow provider", (
     total: 0,
     byType: {},
     recent: [],
-    persistentNotes: [],
   });
   assert.equal(request.payload.inputs.user_input.includes("hello workflow"), true);
 });
@@ -219,6 +239,30 @@ test("buildDisasterSystemPrompt works without live hazard context", () => {
 
   assert.match(prompt, /Prometheus Global Guardian/);
   assert.doesNotMatch(prompt, /平台实时数据上下文/);
+});
+
+test("buildDisasterSystemPrompt labels conversation summaries without treating them as confirmed memories", () => {
+  const prompt = buildDisasterSystemPrompt({
+    conversationSummary: "用户正在维护灾害监测项目",
+  });
+
+  assert.match(prompt, /此前对话摘要/);
+  assert.doesNotMatch(prompt, /用户确认的长期记忆/);
+});
+
+test("buildDisasterSystemPrompt truncates long conversation summaries", () => {
+  const prompt = buildDisasterSystemPrompt({
+    conversationSummary: "a".repeat(7_000),
+  });
+
+  assert.match(prompt, /a{6000}/);
+  assert.doesNotMatch(prompt, /a{6001}/);
+});
+
+test("buildDisasterSystemPrompt omits empty conversation summaries", () => {
+  const prompt = buildDisasterSystemPrompt({ conversationSummary: "   " });
+
+  assert.doesNotMatch(prompt, /此前对话摘要/);
 });
 
 test("buildDisasterSystemPrompt uses safe canonical source and layer labels", () => {

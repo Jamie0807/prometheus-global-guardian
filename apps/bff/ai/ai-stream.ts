@@ -29,6 +29,9 @@ const RESPONSE_FAILURE_CODES = {
   "response.failed": "AI_PROVIDER_STREAM_FAILED",
   "response.incomplete": "AI_PROVIDER_STREAM_INCOMPLETE",
 } as const;
+const MAX_WORKFLOW_RESULT_CHARACTERS = 16_000;
+const WORKFLOW_STRUCTURED_SECTION_PATTERN =
+  /(?:^|\n)\s*(?:\*\*)?(摘要|风险等级|关键发现|优先行动建议|数据来源|数据限制)(?:\*\*)?\s*[:：]?\s*(?:\n|$)/g;
 
 function toStreamError(code: string): string {
   return `event: error\ndata: ${JSON.stringify({
@@ -76,20 +79,218 @@ export function convertResponsesSSEToChatCompletionsSSE(sseText: string): string
 }
 
 export function extractWorkflowResult(workflowResponse: unknown): string {
-  if (!workflowResponse || typeof workflowResponse !== "object") return "";
-  const response = workflowResponse as Record<string, unknown>;
-  const data =
-    response.data && typeof response.data === "object"
-      ? (response.data as Record<string, unknown>)
-      : undefined;
-  const outputs =
-    data?.outputs && typeof data.outputs === "object"
-      ? (data.outputs as Record<string, unknown>)
-      : response.outputs && typeof response.outputs === "object"
-        ? (response.outputs as Record<string, unknown>)
-        : undefined;
-  const result = outputs?.result;
-  return typeof result === "string" && result.trim().length > 0 ? result : "";
+  const outputs = readWorkflowOutputs(workflowResponse);
+  if (!outputs) return "";
+
+  const resultText = readText(outputs.result);
+  const sections = [
+    formatTextSection("摘要", outputs.summary),
+    formatRiskSection(outputs.risk_level),
+    formatListSection("关键发现", outputs.key_findings, formatKeyFindingItem),
+    formatListSection("优先行动建议", outputs.recommendations, formatRecommendationItem, true),
+    formatListSection("数据来源", outputs.sources, formatSourceItem),
+    formatListSection("数据限制", outputs.limitations, formatLimitationItem),
+  ].filter((section): section is string => Boolean(section));
+
+  const result = sections.length > 0 ? stripProviderRenderedSections(resultText) : resultText;
+  if (sections.length === 0) return result;
+  return [result, ...sections]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, MAX_WORKFLOW_RESULT_CHARACTERS);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readWorkflowOutputs(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  if (isRecord(value.data) && isRecord(value.data.outputs)) return value.data.outputs;
+  if (isRecord(value.outputs)) return value.outputs;
+  return undefined;
+}
+
+function readText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function parseStructuredValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (!text) return "";
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function readScalar(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function stripProviderRenderedSections(value: string): string {
+  WORKFLOW_STRUCTURED_SECTION_PATTERN.lastIndex = 0;
+  const match = WORKFLOW_STRUCTURED_SECTION_PATTERN.exec(value);
+  WORKFLOW_STRUCTURED_SECTION_PATTERN.lastIndex = 0;
+  return match?.index === undefined ? value : value.slice(0, match.index).trim();
+}
+
+function readFirstScalar(record: Record<string, unknown>, keys: readonly string[]): string {
+  for (const key of keys) {
+    const value = readScalar(record[key]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function formatTextSection(label: string, value: unknown): string {
+  const text = readText(value);
+  return text ? `**${label}**\n${text}` : "";
+}
+
+function formatRiskSection(value: unknown): string {
+  const risk = readText(value);
+  if (!risk) return "";
+  const labels: Record<string, string> = {
+    LOW: "低风险",
+    MEDIUM: "中风险",
+    HIGH: "高风险",
+    CRITICAL: "极高风险",
+  };
+  const label = labels[risk.toUpperCase()];
+  return `**风险等级**\n${label ? `${risk}（${label}）` : risk}`;
+}
+
+function stripListMarker(value: string): string {
+  return value.replace(/^\s*(?:[-*•]\s+|\d+\s*[.)、]\s*)/, "").trim();
+}
+
+function formatRecommendationText(value: string): string {
+  let text = stripListMarker(value);
+  const labeledMessage = text.match(
+    /^(?:type|类型)\s*[:：]\s*[^,，]+[,，]\s*(?:message|recommendation|content|建议)\s*[:：]\s*(.+)$/i,
+  );
+  if (labeledMessage?.[1]) return labeledMessage[1].trim();
+
+  text = text.replace(/^(?:message|recommendation|content|建议)\s*[:：]\s*/i, "");
+  return text.replace(/\s*[,，]\s*(?:type|类型)\s*[:：]\s*[^,，]+$/i, "").trim();
+}
+
+const HAZARD_TYPE_LABELS: Record<string, string> = {
+  EARTHQUAKE: "地震",
+  FLOOD: "洪水",
+  STORM: "暴风雨",
+  WILDFIRE: "野火",
+  TROPICAL_CYCLONE: "热带气旋",
+  DROUGHT: "干旱",
+  LANDSLIDE: "滑坡",
+  VOLCANO: "火山",
+  TSUNAMI: "海啸",
+};
+
+const SEVERITY_LABELS: Record<string, string> = {
+  ADVISORY: "提示级",
+  WATCH: "关注级",
+  WARNING: "警戒级",
+  EMERGENCY: "紧急级",
+};
+
+function formatHazardType(value: string): string {
+  return HAZARD_TYPE_LABELS[value.toUpperCase()] ?? "";
+}
+
+function formatSeverity(value: string): string {
+  return SEVERITY_LABELS[value.toUpperCase()] ?? "";
+}
+
+function formatRecommendationItem(value: unknown): string {
+  const parsed = parseStructuredValue(value);
+  const scalar = readScalar(parsed);
+  if (scalar) return formatRecommendationText(scalar);
+  if (!isRecord(parsed)) return "";
+
+  const message = readFirstScalar(parsed, [
+    "content",
+    "message",
+    "recommendation",
+    "action",
+    "description",
+    "text",
+  ]);
+  if (message) return formatRecommendationText(message);
+  return "";
+}
+
+function formatKeyFindingItem(value: unknown): string {
+  const parsed = parseStructuredValue(value);
+  const scalar = readScalar(parsed);
+  if (scalar) return stripListMarker(scalar);
+  if (!isRecord(parsed)) return "";
+
+  const title = readFirstScalar(parsed, ["title", "finding", "summary", "description", "text"]);
+  const type = formatHazardType(readScalar(parsed.type));
+  const severity = formatSeverity(readScalar(parsed.severity));
+  if (title) {
+    const qualifiers = [type, severity].filter(Boolean);
+    return `${stripListMarker(title)}${qualifiers.length > 0 ? `（${qualifiers.join("，")}）` : ""}`;
+  }
+
+  const count = readScalar(parsed.count);
+  if (type && count) return `${type}：${count}${typeof parsed.count === "number" ? " 起" : ""}`;
+  return type;
+}
+
+function formatSourceItem(value: unknown): string {
+  const parsed = parseStructuredValue(value);
+  const scalar = readScalar(parsed);
+  if (scalar) return stripListMarker(scalar);
+  if (!isRecord(parsed)) return "";
+
+  const name = readFirstScalar(parsed, ["name", "source", "title", "label"]);
+  const url = readFirstScalar(parsed, ["url", "href"]);
+  if (name && url) return `${name}（${url}）`;
+  return name || url;
+}
+
+function formatLimitationItem(value: unknown): string {
+  const parsed = parseStructuredValue(value);
+  const scalar = readScalar(parsed);
+  if (scalar) return stripListMarker(scalar);
+  if (!isRecord(parsed)) return "";
+
+  return readFirstScalar(parsed, [
+    "content",
+    "message",
+    "limitation",
+    "description",
+    "reason",
+    "text",
+  ]);
+}
+
+function formatListSection(
+  label: string,
+  value: unknown,
+  formatter: (value: unknown) => string,
+  ordered = false,
+): string {
+  const parsed = parseStructuredValue(value);
+  const items = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  const seen = new Set<string>();
+  const formatted = items.map(formatter).filter((item) => {
+    if (!item) return false;
+    const normalized = item.replace(/\s+/g, " ").trim();
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+  if (formatted.length === 0) return "";
+  const lines = formatted.map((item, index) => `${ordered ? `${index + 1}.` : "-"} ${item}`);
+  return `**${label}**\n${lines.join("\n")}`;
 }
 
 export function workflowResultToChatCompletionsSSE(result: string): string {

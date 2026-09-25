@@ -90,3 +90,26 @@
 - [x] Task 3：将 34 个 Service/组件测试文件中的 168 处浏览器实现引用迁移到 `apps/web/src`，保留根 tests、BFF 路径和测试命令；组件 108/108、契约类型检查、lint、格式和差异检查通过，任务级复核 Spec ✅、Task quality Approved；Service 剩余 Prisma 生成文件和 Task 4 架构门禁阻塞已记录；实现保持未提交。
 - [x] Task 4：扩展 `check:architecture` 扫描 `apps/web`，拒绝服务端/Python/数据库/共享包内部路径并检查根 `src` 残留；架构边界 36/36、架构检查、服务端类型检查、完整构建和差异检查通过，任务级复核 Spec ✅、Task quality Approved；兼容 re-export 测试仍有既有断言覆盖不足的 Minor，已记录待最终复核；实现保持未提交。
 - [x] Task 5：同步 README、项目规格、测试基线和待优化清单，完成 Web 迁移整体验收；lint、格式、三项类型检查、架构 36/36、组件 108/108、Service 310/310 已收集用例和构建通过；E2E/BFF 收集受未设置 `DATABASE_URL` 阻断，本机 Python 受依赖缺失阻断，均已记录；最终复核发现并修复 Vite 根 `.env` 读取的 `envDir` 回归，复核最终 Ready to merge；实现保持未提交。
+
+## 2026-09-25 聊天历史与上下文压缩
+
+- [x] Task 1：移除前端长期记忆入口、管理组件、服务和样式，新增按钮/管理区域不渲染回归测试；组件测试 109/109、客户端类型检查、lint、格式检查和差异检查通过；任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 2：移除 BFF 长期记忆注入，保留同会话摘要与 48 KiB 裁剪，固定 `conversationSummary` 契约并接入上下文测试；上下文 3/3、Service 328/328、Provider Node 测试 21/21、类型检查、lint、格式检查和差异检查通过；二次任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 3：同步 README 与当前项目规格，删除当前文档中的长期记忆确认、记忆建议和 `/api/ai/memories*` 表述，补充聊天记录自动保存、同会话摘要压缩与跨会话隔离；文档检索、Prettier 和差异检查通过；任务级复核 Spec ✅、Task quality Approved；实现保持未提交。
+- [x] Task 4：完成引用扫描、定向测试、类型检查、lint、格式检查、组件测试、构建和差异检查；核心定向测试通过，`test:unit` 的 4 项数据库测试因缺少 `DATABASE_URL` 阻塞，已如实记录；Task quality Approved，最终复核备注摘要持久化缺少数据库动态证据；实现保持未提交。
+- [x] 最终复核修正：摘要纳入 48 KiB 预算，补齐创建/切换/删除/重载会话竞态保护，更新 API 概览 catch-all 并增加 deferred 回归测试；BFF 4/4、组件 14/14、Service 329/329、组件 115/115、类型检查、lint、格式和差异检查通过；修正任务级复核无 Critical/Important，CAS 与数据库动态回归保留为后续边界；实现保持未提交。
+- [x] 最终复核收口：增加会话列表刷新 generation，覆盖新建、删除及连续迟到刷新；最新组件测试 17/17、全量组件 118/118、Service 329/329、Provider Node 21/21、上下文 4/4、类型检查、lint、格式、构建和差异检查通过；最终整体复核 Approved，无 Critical/Important；数据库动态回归、摘要 CAS和README历史测试数字作为后续边界。
+
+## 2026-09-25 Workflow 结构化结果显示修复
+
+- [x] 修复 BFF 仅读取 Workflow `outputs.result` 导致偶发只显示标题的问题；现在合并摘要、风险等级、关键发现、行动建议、来源和限制字段，并覆盖 JSON/SSE 两条路径；新增回归测试 2 项，BFF 定向测试 43/43、Service 329/329、服务端类型检查、lint、格式、构建和差异检查通过；Docker `web` 镜像已重建并健康启动。
+
+## 2026-09-25 Workflow 结果可读性修复
+
+- [x] 按字段类型规范化 Workflow 结构化结果：行动建议统一从 1 编号并清除上游自带编号，隐藏 `type`、`message`、`recommendation` 等内部键；关键发现仅展示标题及中文灾害/严重程度标签，过滤 sourceId、layerId、timestamp 等原始事件元数据；新增 3 项回归测试，ai-stream 测试 14/14、Service 329/329、服务端类型检查、lint、格式检查和 diff 检查通过；Docker `web` 已重建并通过 `/health` 验证。
+- [x] 继续修复 Workflow 完整 `result` 与结构化字段重复渲染、建议保留上游序号以及关键发现重复的问题：结构化字段存在时只保留 `result` 概述，结构化章节由 BFF 重建；关键发现按用户可见文本去重；新增 3 项回归测试，ai-stream 测试 17/17、Service 329/329、lint、格式检查和 diff 检查通过；Docker `web` 已再次重建并通过 `/health` 验证。
+- [x] 定位并修复前端独立 `<li>` 导致不同列表共享序号的问题：关键发现和优先行动建议现在分别渲染在 `<ul>` / `<ol>` 中；新增组件回归测试，组件 119/119、客户端类型检查、lint、格式检查和 diff 检查通过；Docker `web` 已重建并通过 `/health` 验证。
+
+## 2026-09-26 Workflow 聚合统计口径修复
+
+- [x] 修复灾害数量问答把 `recent` 代表样本（最多 8 条）误当作全量事件的问题：BFF 现在明确注入全量总数与各类型聚合数量，要求 Workflow 统计时使用 `byType`，而 `recent` 仅用于展示代表事件；Provider 回归测试 22/22、Service 329/329、lint、格式、客户端/服务端类型检查和 diff 检查通过。

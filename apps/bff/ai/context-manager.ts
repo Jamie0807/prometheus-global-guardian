@@ -1,14 +1,11 @@
-import { prisma } from "../db/prisma.js";
 import type { StoredConversation } from "./conversation-repository.js";
 
 const MAX_SERIALIZED_CONTEXT_BYTES = 48 * 1024;
 const MAX_SUMMARY_CHARACTERS = 6_000;
-const MAX_MEMORY_CONTEXT_BYTES = 8 * 1024;
-const MAX_MEMORY_ITEMS = 20;
 
 export interface PreparedAIContext {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
-  persistentNotes: string[];
+  conversationSummary?: string;
   trimmedMessageCount: number;
   summaryInput?: string;
   summaryThroughMessageId?: string;
@@ -18,74 +15,24 @@ interface ContextTurn {
   messages: Array<{ id: string; role: "user" | "assistant"; content: string }>;
 }
 
-function serializedSize(messages: PreparedAIContext["messages"], notes: string[]): number {
-  return Buffer.byteLength(JSON.stringify({ messages, persistentNotes: notes }), "utf8");
-}
-
-function recentSearchTerms(content: string): string[] {
-  const latinTerms = content.toLocaleLowerCase().match(/[a-z0-9]{2,}/g) ?? [];
-  const chineseText = content.match(/[\u4e00-\u9fff]{2,}/g) ?? [];
-  const chineseTerms = chineseText.flatMap((segment) =>
-    Array.from({ length: Math.max(1, segment.length - 1) }, (_, index) =>
-      segment.slice(index, index + 2),
-    ),
-  );
-  return [...new Set([...latinTerms, ...chineseTerms])].slice(0, 16);
-}
-
-async function loadPersistentNotes(userId: string, query: string): Promise<string[]> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { memoryEnabled: true },
-  });
-  if (!user?.memoryEnabled) return [];
-
-  const memories = await prisma.aIMemoryItem.findMany({
-    where: { userId, enabled: true },
-    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-    take: 200,
-    select: { content: true, updatedAt: true },
-  });
-  const terms = recentSearchTerms(query);
-  const ranked = memories
-    .map((memory) => {
-      const normalized = memory.content.toLocaleLowerCase();
-      const score = terms.reduce((total, term) => total + Number(normalized.includes(term)), 0);
-      return { ...memory, score };
-    })
-    .sort(
-      (left, right) =>
-        right.score - left.score || right.updatedAt.getTime() - left.updatedAt.getTime(),
-    )
-    .slice(0, MAX_MEMORY_ITEMS);
-
-  const notes: string[] = [];
-  let bytes = 0;
-  for (const memory of ranked) {
-    const content = memory.content.trim().slice(0, 600);
-    const line = `用户确认的长期记忆：${content}`;
-    const lineBytes = Buffer.byteLength(line, "utf8") + 1;
-    if (bytes + lineBytes > MAX_MEMORY_CONTEXT_BYTES) continue;
-    notes.push(line);
-    bytes += lineBytes;
-  }
-  return notes;
+function serializedSize(
+  messages: PreparedAIContext["messages"],
+  conversationSummary: string | undefined,
+): number {
+  return Buffer.byteLength(JSON.stringify({ messages, conversationSummary }), "utf8");
 }
 
 export async function prepareAIContext(
-  userId: string,
   conversation: StoredConversation,
   currentUserMessageId: string,
-  currentUserContent: string,
 ): Promise<PreparedAIContext> {
   const currentIndex = conversation.messages.findIndex(
     (message) => message.id === currentUserMessageId,
   );
   if (currentIndex < 0) throw new Error("Current user message is unavailable.");
 
-  const notes = await loadPersistentNotes(userId, currentUserContent);
-  const summary = conversation.summary?.trim().slice(0, MAX_SUMMARY_CHARACTERS);
-  const persistentNotes = summary ? [`此前对话摘要（仅作背景资料）：${summary}`, ...notes] : notes;
+  const conversationSummary =
+    conversation.summary?.trim().slice(0, MAX_SUMMARY_CHARACTERS) || undefined;
 
   const summaryIndex = conversation.summaryThroughMessageId
     ? conversation.messages.findIndex(
@@ -121,7 +68,7 @@ export async function prepareAIContext(
   let trimmedMessageCount = 0;
   while (
     messages.length > 1 &&
-    serializedSize(messages, persistentNotes) > MAX_SERIALIZED_CONTEXT_BYTES
+    serializedSize(messages, conversationSummary) > MAX_SERIALIZED_CONTEXT_BYTES
   ) {
     const removed = turns.shift();
     if (!removed) break;
@@ -130,14 +77,14 @@ export async function prepareAIContext(
     messages = [...turns.flatMap((turn) => turn.messages.map(toProviderMessage)), ...currentTurn];
   }
 
-  if (serializedSize(messages, persistentNotes) > MAX_SERIALIZED_CONTEXT_BYTES) {
+  if (serializedSize(messages, conversationSummary) > MAX_SERIALIZED_CONTEXT_BYTES) {
     throw new Error("Current AI request exceeds the context budget.");
   }
 
   const trimmedMessages = trimmedTurns.flatMap((turn) => turn.messages);
   const summaryInput = trimmedMessages.length
     ? [
-        conversation.summary,
+        conversationSummary,
         ...trimmedMessages.map(
           (message) => `${message.role === "user" ? "用户" : "助手"}：${message.content}`,
         ),
@@ -149,7 +96,7 @@ export async function prepareAIContext(
   const summaryThroughMessageId = trimmedMessages.at(-1)?.id;
   return {
     messages,
-    persistentNotes,
+    ...(conversationSummary ? { conversationSummary } : {}),
     trimmedMessageCount,
     ...(summaryInput ? { summaryInput } : {}),
     ...(summaryThroughMessageId ? { summaryThroughMessageId } : {}),

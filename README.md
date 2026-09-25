@@ -39,7 +39,7 @@ The platform is organized around four operational domains:
 - **Geospatial operations**: renders active events with Mapbox GL markers, popups, heatmap mode, clickable clustering, optional 3D Tiles, and configurable base styles.
 - **Analytics and reporting**: presents summaries, charts, risk and quality results from the Python service, then exports the current filtered hazards as a readable HTML report.
 - **AI-assisted analysis**: sends live hazard context through a streaming BFF endpoint for situation summaries and response recommendations.
-- **Accounts and AI persistence**: registers local/self-hosted accounts, gates application APIs by server-side sessions, and stores user-owned conversations, bounded context summaries, and user-approved long-term memory in PostgreSQL.
+- **Accounts and AI persistence**: registers local/self-hosted accounts, gates application APIs by server-side sessions, and stores accounts, conversations, messages, and bounded summaries scoped to the same conversation in PostgreSQL.
 
 ### Core Capabilities
 
@@ -114,7 +114,7 @@ Frontend state ownership is deliberately small and explicit:
 | ------------------------------ | ------: | -----------: | -------------------------------------------------------------------------------------------- |
 | React / Vite client            | Node.js |         5173 | Local frontend development server                                                            |
 | Express BFF                    | Node.js |         8080 | Static files, user sessions, hazard aggregation, analytics proxy, AI routing and persistence |
-| PostgreSQL                     |     SQL |         5432 | Accounts, sessions, conversations, messages and memory                                       |
+| PostgreSQL                     |     SQL |         5432 | Accounts, sessions, conversations, messages and bounded same-conversation summaries          |
 | Python analytics service       |  Python |         8001 | Internal analysis, prediction, risk, ETL, quality and pivot APIs                             |
 | External data and AI providers |    SaaS |        HTTPS | Hazard feeds and streaming model responses                                                   |
 
@@ -310,7 +310,7 @@ Read [services/analytics/README.md](services/analytics/README.md) for startup in
 
 ### AI Assistant Provider
 
-The browser sends new messages to `POST /api/ai/conversations/:id/messages`; Express loads the user-owned conversation, applies bounded context and approved memories, then streams and persists the result. `POST /api/ai/cancel` stops an active generation for the current user. Conversation history is restored after reload. Memory suggestions are generated only on explicit user action and are not used until accepted. With `AI_PROVIDER=router`, disaster-domain analysis can go to ai-workflow and general conversation can go to Volcengine Ark. The BFF supports Ark's OpenAI-compatible Chat Completions and Responses protocols. If no provider is configured, the existing local demo reply remains available; provider-backed assistant output is stored server-side.
+The browser sends new messages to `POST /api/ai/conversations/:id/messages`; chat messages are saved automatically to the signed-in user's conversation. Express applies a bounded context from that conversation and its summary, then streams and persists the result. When a conversation exceeds the context budget, earlier messages are compressed into a bounded same-conversation summary while the original messages remain stored. A new conversation does not load messages or summaries from any other conversation. `POST /api/ai/cancel` stops an active generation for the current user. Conversation history is restored after reload. With `AI_PROVIDER=router`, disaster-domain analysis can go to ai-workflow and general conversation can go to Volcengine Ark. The BFF supports Ark's OpenAI-compatible Chat Completions and Responses protocols. If no provider is configured, the existing local demo reply remains available; provider-backed assistant output is stored server-side.
 
 ### Local Production Build
 
@@ -332,23 +332,22 @@ It listens on `http://localhost:8080` by default. `pnpm run start:static` serves
 
 #### Express BFF
 
-| Endpoint                             | Method                    | Purpose                                                                          |
-| ------------------------------------ | ------------------------- | -------------------------------------------------------------------------------- |
-| `/api/authorize`                     | `POST`                    | Uses server-side DisasterAware credentials and returns authorization status only |
-| `/api/auth/register`                 | `POST`                    | Creates a local account and server-side session                                  |
-| `/api/auth/login`                    | `POST`                    | Starts an authenticated session                                                  |
-| `/api/auth/session`                  | `GET`                     | Restores the current browser session                                             |
-| `/api/auth/logout`                   | `POST`                    | Revokes the current session                                                      |
-| `/api/auth/account`                  | `PATCH` / `DELETE`        | Updates memory preference or deletes the account and owned data                  |
-| `/api/hazards`                       | `GET`                     | Aggregates public hazard feeds; supports `source` and `type` filters             |
-| `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | Manages only the signed-in user's conversations and messages                     |
-| `/api/ai/conversations/:id/messages` | `POST`                    | Streams and persists an AI response                                              |
-| `/api/ai/memories*`                  | Various                   | Manages user-approved long-term memory                                           |
-| `/api/analytics/*`                   | Various                   | Proxies allowlisted analytics calls to private FastAPI                           |
-| `/api/hazards/types`                 | `GET`                     | Proxies the authenticated DisasterAware type endpoint                            |
-| `/api/hazards/active`                | `GET`                     | Proxies authenticated active hazards                                             |
-| `/api/hazards/active/category/:id`   | `GET`                     | Proxies authenticated category hazards                                           |
-| Other `/api/*`                       | Any                       | Returns a stable 404 or 405; arbitrary upstream proxying is not supported        |
+| Endpoint                             | Method                    | Purpose                                                                                                                                     |
+| ------------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/authorize`                     | `POST`                    | Uses server-side DisasterAware credentials and returns authorization status only                                                            |
+| `/api/auth/register`                 | `POST`                    | Creates a local account and server-side session                                                                                             |
+| `/api/auth/login`                    | `POST`                    | Starts an authenticated session                                                                                                             |
+| `/api/auth/session`                  | `GET`                     | Restores the current browser session                                                                                                        |
+| `/api/auth/logout`                   | `POST`                    | Revokes the current session                                                                                                                 |
+| `/api/auth/account`                  | `PATCH` / `DELETE`        | Updates the account or deletes the account and owned data                                                                                   |
+| `/api/hazards`                       | `GET`                     | Aggregates public hazard feeds; supports `source` and `type` filters                                                                        |
+| `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | Manages only the signed-in user's conversations and messages                                                                                |
+| `/api/ai/conversations/:id/messages` | `POST`                    | Streams and persists an AI response                                                                                                         |
+| `/api/analytics/*`                   | Various                   | Proxies allowlisted analytics calls to private FastAPI                                                                                      |
+| `/api/hazards/types`                 | `GET`                     | Proxies the authenticated DisasterAware type endpoint                                                                                       |
+| `/api/hazards/active`                | `GET`                     | Proxies authenticated active hazards                                                                                                        |
+| `/api/hazards/active/category/:id`   | `GET`                     | Proxies authenticated category hazards                                                                                                      |
+| Other `/api/*`                       | Any                       | This overview is not exhaustive; mounted compatibility routes may handle additional paths, and arbitrary upstream proxying is not supported |
 
 #### Python analytics
 
@@ -400,7 +399,7 @@ prometheus-global-guardian/
 │       └── App.tsx             # Authentication gate and provider/view composition
 ├── apps/bff/
 │   ├── index.ts                 # Express application entry
-│   ├── ai/                      # Provider routing, persistent conversations, and memory
+│   ├── ai/                      # Provider routing, persistent conversations, and bounded summaries
 │   ├── auth/                    # Account endpoints, password hashing, and sessions
 │   ├── db/                      # Prisma/PostgreSQL client
 │   ├── analytics/               # Authenticated Analytics proxy
@@ -474,7 +473,7 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 - **地理态势**：以 Mapbox GL 呈现活动事件、标记、弹窗、热力图、可点击展开的聚合、可选 3D Tiles 和可配置底图。
 - **分析与报告**：调用 Python 服务呈现统计、图表、风险和质量结果，并把当前筛选后的灾害数据导出为可读 HTML 报告。
 - **AI 辅助研判**：将实时灾害上下文送入流式 BFF 接口，生成态势摘要和响应建议。
-- **账号与 AI 持久化**：支持本地/自托管账号注册，全站 API 按服务端会话鉴权；会话、对话、上下文摘要和用户确认的长期记忆保存在 PostgreSQL。
+- **账号与 AI 持久化**：支持本地/自托管账号注册，全站 API 按服务端会话鉴权；账号、会话、对话、消息和有界同会话摘要保存在 PostgreSQL。
 
 ### 核心能力
 
@@ -512,9 +511,9 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 #### 账号与 AI 持久化
 
 - 注册和登录后由 Express 通过 HttpOnly Cookie 恢复全站会话，受保护的业务 API 均按当前用户授权。
-- PostgreSQL 保存用户账号、会话、AI 对话和消息；新设备/刷新页面后可继续查看自己的历史对话。
-- 对话上下文有大小上限；较早消息会进入摘要，不会从原始会话记录中删除。
-- 长期记忆需用户主动生成建议并逐条确认；用户可编辑、停用或删除记忆。
+- PostgreSQL 保存用户账号、会话、AI 对话、消息和有界同会话摘要；聊天消息自动保存，新设备或刷新页面后可继续查看当前用户自己的历史对话。
+- 同一会话超过上下文预算时，较早消息会压缩为有界摘要，原始消息仍保留；新建会话不会读取其他会话的消息或摘要。
+- 上下文仅来自当前会话及其摘要，不注入跨会话的持久记忆。
 - 注册面向本地或私有运营实例；不包含邮箱验证、密码找回、OAuth 和公网滥用防护。
 
 #### 报告与通知
@@ -557,7 +556,7 @@ flowchart LR
 | ------------------- | ------: | -------: | -------------------------------------------------- |
 | React / Vite 客户端 | Node.js |     5173 | 本地前端开发服务                                   |
 | Express BFF         | Node.js |     8080 | 静态文件、用户会话、灾害聚合、分析代理和 AI 持久化 |
-| PostgreSQL          |     SQL |     5432 | 账号、会话、对话、消息与记忆                       |
+| PostgreSQL          |     SQL |     5432 | 账号、会话、对话、消息与有界同会话摘要             |
 | Python 分析服务     |  Python |     8001 | 内部分析、预测、风险、ETL、质量和透视接口          |
 | 外部数据与 AI 服务  |    SaaS |    HTTPS | 灾害数据与流式模型响应                             |
 
@@ -764,7 +763,7 @@ FastAPI 是内部分析服务。`/`、`/health`、`/docs` 和 `/redoc` 可在服
 
 ### AI 助手服务
 
-浏览器向 `POST /api/ai/conversations/:id/messages` 提交新消息；Express 读取当前用户自己的对话，组装有长度上限的上下文和已确认记忆，再流式返回并持久化回复。`POST /api/ai/cancel` 会停止当前用户正在进行的生成。刷新后可以恢复对话。只有用户主动发起时才生成记忆建议，接受后才会用于后续上下文。使用 `AI_PROVIDER=router` 时，灾害分析可路由至 ai-workflow，通用对话可路由至火山方舟；如果 Ark 未配置，后台摘要和记忆任务会回退到已配置的工作流。BFF 支持 Ark 的 OpenAI 兼容 Chat Completions 与 Responses 协议。未配置 Provider 时仍可使用本地演示回复；真实 Provider 的助手回复保存在服务端。
+浏览器向 `POST /api/ai/conversations/:id/messages` 提交新消息；聊天消息会自动保存到当前用户的会话，Express 仅读取该会话及其有界摘要，组装有长度上限的上下文后流式返回并持久化回复。同一会话超过上下文预算时，较早消息会压缩为摘要，原始消息仍保留；新建会话不会自动读取其他会话的消息或摘要。`POST /api/ai/cancel` 会停止当前用户正在进行的生成。刷新后可以恢复对话。使用 `AI_PROVIDER=router` 时，灾害分析可路由至 ai-workflow，通用对话可路由至火山方舟；如果 Ark 未配置，后台摘要任务会回退到已配置的工作流。BFF 支持 Ark 的 OpenAI 兼容 Chat Completions 与 Responses 协议。未配置 Provider 时仍可使用本地演示回复；真实 Provider 的助手回复保存在服务端。
 
 ### 本地生产构建
 
@@ -786,23 +785,22 @@ pnpm start
 
 #### Express BFF
 
-| 接口                                 | 方法                      | 作用                                           |
-| ------------------------------------ | ------------------------- | ---------------------------------------------- |
-| `/api/authorize`                     | `POST`                    | 使用服务端 DisasterAware 凭据，只返回鉴权状态  |
-| `/api/auth/register`                 | `POST`                    | 创建本地账号和服务端会话                       |
-| `/api/auth/login`                    | `POST`                    | 建立已鉴权会话                                 |
-| `/api/auth/session`                  | `GET`                     | 恢复当前浏览器会话                             |
-| `/api/auth/logout`                   | `POST`                    | 撤销当前会话                                   |
-| `/api/auth/account`                  | `PATCH` / `DELETE`        | 修改记忆偏好或删除账号及其数据                 |
-| `/api/hazards`                       | `GET`                     | 聚合公开灾害数据，支持 `source` 和 `type` 筛选 |
-| `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | 管理当前用户自己的对话和消息                   |
-| `/api/ai/conversations/:id/messages` | `POST`                    | 流式生成并保存 AI 回复                         |
-| `/api/ai/memories*`                  | 多种                      | 管理用户确认的长期记忆                         |
-| `/api/analytics/*`                   | 多种                      | 代理允许的请求到私有 FastAPI                   |
-| `/api/hazards/types`                 | `GET`                     | 代理已鉴权的 DisasterAware 类型接口            |
-| `/api/hazards/active`                | `GET`                     | 代理已鉴权的活动灾害接口                       |
-| `/api/hazards/active/category/:id`   | `GET`                     | 代理已鉴权的分类灾害接口                       |
-| 其他 `/api/*`                        | Any                       | 返回稳定的 404 或 405，不支持任意上游代理      |
+| 接口                                 | 方法                      | 作用                                                               |
+| ------------------------------------ | ------------------------- | ------------------------------------------------------------------ |
+| `/api/authorize`                     | `POST`                    | 使用服务端 DisasterAware 凭据，只返回鉴权状态                      |
+| `/api/auth/register`                 | `POST`                    | 创建本地账号和服务端会话                                           |
+| `/api/auth/login`                    | `POST`                    | 建立已鉴权会话                                                     |
+| `/api/auth/session`                  | `GET`                     | 恢复当前浏览器会话                                                 |
+| `/api/auth/logout`                   | `POST`                    | 撤销当前会话                                                       |
+| `/api/auth/account`                  | `PATCH` / `DELETE`        | 更新账号或删除账号及其数据                                         |
+| `/api/hazards`                       | `GET`                     | 聚合公开灾害数据，支持 `source` 和 `type` 筛选                     |
+| `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | 管理当前用户自己的对话和消息                                       |
+| `/api/ai/conversations/:id/messages` | `POST`                    | 流式生成并保存 AI 回复                                             |
+| `/api/analytics/*`                   | 多种                      | 代理允许的请求到私有 FastAPI                                       |
+| `/api/hazards/types`                 | `GET`                     | 代理已鉴权的 DisasterAware 类型接口                                |
+| `/api/hazards/active`                | `GET`                     | 代理已鉴权的活动灾害接口                                           |
+| `/api/hazards/active/category/:id`   | `GET`                     | 代理已鉴权的分类灾害接口                                           |
+| 其他 `/api/*`                        | Any                       | 本表不是穷举；已挂载的兼容路由可能处理其他路径，不支持任意上游代理 |
 
 #### Python 分析服务
 

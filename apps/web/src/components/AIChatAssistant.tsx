@@ -9,7 +9,6 @@ import { formatTime, QUICK_PROMPTS } from "../utils/aiAssistant";
 import { useAIChatSession } from "../hooks/useAIChatSession";
 import { useMapState } from "../features/map/state/MapStateContext";
 import { useUIState } from "../state/UIStateContext";
-import AIMemoryManager from "./AIMemoryManager";
 
 // ─── 辅助组件：消息气泡 ───────────────────────────────────────────────────────
 
@@ -23,70 +22,108 @@ const MessageBubble: React.FC<BubbleProps> = ({ msg }) => {
   // 按行格式化粗体、二三级标题、列表和管道分隔行。
   const renderMarkdown = (text: string) => {
     const lines = text.split("\n");
-    return lines.map((line, i) => {
+    const elements: React.ReactNode[] = [];
+    let activeListType: "ordered" | "unordered" | undefined;
+    let listItems: Array<{ html: string; key: number }> = [];
+
+    const flushList = () => {
+      if (!activeListType || listItems.length === 0) return;
+
+      const items = listItems;
+      const listType = activeListType;
+      listItems = [];
+      activeListType = undefined;
+      const renderedItems = items.map(({ html, key }) => (
+        <li
+          key={key}
+          className="ai-md-li"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+        />
+      ));
+
+      elements.push(
+        listType === "ordered" ? (
+          <ol
+            key={`ordered-list-${items[0]?.key ?? elements.length}`}
+            className="ai-md-list ai-md-ol-list"
+          >
+            {renderedItems}
+          </ol>
+        ) : (
+          <ul key={`unordered-list-${items[0]?.key ?? elements.length}`} className="ai-md-list">
+            {renderedItems}
+          </ul>
+        ),
+      );
+    };
+
+    lines.forEach((line, i) => {
       // 标题 **文本**
       const boldLine = line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+      const isUnorderedItem = line.startsWith("- ") || line.startsWith("• ");
+      const isOrderedItem = /^\d+\. /.test(line);
+
+      if (isUnorderedItem || isOrderedItem) {
+        const nextListType = isOrderedItem ? "ordered" : "unordered";
+        if (activeListType !== nextListType) {
+          flushList();
+          activeListType = nextListType;
+        }
+        listItems.push({
+          key: i,
+          html: isOrderedItem ? boldLine.replace(/^\d+\. /, "") : boldLine.replace(/^[-•] /, ""),
+        });
+        return;
+      }
+
+      flushList();
 
       if (line.startsWith("### "))
-        return (
+        elements.push(
           <h4
             key={i}
             className="ai-md-h4"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^### /, "")) }}
-          />
+          />,
         );
-      if (line.startsWith("## "))
-        return (
+      else if (line.startsWith("## "))
+        elements.push(
           <h3
             key={i}
             className="ai-md-h3"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^## /, "")) }}
-          />
+          />,
         );
-      if (line.startsWith("**") && line.endsWith("**") && !line.slice(2, -2).includes("**"))
-        return (
+      else if (line.startsWith("**") && line.endsWith("**") && !line.slice(2, -2).includes("**"))
+        elements.push(
           <p
             key={i}
             className="ai-md-bold-line"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
-          />
+          />,
         );
-      if (line.startsWith("- ") || line.startsWith("• "))
-        return (
-          <li
-            key={i}
-            className="ai-md-li"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine.replace(/^[-•] /, "")) }}
-          />
-        );
-      if (line.match(/^\d+\. /))
-        return (
-          <li
-            key={i}
-            className="ai-md-li ai-md-ol"
-            dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(boldLine.replace(/^\d+\. /, "")),
-            }}
-          />
-        );
-      if (line.startsWith("|") && line.endsWith("|"))
-        return (
+      else if (line.startsWith("|") && line.endsWith("|"))
+        elements.push(
           <div
             key={i}
             className="ai-md-table-row"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
-          />
+          />,
         );
-      if (line === "---") return <hr key={i} className="ai-md-hr" />;
-      if (line.trim() === "") return <div key={i} className="ai-md-spacer" />;
-      return (
-        <p
-          key={i}
-          className="ai-md-p"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
-        />
-      );
+      else if (line === "---") elements.push(<hr key={i} className="ai-md-hr" />);
+      else if (line.trim() === "") elements.push(<div key={i} className="ai-md-spacer" />);
+      else
+        elements.push(
+          <p
+            key={i}
+            className="ai-md-p"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(boldLine) }}
+          />,
+        );
     });
+
+    flushList();
+    return elements;
   };
 
   return (
@@ -121,7 +158,6 @@ const AIChatAssistant: React.FC = () => {
   const { activeModal, closeModal } = useUIState();
   const isOpen = activeModal === "ai";
   const [contextEnabled, setContextEnabled] = useState(true);
-  const [memoryManagerOpen, setMemoryManagerOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -227,13 +263,6 @@ const AIChatAssistant: React.FC = () => {
             </div>
           </div>
           <div className="ai-header-actions">
-            <button
-              className="ai-new-conversation-btn"
-              type="button"
-              onClick={() => setMemoryManagerOpen((open) => !open)}
-            >
-              长期记忆
-            </button>
             {/* 上下文开关 */}
             <button
               className={`ai-ctx-btn ${contextEnabled ? "active" : ""}`}
@@ -243,7 +272,11 @@ const AIChatAssistant: React.FC = () => {
               {contextEnabled ? "📡 上下文已开" : "📡 上下文已关"}
             </button>
 
-            <button className="ai-new-conversation-btn" onClick={() => void newConversation()}>
+            <button
+              className="ai-new-conversation-btn"
+              onClick={() => void newConversation()}
+              disabled={isLoadingConversations}
+            >
               ＋ 新对话
             </button>
 
@@ -286,9 +319,9 @@ const AIChatAssistant: React.FC = () => {
             <button
               className="ai-delete-conversation-btn"
               type="button"
-              disabled={isStreaming}
+              disabled={isStreaming || isLoadingConversations}
               onClick={() => {
-                if (window.confirm("删除这条会话？已保存的长期记忆会保留。")) {
+                if (window.confirm("删除这条会话？聊天记录将被永久删除。")) {
                   void removeConversation(currentConversationId);
                 }
               }}
@@ -299,11 +332,6 @@ const AIChatAssistant: React.FC = () => {
           )}
           {isLoadingConversations && <span className="ai-conversation-loading">正在加载…</span>}
         </div>
-        <AIMemoryManager
-          open={memoryManagerOpen}
-          conversationId={currentConversationId}
-          onClose={() => setMemoryManagerOpen(false)}
-        />
 
         {/* ── 消息区域 ── */}
         <div className="ai-messages">
@@ -341,7 +369,7 @@ const AIChatAssistant: React.FC = () => {
                   key={i}
                   className="ai-quick-btn"
                   onClick={() => void send(p.text)}
-                  disabled={isStreaming}
+                  disabled={isStreaming || isLoadingConversations}
                 >
                   {p.label}
                 </button>
@@ -361,12 +389,12 @@ const AIChatAssistant: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder="输入灾害分析问题……（按 Enter 发送，按 Shift+Enter 换行）"
               rows={2}
-              disabled={isStreaming}
+              disabled={isStreaming || isLoadingConversations}
             />
             <button
               type="submit"
               className={`ai-send-btn ${isStreaming ? "loading" : ""}`}
-              disabled={!input.trim() || isStreaming}
+              disabled={!input.trim() || isStreaming || isLoadingConversations}
               title="发送"
             >
               {isStreaming ? (
@@ -389,7 +417,7 @@ const AIChatAssistant: React.FC = () => {
           </div>
           <p className="ai-hint">
             {isStreaming
-              ? "🔄 AI 正在生成分析结果……"
+              ? "AI 正在生成分析结果……"
               : "按 Enter 发送 · 按 Shift+Enter 换行 · 按 ESC 关闭"}
           </p>
         </form>

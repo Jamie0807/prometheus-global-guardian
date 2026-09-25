@@ -71,6 +71,7 @@ export function useAIChatSession(
   const activeRequestRef = useRef<ActiveRequest | undefined>(undefined);
   const requestSequenceRef = useRef(0);
   const selectionSequenceRef = useRef(0);
+  const conversationListGenerationRef = useRef(0);
 
   const stop = useCallback(() => {
     const active = activeRequestRef.current;
@@ -91,53 +92,97 @@ export function useAIChatSession(
     setIsStreaming(false);
   }, []);
 
-  const loadConversation = useCallback(async (id: string): Promise<void> => {
+  const loadConversation = useCallback(async (id: string): Promise<number> => {
     const selection = ++selectionSequenceRef.current;
     const conversation = await getAIConversation(id);
-    if (selection !== selectionSequenceRef.current) return;
-    setCurrentConversationId(conversation.id);
-    setMessages(conversation.messages);
-    setErrorText("");
-    setRetrySnapshot(undefined);
+    if (selection === selectionSequenceRef.current) {
+      setCurrentConversationId(conversation.id);
+      setMessages(conversation.messages);
+      setErrorText("");
+      setRetrySnapshot(undefined);
+    }
+    return selection;
   }, []);
 
   const refreshConversations = useCallback(async (): Promise<AIConversationSummary[]> => {
+    const generation = ++conversationListGenerationRef.current;
     const current = await listAIConversations();
-    setConversations(current);
+    if (generation === conversationListGenerationRef.current) {
+      setConversations(current);
+    }
     return current;
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    const selection = ++selectionSequenceRef.current;
+    const listGeneration = ++conversationListGenerationRef.current;
+    setCurrentConversationId(undefined);
+    setMessages([]);
+    setRetrySnapshot(undefined);
+    setErrorText("");
     setIsLoadingConversations(true);
     void (async () => {
       try {
         const current = await listAIConversations();
-        if (cancelled) return;
+        if (
+          cancelled ||
+          selection !== selectionSequenceRef.current ||
+          listGeneration !== conversationListGenerationRef.current
+        ) {
+          return;
+        }
         setConversations(current);
         const latest = current[0];
         if (latest) {
           const conversation = await getAIConversation(latest.id);
-          if (!cancelled) {
+          if (
+            !cancelled &&
+            selection === selectionSequenceRef.current &&
+            listGeneration === conversationListGenerationRef.current
+          ) {
             setCurrentConversationId(conversation.id);
             setMessages(conversation.messages);
           }
-        } else {
+        } else if (
+          !cancelled &&
+          selection === selectionSequenceRef.current &&
+          listGeneration === conversationListGenerationRef.current
+        ) {
           setCurrentConversationId(undefined);
           setMessages([]);
         }
-        setErrorText("");
-        setRetrySnapshot(undefined);
+        if (
+          !cancelled &&
+          selection === selectionSequenceRef.current &&
+          listGeneration === conversationListGenerationRef.current
+        ) {
+          setErrorText("");
+          setRetrySnapshot(undefined);
+        }
       } catch {
-        if (!cancelled) setErrorText("无法加载历史会话，请重试。");
+        if (
+          !cancelled &&
+          selection === selectionSequenceRef.current &&
+          listGeneration === conversationListGenerationRef.current
+        ) {
+          setErrorText("无法加载历史会话，请重试。");
+        }
       } finally {
-        if (!cancelled) setIsLoadingConversations(false);
+        if (
+          !cancelled &&
+          selection === selectionSequenceRef.current &&
+          listGeneration === conversationListGenerationRef.current
+        ) {
+          setIsLoadingConversations(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
       selectionSequenceRef.current += 1;
+      conversationListGenerationRef.current += 1;
     };
   }, [isOpen]);
 
@@ -256,7 +301,7 @@ export function useAIChatSession(
   const send = useCallback(
     async (text: string): Promise<void> => {
       const content = text.trim();
-      if (!content || activeRequestRef.current) return;
+      if (!content || activeRequestRef.current || isLoadingConversations) return;
       if (content.length > MAX_MESSAGE_CHARACTERS) {
         setErrorText(`单条消息不能超过 ${MAX_MESSAGE_CHARACTERS} 个字符。`);
         return;
@@ -264,13 +309,26 @@ export function useAIChatSession(
 
       setInput("");
       setErrorText("");
+      let creationSelection: number | undefined;
+      let creationListGeneration: number | undefined;
       try {
         let conversationId = currentConversationId;
         if (!conversationId) {
+          creationSelection = ++selectionSequenceRef.current;
+          creationListGeneration = ++conversationListGenerationRef.current;
+          setIsLoadingConversations(true);
+          setCurrentConversationId(undefined);
           const conversation = await createAIConversation();
+          if (
+            creationSelection !== selectionSequenceRef.current ||
+            creationListGeneration !== conversationListGenerationRef.current
+          ) {
+            return;
+          }
           conversationId = conversation.id;
           setCurrentConversationId(conversation.id);
           setConversations((current) => [conversation, ...current]);
+          setIsLoadingConversations(false);
         }
         const clientMessageId = generateMessageId();
         const userMessage: ChatMessage = {
@@ -282,11 +340,19 @@ export function useAIChatSession(
         };
         await start({ conversationId, clientMessageId, userMessage, context }, true);
       } catch {
+        if (
+          (creationSelection !== undefined && creationSelection !== selectionSequenceRef.current) ||
+          (creationListGeneration !== undefined &&
+            creationListGeneration !== conversationListGenerationRef.current)
+        ) {
+          return;
+        }
+        if (creationSelection !== undefined) setIsLoadingConversations(false);
         setInput(content);
         setErrorText("无法创建会话，请稍后重试。");
       }
     },
-    [context, currentConversationId, start],
+    [context, currentConversationId, isLoadingConversations, start],
   );
 
   const retry = useCallback(async (): Promise<void> => {
@@ -296,17 +362,40 @@ export function useAIChatSession(
 
   const newConversation = useCallback(async (): Promise<void> => {
     stop();
+    const selection = ++selectionSequenceRef.current;
+    const listGeneration = ++conversationListGenerationRef.current;
+    setIsLoadingConversations(true);
+    setCurrentConversationId(undefined);
     setMessages([]);
     setInput("");
     setErrorText("");
     setRetrySnapshot(undefined);
     try {
       const conversation = await createAIConversation();
+      if (
+        selection !== selectionSequenceRef.current ||
+        listGeneration !== conversationListGenerationRef.current
+      ) {
+        return;
+      }
       setConversations((current) => [conversation, ...current]);
       setCurrentConversationId(conversation.id);
     } catch {
+      if (
+        selection !== selectionSequenceRef.current ||
+        listGeneration !== conversationListGenerationRef.current
+      ) {
+        return;
+      }
       setCurrentConversationId(undefined);
       setErrorText("无法创建新会话，请稍后重试。");
+    } finally {
+      if (
+        selection === selectionSequenceRef.current &&
+        listGeneration === conversationListGenerationRef.current
+      ) {
+        setIsLoadingConversations(false);
+      }
     }
   }, [stop]);
 
@@ -314,13 +403,21 @@ export function useAIChatSession(
     async (id: string): Promise<void> => {
       if (id === currentConversationId || isStreaming) return;
       stop();
+      const selection = selectionSequenceRef.current + 1;
+      setCurrentConversationId(undefined);
+      setMessages([]);
+      setRetrySnapshot(undefined);
       setIsLoadingConversations(true);
       try {
-        await loadConversation(id);
+        const loadedSelection = await loadConversation(id);
+        if (loadedSelection === selectionSequenceRef.current) {
+          setIsLoadingConversations(false);
+        }
       } catch {
-        setErrorText("无法加载所选会话。");
-      } finally {
-        setIsLoadingConversations(false);
+        if (selection === selectionSequenceRef.current) {
+          setErrorText("无法加载所选会话。");
+          setIsLoadingConversations(false);
+        }
       }
     },
     [currentConversationId, isStreaming, loadConversation, stop],
@@ -328,23 +425,61 @@ export function useAIChatSession(
 
   const removeConversation = useCallback(
     async (id: string): Promise<void> => {
+      const isCurrentConversation = currentConversationId === id;
+      const deletionSelection = isCurrentConversation ? ++selectionSequenceRef.current : undefined;
+      const deletionListGeneration = ++conversationListGenerationRef.current;
+      let nextLoadSelection: number | undefined;
+      if (isCurrentConversation) {
+        stop();
+        setCurrentConversationId(undefined);
+        setMessages([]);
+        setRetrySnapshot(undefined);
+        setIsLoadingConversations(true);
+      }
       try {
         await deleteAIConversation(id);
         const remaining = conversations.filter((conversation) => conversation.id !== id);
+        if (deletionListGeneration !== conversationListGenerationRef.current) return;
+        if (!isCurrentConversation) {
+          setConversations(remaining);
+          return;
+        }
+        if (
+          deletionSelection !== selectionSequenceRef.current ||
+          deletionListGeneration !== conversationListGenerationRef.current
+        ) {
+          return;
+        }
         setConversations(remaining);
-        if (currentConversationId === id) {
-          const next = remaining[0];
-          if (next) await loadConversation(next.id);
-          else {
-            setCurrentConversationId(undefined);
-            setMessages([]);
-          }
+        const next = remaining[0];
+        if (!next) {
+          setIsLoadingConversations(false);
+          return;
+        }
+        nextLoadSelection = selectionSequenceRef.current + 1;
+        const loadedSelection = await loadConversation(next.id);
+        if (
+          loadedSelection === selectionSequenceRef.current &&
+          deletionListGeneration === conversationListGenerationRef.current
+        ) {
+          setIsLoadingConversations(false);
         }
       } catch {
+        const selectionIsCurrent = isCurrentConversation
+          ? deletionSelection === selectionSequenceRef.current ||
+            nextLoadSelection === selectionSequenceRef.current
+          : true;
+        if (
+          !selectionIsCurrent ||
+          deletionListGeneration !== conversationListGenerationRef.current
+        ) {
+          return;
+        }
         setErrorText("无法删除会话，请重试。");
+        if (isCurrentConversation) setIsLoadingConversations(false);
       }
     },
-    [conversations, currentConversationId, loadConversation],
+    [conversations, currentConversationId, loadConversation, stop],
   );
 
   const close = useCallback(() => {

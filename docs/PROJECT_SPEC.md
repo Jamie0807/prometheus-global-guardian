@@ -23,7 +23,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 在 Mapbox 地图和分析界面中消费同一灾害状态；
 - 通过 FastAPI 提供统计、预测、风险、ETL、质量、统一模型和透视分析；
 - 通过 Express BFF 完成 DisasterAware 服务端授权、受限代理、多源灾害聚合和 AI 流式代理；
-- 通过 PostgreSQL/Prisma 提供账号注册、服务端会话、全站 API 登录门禁、账号隔离的 AI 对话/消息以及用户控制的长期记忆；Analytics 浏览器请求经 BFF allowlist 代理并使用服务间令牌访问 FastAPI；
+- 通过 PostgreSQL/Prisma 提供账号注册、服务端会话、全站 API 登录门禁、账号隔离的 AI 对话、消息和有界同会话摘要；Analytics 浏览器请求经 BFF allowlist 代理并使用服务间令牌访问 FastAPI；
 - 通过 BFF 的 `meta.sources[]` 为 DisasterAware、USGS、NASA EONET 和 GDACS 输出固定五分钟窗口的进程内来源健康快照；
 - 通过前端 Service 运行时解析、Python Pydantic 模型和共享 JSON 样本维护 Analytics 输入边界；
 - 通过 `packages/hazard-domain/` 与 `packages/contracts/hazard-event.json` 维护统一事件/图层注册表，通过 `@pgg/hazard-domain` 公共入口向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
@@ -82,7 +82,7 @@ flowchart LR
   BFF --> Ark
 ```
 
-浏览器的业务 API 统一经同源 `/api/*` 进入 Express BFF。BFF 校验用户会话并执行资源授权；Analytics 请求再由 BFF 通过 allowlist 和服务间令牌转发至 FastAPI。BFF 将用户、会话、AI 对话和记忆写入 PostgreSQL。
+浏览器的业务 API 统一经同源 `/api/*` 进入 Express BFF。BFF 校验用户会话并执行资源授权；Analytics 请求再由 BFF 通过 allowlist 和服务间令牌转发至 FastAPI。BFF 将账号、会话、AI 对话、消息和有界同会话摘要写入 PostgreSQL。
 
 浏览器不得接收 DisasterAware 用户名、密码或 access token，不得接收 AI Provider key，也不得接收 Python 管理令牌。上述值只能由相应服务端运行时读取。前端所需公开配置使用 `VITE_*`，并在客户端构建时写入产物。
 
@@ -164,7 +164,7 @@ BFF 的公开应用职责包括：
 | `/api/authorize`                   | `POST` | 使用服务端 DisasterAware 凭据获取上游 token，仅向浏览器返回授权状态。                     |
 | `/api/auth/register`、`/login`     | `POST` | 注册和登录；仅这些认证入口不要求已有用户会话。                                            |
 | `/api/auth/session`                | `GET`  | 校验 HttpOnly Cookie 并恢复当前用户会话。                                                 |
-| `/api/auth/logout`、`/account`     | 多种   | 撤销会话、修改账号偏好或验证密码后删除账号。                                              |
+| `/api/auth/logout`、`/account`     | 多种   | 撤销会话、更新账号或验证密码后删除账号。                                                  |
 | `/api/hazards`                     | `GET`  | 优先使用 DisasterAware，失败时聚合 USGS、NASA EONET 和 GDACS；返回 hazards 与来源元数据。 |
 | `/api/hazards/types`               | `GET`  | 代理允许的 DisasterAware 类型端点。                                                       |
 | `/api/hazards/active`              | `GET`  | 代理允许的活动灾害端点。                                                                  |
@@ -172,9 +172,8 @@ BFF 的公开应用职责包括：
 | `/api/analytics/*`                 | 多种   | 限定路径与方法，将业务请求代理到私有 FastAPI。                                            |
 | `/api/ai/conversations*`           | 多种   | 用户隔离的会话和消息读取、创建、删除与流式生成。                                          |
 | `/api/ai/cancel`                   | `POST` | 取消当前用户正在进行的 AI 生成，并将助手消息标记为失败/取消终态。                         |
-| `/api/ai/memories*`                | 多种   | 用户记忆与待确认记忆建议管理。                                                            |
 
-其他 `/api/*` 路径或不允许的方法返回稳定的 404 或 405，不构成任意上游代理。
+以上是主要公开接口概览，并非所有 API 路径的穷举；已挂载的兼容路由可能处理未列出的路径。不支持任意上游代理，未列路径的响应不能由本文档推断为统一状态码。
 
 BFF 执行以下请求边界：
 
@@ -298,11 +297,11 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 
 ### 8.3 AI 流式会话
 
-浏览器向 `POST /api/ai/conversations/:conversationId/messages` 发送单条新消息和灾害上下文。BFF 按当前 `userId` 读取会话与历史消息，执行上下文预算、摘要和已确认长期记忆注入，然后选择 Provider；助手流和最终结果均写入 PostgreSQL。路由模式根据知识库、灾害领域和实时上下文信号选择优先 Provider；强制模式固定使用 workflow 或 Ark。首选 Provider 在响应开始前失败时，BFF 才尝试另一个 Provider。
+浏览器向 `POST /api/ai/conversations/:conversationId/messages` 发送单条新消息和灾害上下文；聊天消息自动保存。BFF 按当前 `userId` 只读取目标会话与其历史消息，执行同会话上下文预算和摘要压缩，然后选择 Provider；同一会话超过预算时，较早消息进入有界摘要，原始消息仍保留。新建会话不会读取其他会话的消息或摘要。助手流和最终结果均写入 PostgreSQL。路由模式根据知识库、灾害领域和实时上下文信号选择优先 Provider；强制模式固定使用 workflow 或 Ark。首选 Provider 在响应开始前失败时，BFF 才尝试另一个 Provider。
 
-前端只在 React state 中维护当前呈现状态；用户拥有的对话和消息保存在 PostgreSQL，刷新后可重新加载，用户之间通过所有权查询隔离。同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；Hook 的本地请求序号防止迟到 chunk 写入新请求，Service 为每次 SSE 逻辑请求生成随机请求 ID 并在自动重连中复用。手动重试使用同一客户端消息 ID，不重复追加用户消息。服务端模型上下文限制为 48 KiB，保留当前输入和近期完整轮次，并为被裁剪的较早轮次更新摘要；原始消息仍保存。单条用户输入上限为 8,000 字符。
+前端只在 React state 中维护当前呈现状态；用户拥有的对话、消息和有界同会话摘要保存在 PostgreSQL，聊天记录自动保存，刷新后可重新加载，用户之间通过所有权查询隔离。同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；Hook 的本地请求序号防止迟到 chunk 写入新请求，Service 为每次 SSE 逻辑请求生成随机请求 ID 并在自动重连中复用。手动重试使用同一客户端消息 ID，不重复追加用户消息。服务端模型上下文限制为 48 KiB，保留当前输入和近期完整轮次，并为被裁剪的较早轮次更新当前会话摘要；原始消息仍保存。单条用户输入上限为 8,000 字符。
 
-客户端 SSE parser 支持 CRLF、注释心跳、多行 `data` 和任意 UTF-8 字节分割，以 `[DONE]` 作为完成标记。网络异常、读取异常或没有 `[DONE]` 的 EOF 会在有限次数内使用相同请求 ID 和 `Last-Event-ID` 自动恢复，并按事件 ID 去重；显式 provider 错误和 HTTP 错误不自动重试。BFF 在单实例短时有界内存会话中缓存已转换事件，恢复窗口结束后返回稳定过期错误。Provider 配置缺失的特定 503 错误触发浏览器本地 Demo 流；provider-backed 回复按流检查点和终态写入数据库，其他上游正文不会直接展示给用户。长期记忆仅在用户显式生成并逐条接受后进入上下文。
+客户端 SSE parser 支持 CRLF、注释心跳、多行 `data` 和任意 UTF-8 字节分割，以 `[DONE]` 作为完成标记。网络异常、读取异常或没有 `[DONE]` 的 EOF 会在有限次数内使用相同请求 ID 和 `Last-Event-ID` 自动恢复，并按事件 ID 去重；显式 provider 错误和 HTTP 错误不自动重试。BFF 在单实例短时有界内存会话中缓存已转换事件，恢复窗口结束后返回稳定过期错误。Provider 配置缺失的特定 503 错误触发浏览器本地 Demo 流；provider-backed 回复按流检查点和终态写入数据库，其他上游正文不会直接展示给用户。上下文只使用当前会话及其摘要，不注入跨会话的持久内容。
 
 ## 9. 跨语言契约与测试责任
 
@@ -443,7 +442,7 @@ Compose 中：
 
 ### 14.2 AI 与会话
 
-- 用户账号、登录会话、对话、消息、摘要和确认后的记忆保存在 PostgreSQL，并通过所有者 ID 查询；SSE 续传事件缓存仍是单实例短时内存状态，不支持跨实例恢复或审计存储；
+- 用户账号、登录会话、对话、消息和有界同会话摘要保存在 PostgreSQL，并通过所有者 ID 查询；原始消息保留，摘要只服务当前会话；SSE 续传事件缓存仍是单实例短时内存状态，不支持跨实例恢复或审计存储；
 - Provider 降级只发生在单次请求响应开始前，没有健康探测、熔断、持久化失败计数或用户/模型配额；
 - 已建立的上游 SSE 若中途失败，BFF 发布安全 `event: error` 并结束会话；客户端不会把明确 provider 错误自动重试，传输异常则按有限次数自动恢复。
 

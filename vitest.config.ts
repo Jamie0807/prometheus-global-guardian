@@ -19,6 +19,7 @@ export default defineConfig({
     include: [
       "apps/web/tests/services/**/*.test.ts",
       "apps/bff/tests/service-*.test.ts",
+      "apps/bff/tests/context-manager.test.ts",
       "apps/bff/tests/server-hazard-event-registry.test.ts",
       "tests/integration/**/*.test.ts",
       "infra/persistence/tests/**/*.test.ts",

@@ -631,12 +631,7 @@ export function registerAIChatRoute(
 
     let preparedContext: Awaited<ReturnType<typeof prepareAIContext>>;
     try {
-      preparedContext = await prepareAIContext(
-        userId,
-        conversation,
-        persistedUserMessage.id,
-        content,
-      );
+      preparedContext = await prepareAIContext(conversation, persistedUserMessage.id);
     } catch {
       await persistAssistant("FAILED").catch(() => undefined);
       res.status(503).json({
@@ -648,7 +643,7 @@ export function registerAIChatRoute(
     }
     const disasterContext = {
       ...(getDisasterContext(body) ?? {}),
-      persistentNotes: preparedContext.persistentNotes,
+      conversationSummary: preparedContext.conversationSummary,
     };
 
     let selectedController: AbortController | undefined;
