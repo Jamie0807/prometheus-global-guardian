@@ -15,11 +15,11 @@
 | `pnpm run test:component`     | React 组件测试   | 使用 Vitest、React Testing Library 和 jsdom 测试用户可观察的组件行为                   |
 | `pnpm run test:e2e`           | 浏览器冒烟测试   | 构建并启动本地生产服务，用 Playwright 验证 `apps/web/tests/e2e` 中的关键流程           |
 | `pnpm run test:python`        | Python API 测试  | 运行分析服务 `tests/test_*.py` 的 unittest 测试集                                      |
-| `pnpm run check:architecture` | 架构边界检查     | 检查共享包元数据、根目录契约残留和包与运行单元的相对导入方向                           |
+| `pnpm run check:architecture` | 架构边界检查     | 检查共享包元数据、根目录编排文件、兼容入口和包与运行单元的相对导入方向                 |
 | `pnpm run check:docker`       | Docker 配置检查  | 校验本地完整栈 Compose 与隔离测试数据库覆盖配置，不启动服务                            |
 | `pnpm run test:baseline`      | 完整 Node 基线   | 依次执行 lint、格式、客户端/服务端/契约类型检查、架构检查、unit、component、E2E 和构建 |
 
-`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`、`check:architecture` 和 `check:docker`，但不包含 Python 测试。`check:architecture` 检查 Web、BFF、Analytics 三个运行单元入口、旧目录残留、依赖方向、共享包反向导入运行单元及生产代码对共享包内部模块的引用，同时检查 Docker 编排文件的归属入口。Web 与 BFF 通过 `@pgg/hazard-domain` 公共入口使用共享领域包。Web 入口为 `apps/web/index.html`，BFF 入口为 `apps/bff/index.ts`，Analytics 入口为 `services/analytics/main.py`；Vite 产物位于根 `dist/`，BFF 编译入口为 `dist-server/apps/bff/index.js`。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `tooling/node/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
+`test:baseline` 是完整 Node 质量基线，包含 `typecheck:contracts`、`check:architecture` 和 `check:docker`，但不包含 Python 测试。`check:architecture` 检查 Web、BFF、Analytics 三个运行单元入口、旧目录残留、根目录编排文件、pnpm 单一锁文件、依赖方向、共享包反向导入运行单元及生产代码对共享包内部模块的引用，同时检查 Docker 编排文件的归属入口。Web 与 BFF 通过 `@pgg/hazard-domain` 公共入口使用共享领域包。Web 入口为 `apps/web/index.html`，BFF 入口为 `apps/bff/index.ts`，Analytics 入口为 `services/analytics/main.py`；Vite 产物位于根 `dist/`，BFF 编译入口为 `dist-server/apps/bff/index.js`。BFF 认证、对话持久化和迁移用例需要 PostgreSQL，运行前需设置测试专用 `DATABASE_URL` 并应用 `pnpm run db:migrate:deploy`；不要把开发或生产数据用于测试。GitHub Actions 启动一次性 PostgreSQL 服务，显式运行架构检查并应用仓库迁移。`test:python` 由 CI 的独立 Python job 在安装依赖后的 Python 3.13 环境执行。任一命令失败都会终止后续基线步骤。项目命令通过 `tooling/node/with-node-version.sh` 使用 `.nvmrc` 中的 Node.js 版本。
 
 测试文件按边界归档：Web Service、组件和端到端测试位于 `apps/web/tests/`，BFF Node 与 Vitest 测试位于 `apps/bff/tests/`，契约类型测试位于 `packages/contracts/tests/type-tests/`，跨运行单元检查位于 `tests/integration/`，持久化运维测试位于 `infra/persistence/tests/`。
 

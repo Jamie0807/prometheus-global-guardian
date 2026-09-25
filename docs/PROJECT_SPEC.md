@@ -364,7 +364,7 @@ Compose 中：
 | `pnpm run typecheck:client`        | 客户端 TypeScript 类型检查。                                                                       |
 | `pnpm run typecheck:server`        | Express BFF TypeScript 类型检查。                                                                  |
 | `pnpm run typecheck:contracts`     | TypeScript 契约正反例类型检查。                                                                    |
-| `pnpm run check:architecture`      | 检查共享包元数据、契约唯一目录和共享包与运行单元的导入方向。                                       |
+| `pnpm run check:architecture`      | 检查共享包元数据、根目录编排文件、契约唯一目录和共享包与运行单元的导入方向。                       |
 | `pnpm run check:docker`            | 校验根 Compose 与测试覆盖 Compose 的配置结构，不启动服务或访问数据卷。                             |
 | `pnpm test` / `pnpm run test:unit` | 串行执行 BFF Node 测试和前端 Service Vitest。                                                      |
 | `pnpm run test:component`          | React Testing Library + jsdom 组件测试。                                                           |
