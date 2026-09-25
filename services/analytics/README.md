@@ -21,7 +21,7 @@ Express BFF -- authorization, hazards, AI --> external providers
 从仓库根目录启动：
 
 ```bash
-./scripts/start-python-service.sh
+./services/analytics/start-service.sh
 ```
 
 或手动启动：

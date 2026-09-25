@@ -26,7 +26,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 通过 PostgreSQL/Prisma 提供账号注册、服务端会话、全站 API 登录门禁、账号隔离的 AI 对话/消息以及用户控制的长期记忆；Analytics 浏览器请求经 BFF allowlist 代理并使用服务间令牌访问 FastAPI；
 - 通过 BFF 的 `meta.sources[]` 为 DisasterAware、USGS、NASA EONET 和 GDACS 输出固定五分钟窗口的进程内来源健康快照；
 - 通过前端 Service 运行时解析、Python Pydantic 模型和共享 JSON 样本维护 Analytics 输入边界；
-- 通过 `packages/hazard-domain/` 与 `packages/contracts/hazard-event.json` 维护统一事件/图层注册表，`shared/hazards/` 保留兼容入口，向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
+- 通过 `packages/hazard-domain/` 与 `packages/contracts/hazard-event.json` 维护统一事件/图层注册表，通过 `@pgg/hazard-domain` 公共入口向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
 - 通过 lint、格式检查、TypeScript 类型检查、多层自动化测试和构建命令执行质量检查。
 
 当前仓库没有部署工作流，Docker Compose 只定义本地完整栈启动方式。以下能力不属于当前已实现范围：
@@ -118,7 +118,7 @@ flowchart LR
 | `apps/bff/analytics/`                                    | 认证后的 Analytics allowlist BFF 代理。                                     |
 | `apps/bff/hazards/`                                      | 公共灾害源获取、适配、缓存和聚合。                                          |
 | `apps/bff/security/`                                     | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                      |
-| `shared/hazards/`                                        | BFF 迁移期旧导入路径的兼容转导出，指向灾害领域共享包中的实现。              |
+| `packages/hazard-domain/`                                | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
 | `services/analytics/app/`                                | FastAPI 应用工厂、core、routes、schemas 和应用服务。                        |
 | `services/analytics/analytics/`                          | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                       |
 | `packages/contracts/`                                    | Analytics 与统一灾害事件的跨语言契约样本。                                  |
@@ -239,7 +239,7 @@ FastAPI CORS 默认使用显式 localhost 来源列表，可由逗号分隔的 `
 - BFF 当前对路径、方法和转发 header 使用 allowlist，query 仅限制形状、数量和长度并会原样转发；AI 请求会校验已知字段但尚不拒绝所有未知字段。新增上游能力必须明确输入限制、超时、响应上限、错误契约与测试；
 - Python 新接口按 `schema -> route -> service -> analytics` 方向接入。算法函数不能因 HTTP 需求改变为读取 request、环境变量或全局应用对象；
 - 共享输入变化先更新 `packages/contracts/` 工件与双端测试，再调整 TypeScript Service 和 Python schema；不得只修改一端以维持表面兼容；
-- `packages/*` 不能用相对路径反向导入 `apps/web/src/`、`apps/bff/`、`apps/` 或 `services/`；`apps/web/src/`、`apps/bff/`、`shared/` 的生产代码不能直接导入 `packages/hazard-domain/src/` 内部模块。Web 应通过 `@pgg/hazard-domain` 公共入口使用该包。仅 `shared/hazards/hazard-event.ts` 和 `shared/hazards/hazard-layer-registry.ts` 的 BFF 兼容转导出是迁移期例外；
+- `packages/*` 不能用相对路径反向导入 `apps/web/src/`、`apps/bff/`、`apps/` 或 `services/`；`apps/web/src/`、`apps/bff/` 的生产代码不能直接导入 `packages/hazard-domain/src/` 内部模块。Web 和 BFF 应通过 `@pgg/hazard-domain` 公共入口使用该包；
 - 同一业务语义在不同层可有不同数据表示，但转换只能在边界 adapter、parser 或 schema 中发生，不能散落在 UI 和路由条件分支中。
 
 ### 7.6 类型、错误和日志细则
@@ -302,7 +302,7 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 
 `packages/contracts/analytics-hazard-data.json` 与 `packages/contracts/hazard-event.json` 是 TypeScript 与 Python 共同读取的 Analytics 灾害输入和统一事件样本。双方不互相导入实现代码：
 
-- TypeScript 侧由 `formatHazards`、运行时 parser 和 `tests/service-cross-language-hazard-contract.test.ts` 验证；
+- TypeScript 侧由 `formatHazards`、运行时 parser 和 `tests/integration/service-cross-language-hazard-contract.test.ts` 验证；
 - Python 侧由 Pydantic `HazardData`、请求模型和 `services/analytics/tests/test_cross_language_hazard_contract.py` 验证；
 - 修改共同输入字段、默认值、长度、坐标、数值或未知字段策略时，必须同步更新共享样本和双端测试；
 - Analytics 响应由 Python 统一 helper 生成版本化成功/错误信封，前端 parser 对元数据成组校验并保留迁移期旧响应兼容；双方共同读取 `packages/contracts/analytics-response-envelope.json`、`packages/contracts/analytics-error-envelope.json` 和 `packages/contracts/hazard-event.json`。`data` 内部业务字段和 4D 扩展仍由各领域 parser 维护，不能据此推断复杂几何或历史回放已经完成。
@@ -322,16 +322,16 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 
 ### 11.1 本地命令
 
-| 命令                                | 当前作用                                                                                              |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                          | 通过项目 Node 版本包装脚本启动 Vite。Vite 配置将 `/api/ai` 和 `/api` 转发到 `http://localhost:8080`。 |
-| `pnpm run db:generate`              | 从 Prisma schema 生成服务端 Prisma Client。                                                           |
-| `pnpm run db:migrate:deploy`        | 显式应用 PostgreSQL 版本化迁移；服务启动不会自动迁移。                                                |
-| `pnpm run build:server`             | 生成 Prisma Client 并编译 Express BFF。                                                               |
-| `pnpm start`                        | 运行 `dist-server/apps/bff/index.js`；BFF 默认监听 8080，并托管 `dist` 与 SPA 回退。                  |
-| `./scripts/start-python-service.sh` | 启动本地 Python Analytics 服务。                                                                      |
-| `pnpm build`                        | 顺序执行 Vite 客户端构建和 BFF TypeScript 编译。                                                      |
-| `docker compose up --build`         | 构建并启动本地完整栈。                                                                                |
+| 命令                                    | 当前作用                                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                              | 通过项目 Node 版本包装脚本启动 Vite。Vite 配置将 `/api/ai` 和 `/api` 转发到 `http://localhost:8080`。 |
+| `pnpm run db:generate`                  | 从 Prisma schema 生成服务端 Prisma Client。                                                           |
+| `pnpm run db:migrate:deploy`            | 显式应用 PostgreSQL 版本化迁移；服务启动不会自动迁移。                                                |
+| `pnpm run build:server`                 | 生成 Prisma Client 并编译 Express BFF。                                                               |
+| `pnpm start`                            | 运行 `dist-server/apps/bff/index.js`；BFF 默认监听 8080，并托管 `dist` 与 SPA 回退。                  |
+| `./services/analytics/start-service.sh` | 启动本地 Python Analytics 服务。                                                                      |
+| `pnpm build`                            | 顺序执行 Vite 客户端构建和 BFF TypeScript 编译。                                                      |
+| `docker compose up --build`             | 构建并启动本地完整栈。                                                                                |
 
 `vite.config.ts` 没有显式固定浏览器开发服务器端口，因此具体开发端口不作为本规格的配置契约。
 
@@ -455,7 +455,7 @@ Compose 中：
 - 新增接口前先定义输入、输出、失败语义和测试，再接入页面或路由；
 - 外部 JSON、浏览器事件和网络响应保持 `unknown` 边界，解析成功后再进入领域类型；
 - 调整 Analytics 共同输入时同步修改共享 JSON 样本和 TypeScript/Python 双端测试；
-- 统一灾害事件字段以 `packages/hazard-domain/` 和 `packages/contracts/hazard-event.json` 为边界；`shared/hazards/` 仅保留迁移期兼容入口；未知来源或图层回退为 `unknown`，旧字段兼容不得扩大到未经校验的原始文本；
+- 统一灾害事件字段以 `packages/hazard-domain/` 和 `packages/contracts/hazard-event.json` 为边界；旧共享兼容目录已删除；未知来源或图层回退为 `unknown`，旧字段兼容不得扩大到未经校验的原始文本；
 - 服务端凭据只由 BFF 或 Python 运行时读取，不得进入 `VITE_*` 或前端构建产物；
 - 新增 BFF 上游能力时继续采用显式路径、方法、query、body、header、超时和响应大小边界；
 - 不部署阶段优先保持测试可复现和提交边界清晰；身份、共享限流、集中观测和告警在决定公网部署时单独设计；
@@ -467,7 +467,7 @@ Compose 中：
 
 - 运行与构建：`package.json`、`.nvmrc`、`vite.config.ts`、`Dockerfile`、`docker-compose.yml`、`.github/workflows/quality.yml`；
 - React 与 Service：`apps/web/src/App.tsx`、`apps/web/src/state/`、`apps/web/src/features/`、`apps/web/src/services/`、`apps/web/src/hooks/useAIChatSession.ts`；
-- Express BFF：`apps/bff/index.ts`、`apps/bff/ai/`、`apps/bff/hazards/`、`apps/bff/security/`、`shared/logging.ts`；
+- Express BFF：`apps/bff/index.ts`、`apps/bff/ai/`、`apps/bff/hazards/`、`apps/bff/security/`、`packages/logging/`；
 - Python：`services/analytics/app/`、`services/analytics/analytics/`、`services/analytics/security.py`、`services/analytics/log_config.py`；
-- 契约与测试：`packages/hazard-domain/`、`shared/hazards/` 兼容入口、`packages/contracts/analytics-hazard-data.json`、`packages/contracts/hazard-event.json`、`tests/`、`services/analytics/tests/`；
+- 契约与测试：`packages/hazard-domain/`、`packages/logging/`、`packages/contracts/analytics-hazard-data.json`、`packages/contracts/hazard-event.json`、`apps/web/tests/`、`apps/bff/tests/`、`tests/integration/`、`infra/persistence/tests/`、`services/analytics/tests/`；
 - 持续维护文档：`README.md`、`services/analytics/README.md`、`docs/TESTING_BASELINE.md`、`docs/PROJECT_OPTIMIZATION_BACKLOG.md`、`AGENTS.md`。

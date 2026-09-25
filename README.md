@@ -149,7 +149,7 @@ Frontend state ownership is deliberately small and explicit:
 | pnpm    | `10.15.1`                      |
 | Python  | 3.13 recommended for analytics |
 
-The repository contains `.nvmrc`. Project scripts use `scripts/with-node-version.sh` to select that version when nvm is available. Docker images already provide Node.js 20.19.0.
+The repository contains `.nvmrc`. Project scripts use `tooling/node/with-node-version.sh` to select that version when nvm is available. Docker images already provide Node.js 20.19.0.
 
 ### Configuration
 
@@ -248,7 +248,7 @@ pnpm run dev
 Open `http://localhost:5173`. Start the Python service whenever analytics features are needed:
 
 ```bash
-./scripts/start-python-service.sh
+./services/analytics/start-service.sh
 ```
 
 For direct local development, set `DATABASE_URL` to a local PostgreSQL database and `ANALYTICS_SERVICE_URL=http://localhost:8001` in `.env`. Apply the checked-in schema with `pnpm run db:migrate:deploy` before starting Express. Registration is intended for local or privately operated instances; email verification, password reset, OAuth and public-service abuse controls are not included.
@@ -411,12 +411,15 @@ prometheus-global-guardian/
 │   └── tests/                   # Python unittest suite
 ├── packages/
 │   ├── contracts/               # Language-neutral JSON contracts shared by TypeScript and Python
-│   └── hazard-domain/           # Runtime-independent TypeScript hazard model and registry
-├── shared/hazards/              # Compatibility re-exports for existing consumers
-├── tests/                       # BFF, Service, component, and E2E tests
+│   ├── hazard-domain/           # Runtime-independent TypeScript hazard model and registry
+│   └── logging/                 # Shared logging API for Web and BFF
+├── apps/web/tests/              # Web Service, component, and E2E tests
+├── apps/bff/tests/              # BFF Node and service tests
+├── tests/integration/           # Cross-runtime integration tests
+├── infra/persistence/tests/     # Persistence operations tests
 ├── prisma/                      # PostgreSQL schema and explicit migrations
 ├── docs/                        # Governance, test baseline, plans, and specifications
-├── scripts/                     # Node-version, Python-test, and service-start scripts
+├── tooling/                     # Node-version and architecture tools
 ├── package.json                  # Repository scripts and workspace dependency orchestration
 ├── vite.config.ts                # Web root and root dist/ output
 ├── vitest.config.ts              # Service test configuration
@@ -426,7 +429,7 @@ prometheus-global-guardian/
 └── AGENTS.md                    # Development, worktree, TDD, and validation conventions
 ```
 
-The Web runtime lives in `apps/web/`, with implementation under `apps/web/src/`. The BFF runtime lives in `apps/bff/`, with `apps/bff/index.ts` as its entrypoint. The Analytics runtime lives in `services/analytics/`, with `main.py` retained as its direct and Uvicorn entrypoint. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express serves. The repository root retains the package scripts, Vite, Vitest, Playwright, and Dockerfile orchestration. Web and BFF production code import the hazard model through the public `@pgg/hazard-domain` entrypoint; `shared/hazards/` remains a compatibility re-export.
+The Web runtime lives in `apps/web/`, with implementation under `apps/web/src/`. The BFF runtime lives in `apps/bff/`, with `apps/bff/index.ts` as its entrypoint. The Analytics runtime lives in `services/analytics/`, with `main.py` retained as its direct and Uvicorn entrypoint. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express serves. The repository root retains the package scripts, Vite, Vitest, Playwright, and Dockerfile orchestration. Web and BFF production code import the hazard model through the public `@pgg/hazard-domain` entrypoint; the removed shared hazard compatibility layer is no longer part of the runtime boundary.
 
 ---
 
@@ -583,7 +586,7 @@ flowchart LR
 | pnpm    | `10.15.1`             |
 | Python  | 分析服务建议使用 3.13 |
 
-仓库包含 `.nvmrc`。在 nvm 可用时，项目脚本通过 `scripts/with-node-version.sh` 使用对应版本；Docker 镜像已内置 Node.js 20.19.0。
+仓库包含 `.nvmrc`。在 nvm 可用时，项目脚本通过 `tooling/node/with-node-version.sh` 使用对应版本；Docker 镜像已内置 Node.js 20.19.0。
 
 ### 配置
 
@@ -682,7 +685,7 @@ pnpm run dev
 访问 `http://localhost:5173`。需要分析功能时启动 Python 服务：
 
 ```bash
-./scripts/start-python-service.sh
+./services/analytics/start-service.sh
 ```
 
 直接本地开发时，在 `.env` 中把 `DATABASE_URL` 指向本机 PostgreSQL，并设置 `ANALYTICS_SERVICE_URL=http://localhost:8001`。启动 Express 前先执行仓库迁移 `pnpm run db:migrate:deploy`。注册功能面向本地或私有运营实例；当前不包含邮箱验证、密码找回、OAuth 或公网滥用防护。
@@ -853,11 +856,14 @@ prometheus-global-guardian/
 │   └── tests/                   # Python unittest 套件
 ├── packages/
 │   ├── contracts/               # TypeScript 与 Python 共用的语言无关 JSON 契约
-│   └── hazard-domain/           # 不依赖具体运行时的 TypeScript 灾害模型与注册表
-├── shared/hazards/              # 供现有调用方使用的兼容转导出
-├── tests/                       # BFF、Service、组件和 E2E 测试
+│   ├── hazard-domain/           # 不依赖具体运行时的 TypeScript 灾害模型与注册表
+│   └── logging/                 # Web 与 BFF 共用的日志 API
+├── apps/web/tests/              # Web Service、组件和 E2E 测试
+├── apps/bff/tests/              # BFF Node 与 Service 测试
+├── tests/integration/           # 跨运行单元集成测试
+├── infra/persistence/tests/     # 持久化运维测试
 ├── docs/                        # 治理、测试基线、计划和规格
-├── scripts/                     # Node 版本、Python 测试和服务启动脚本
+├── tooling/                     # Node 版本与架构工具
 ├── package.json                  # 仓库脚本与工作区依赖编排
 ├── vite.config.ts                # Web root 与根目录 dist/ 输出
 ├── vitest.config.ts              # Service 测试配置
@@ -867,4 +873,4 @@ prometheus-global-guardian/
 └── AGENTS.md                    # 开发、worktree、TDD 和验证约定
 ```
 
-Web 运行单元位于 `apps/web/`，实现位于 `apps/web/src/`；BFF 运行单元位于 `apps/bff/`，入口为 `apps/bff/index.ts`；Analytics 运行单元位于 `services/analytics/`，入口为 `main.py`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest、Playwright 和 Dockerfile 编排入口。Web 与 BFF 生产代码通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；`shared/hazards/` 保留兼容转导出。
+Web 运行单元位于 `apps/web/`，实现位于 `apps/web/src/`；BFF 运行单元位于 `apps/bff/`，入口为 `apps/bff/index.ts`；Analytics 运行单元位于 `services/analytics/`，入口为 `main.py`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest、Playwright 和 Dockerfile 编排入口。Web 与 BFF 生产代码通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；旧共享灾害兼容层已移除。

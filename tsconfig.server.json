@@ -11,6 +11,11 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pgg/hazard-domain": ["./packages/hazard-domain/src/index.ts"],
+      "@pgg/logging": ["./packages/logging/src/index.ts"]
+    },
     "sourceMap": true
   },
   "include": [
@@ -20,5 +25,5 @@
     "shared/**/*.ts",
     "packages/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist", "dist-server"]
+  "exclude": ["node_modules", "dist", "dist-server", "apps/bff/tests", "packages/**/tests"]
 }

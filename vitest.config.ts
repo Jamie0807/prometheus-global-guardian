@@ -11,10 +11,18 @@ export default defineConfig({
   resolve: {
     alias: {
       "@pgg/hazard-domain": path.resolve(repositoryRoot, "packages/hazard-domain/src/index.ts"),
+      "@pgg/logging": path.resolve(repositoryRoot, "packages/logging/src/index.ts"),
     },
   },
   test: {
     environment: "node",
-    include: ["tests/service-*.test.ts", "tests/server-hazard-event-registry.test.ts"],
+    include: [
+      "apps/web/tests/services/**/*.test.ts",
+      "apps/bff/tests/service-*.test.ts",
+      "apps/bff/tests/server-hazard-event-registry.test.ts",
+      "tests/integration/**/*.test.ts",
+      "infra/persistence/tests/**/*.test.ts",
+      "packages/logging/tests/**/*.test.ts",
+    ],
   },
 });

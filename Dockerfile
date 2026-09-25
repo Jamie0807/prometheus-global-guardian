@@ -55,11 +55,12 @@ RUN node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('packa
 
 COPY --from=build /app/dist-server ./dist-server
 COPY --from=build /app/packages/hazard-domain/dist ./packages/hazard-domain/dist
+COPY --from=build /app/packages/logging/dist ./packages/logging/dist
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/.nvmrc ./.nvmrc
-COPY --from=build /app/scripts/with-node-version.sh ./scripts/with-node-version.sh
+COPY --from=build /app/tooling/node/with-node-version.sh ./tooling/node/with-node-version.sh
 
 EXPOSE 8080
 CMD ["node", "dist-server/apps/bff/index.js"]

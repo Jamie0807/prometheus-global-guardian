@@ -15,6 +15,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@pgg/hazard-domain": path.resolve(repositoryRoot, "packages/hazard-domain/src/index.ts"),
+      "@pgg/logging": path.resolve(repositoryRoot, "packages/logging/src/index.ts"),
     },
   },
   plugins: [react()],

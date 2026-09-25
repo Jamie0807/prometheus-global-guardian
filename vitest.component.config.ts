@@ -11,11 +11,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@pgg/hazard-domain": path.resolve(repositoryRoot, "packages/hazard-domain/src/index.ts"),
+      "@pgg/logging": path.resolve(repositoryRoot, "packages/logging/src/index.ts"),
     },
   },
   test: {
     environment: "jsdom",
-    setupFiles: ["./tests/component/setup.ts"],
-    include: ["tests/component/**/*.test.tsx"],
+    setupFiles: ["./apps/web/tests/component/setup.ts"],
+    include: ["apps/web/tests/component/**/*.test.tsx"],
   },
 });

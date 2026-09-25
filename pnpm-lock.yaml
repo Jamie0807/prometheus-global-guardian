@@ -35,6 +35,9 @@ importers:
       '@pgg/hazard-domain':
         specifier: workspace:*
         version: link:packages/hazard-domain
+      '@pgg/logging':
+        specifier: workspace:*
+        version: link:packages/logging
       '@prisma/adapter-pg':
         specifier: ^7.10.0
         version: 7.10.0
@@ -181,6 +184,8 @@ importers:
   packages/contracts: {}
 
   packages/hazard-domain: {}
+
+  packages/logging: {}
 
 packages:
 

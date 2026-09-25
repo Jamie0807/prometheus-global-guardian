@@ -4,12 +4,20 @@
     "apps/bff/index.ts",
     "apps/bff/**/*.ts",
     "apps/bff/**/*.d.ts",
-    "tests/ai-provider.test.ts",
-    "tests/ai-router.test.ts",
-    "tests/ai-stream.test.ts",
-    "tests/server-ai-stream.test.ts",
-    "tests/server-ai-persistence.test.ts",
-    "tests/server-auth.test.ts",
-    "tests/request-boundaries.test.ts"
+    "apps/bff/tests/ai-provider.test.ts",
+    "apps/bff/tests/ai-router.test.ts",
+    "apps/bff/tests/ai-stream.test.ts",
+    "apps/bff/tests/server-ai-stream.test.ts",
+    "apps/bff/tests/server-ai-persistence.test.ts",
+    "apps/bff/tests/server-auth.test.ts",
+    "apps/bff/tests/request-boundaries.test.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-server",
+    "apps/bff/tests/service-*.test.ts",
+    "apps/bff/tests/server-hazard-event-registry.test.ts",
+    "packages/**/tests"
   ]
 }

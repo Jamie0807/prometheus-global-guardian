@@ -23,8 +23,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "paths": { "@pgg/hazard-domain": ["./packages/hazard-domain/src/index.ts"] }
+    "paths": {
+      "@pgg/hazard-domain": ["./packages/hazard-domain/src/index.ts"],
+      "@pgg/logging": ["./packages/logging/src/index.ts"]
+    }
   },
   "include": ["apps/web", "shared", "packages"],
-  "exclude": ["node_modules", "dist", "dist-server"]
+  "exclude": ["node_modules", "dist", "dist-server", "apps/web/tests", "packages/**/tests"]
 }
