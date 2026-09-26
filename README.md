@@ -339,7 +339,7 @@ It listens on `http://localhost:8080` by default. `pnpm run start:static` serves
 | `/api/auth/login`                    | `POST`                    | Starts an authenticated session                                                                                                             |
 | `/api/auth/session`                  | `GET`                     | Restores the current browser session                                                                                                        |
 | `/api/auth/logout`                   | `POST`                    | Revokes the current session                                                                                                                 |
-| `/api/auth/account`                  | `PATCH` / `DELETE`        | Updates the account or deletes the account and owned data                                                                                   |
+| `/api/auth/account`                  | `DELETE`                  | Deletes the account and owned data                                                                                                          |
 | `/api/hazards`                       | `GET`                     | Aggregates public hazard feeds; supports `source` and `type` filters                                                                        |
 | `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | Manages only the signed-in user's conversations and messages                                                                                |
 | `/api/ai/conversations/:id/messages` | `POST`                    | Streams and persists an AI response                                                                                                         |
@@ -792,7 +792,7 @@ pnpm start
 | `/api/auth/login`                    | `POST`                    | 建立已鉴权会话                                                     |
 | `/api/auth/session`                  | `GET`                     | 恢复当前浏览器会话                                                 |
 | `/api/auth/logout`                   | `POST`                    | 撤销当前会话                                                       |
-| `/api/auth/account`                  | `PATCH` / `DELETE`        | 更新账号或删除账号及其数据                                         |
+| `/api/auth/account`                  | `DELETE`                  | 删除账号及其数据                                                   |
 | `/api/hazards`                       | `GET`                     | 聚合公开灾害数据，支持 `source` 和 `type` 筛选                     |
 | `/api/ai/conversations*`             | `GET` / `POST` / `DELETE` | 管理当前用户自己的对话和消息                                       |
 | `/api/ai/conversations/:id/messages` | `POST`                    | 流式生成并保存 AI 回复                                             |

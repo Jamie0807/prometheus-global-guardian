@@ -113,3 +113,9 @@
 ## 2026-09-26 Workflow 聚合统计口径修复
 
 - [x] 修复灾害数量问答把 `recent` 代表样本（最多 8 条）误当作全量事件的问题：BFF 现在明确注入全量总数与各类型聚合数量，要求 Workflow 统计时使用 `byType`，而 `recent` 仅用于展示代表事件；Provider 回归测试 22/22、Service 329/329、lint、格式、客户端/服务端类型检查和 diff 检查通过。
+
+## 2026-09-26 移除旧 Memory 持久化与测试数据治理记录
+
+- [x] 移除确认式 Memory 的 Prisma 模型、BFF 路由、Repository、账号开关和运维必需表检查；新增前向 migration `20260926120000_remove_legacy_ai_memory`，在当前开发数据库中确认两张 Memory 表为空后成功应用。聊天记录与同会话摘要保留在 `ai_conversations`、`ai_messages` 和 `ai_conversations.summary`。
+- [x] 新增健康检查回归，验证不再依赖旧 Memory 表；持久化定向测试 31/31、上下文/Provider 定向测试 26/26、Service 330/330、lint、格式、客户端/服务端类型检查、Docker 构建、Compose 健康检查和 `db:check` 通过。
+- [ ] 将自动化测试账号与会话迁移到独立测试数据库/Compose 项目，增加 `DATABASE_URL` 防误连校验和测试数据自动清理；已记录到 `docs/PROJECT_OPTIMIZATION_BACKLOG.md`，本轮未删除现有 `@example.test` 测试数据。

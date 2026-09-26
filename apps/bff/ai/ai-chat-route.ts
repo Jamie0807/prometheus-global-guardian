@@ -29,7 +29,7 @@ import { createServerLogger } from "../logging.js";
 import * as conversationRepository from "./conversation-repository.js";
 import { prepareAIContext } from "./context-manager.js";
 import type { AIMessageStatus } from "../generated/prisma/enums.js";
-import { summarizeTrimmedConversation } from "./memory-generation.js";
+import { summarizeTrimmedConversation } from "./context-summary.js";
 
 interface ProviderFailure {
   provider: ProviderName;

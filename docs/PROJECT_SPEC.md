@@ -159,19 +159,19 @@ React 组件消费经过 Service 或 feature adapter 转换的领域数据。组
 
 BFF 的公开应用职责包括：
 
-| 路径                               | 方法   | 责任                                                                                      |
-| ---------------------------------- | ------ | ----------------------------------------------------------------------------------------- |
-| `/api/authorize`                   | `POST` | 使用服务端 DisasterAware 凭据获取上游 token，仅向浏览器返回授权状态。                     |
-| `/api/auth/register`、`/login`     | `POST` | 注册和登录；仅这些认证入口不要求已有用户会话。                                            |
-| `/api/auth/session`                | `GET`  | 校验 HttpOnly Cookie 并恢复当前用户会话。                                                 |
-| `/api/auth/logout`、`/account`     | 多种   | 撤销会话、更新账号或验证密码后删除账号。                                                  |
-| `/api/hazards`                     | `GET`  | 优先使用 DisasterAware，失败时聚合 USGS、NASA EONET 和 GDACS；返回 hazards 与来源元数据。 |
-| `/api/hazards/types`               | `GET`  | 代理允许的 DisasterAware 类型端点。                                                       |
-| `/api/hazards/active`              | `GET`  | 代理允许的活动灾害端点。                                                                  |
-| `/api/hazards/active/category/:id` | `GET`  | 代理允许的灾害类别端点。                                                                  |
-| `/api/analytics/*`                 | 多种   | 限定路径与方法，将业务请求代理到私有 FastAPI。                                            |
-| `/api/ai/conversations*`           | 多种   | 用户隔离的会话和消息读取、创建、删除与流式生成。                                          |
-| `/api/ai/cancel`                   | `POST` | 取消当前用户正在进行的 AI 生成，并将助手消息标记为失败/取消终态。                         |
+| 路径                               | 方法              | 责任                                                                                      |
+| ---------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| `/api/authorize`                   | `POST`            | 使用服务端 DisasterAware 凭据获取上游 token，仅向浏览器返回授权状态。                     |
+| `/api/auth/register`、`/login`     | `POST`            | 注册和登录；仅这些认证入口不要求已有用户会话。                                            |
+| `/api/auth/session`                | `GET`             | 校验 HttpOnly Cookie 并恢复当前用户会话。                                                 |
+| `/api/auth/logout`、`/account`     | `POST` / `DELETE` | 撤销会话，或验证密码后删除账号。                                                          |
+| `/api/hazards`                     | `GET`             | 优先使用 DisasterAware，失败时聚合 USGS、NASA EONET 和 GDACS；返回 hazards 与来源元数据。 |
+| `/api/hazards/types`               | `GET`             | 代理允许的 DisasterAware 类型端点。                                                       |
+| `/api/hazards/active`              | `GET`             | 代理允许的活动灾害端点。                                                                  |
+| `/api/hazards/active/category/:id` | `GET`             | 代理允许的灾害类别端点。                                                                  |
+| `/api/analytics/*`                 | 多种              | 限定路径与方法，将业务请求代理到私有 FastAPI。                                            |
+| `/api/ai/conversations*`           | 多种              | 用户隔离的会话和消息读取、创建、删除与流式生成。                                          |
+| `/api/ai/cancel`                   | `POST`            | 取消当前用户正在进行的 AI 生成，并将助手消息标记为失败/取消终态。                         |
 
 以上是主要公开接口概览，并非所有 API 路径的穷举；已挂载的兼容路由可能处理未列出的路径。不支持任意上游代理，未列路径的响应不能由本文档推断为统一状态码。
 

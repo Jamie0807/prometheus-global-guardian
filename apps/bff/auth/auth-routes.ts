@@ -178,33 +178,6 @@ export function createAuthRouter(env: NodeJS.ProcessEnv = process.env): Router {
     }
   });
 
-  router.patch("/account", requireAuthenticatedUser, async (request, response) => {
-    const body = parseBody(request);
-    if (
-      !request.user ||
-      typeof body?.memoryEnabled !== "boolean" ||
-      Object.keys(body).length !== 1
-    ) {
-      sendInvalidRequest(response);
-      return;
-    }
-    try {
-      const result = await prisma.user.updateMany({
-        where: { id: request.user.userId },
-        data: { memoryEnabled: body.memoryEnabled },
-      });
-      if (result.count === 0) {
-        response.status(401).json({ code: "AUTH_REQUIRED", message: "Sign in to continue." });
-        return;
-      }
-      response.status(200).json({ memoryEnabled: body.memoryEnabled });
-    } catch {
-      response
-        .status(503)
-        .json({ code: "AUTH_UNAVAILABLE", message: "Could not update account preferences." });
-    }
-  });
-
   router.delete("/account", requireAuthenticatedUser, async (request, response) => {
     const body = parseBody(request);
     const password = body?.password;

@@ -150,6 +150,21 @@ describe("persistence health and restore rehearsal", () => {
     expect(calls.some((args) => args.includes("run") && args.includes("web"))).toBe(true);
   });
 
+  it("does not require removed legacy memory tables", async () => {
+    const calls: string[][] = [];
+    await checkDatabase({
+      composeRunner: async (args: string[]) => {
+        calls.push(args);
+        if (args.includes("run")) return "Database schema is up to date";
+        return "t\n";
+      },
+    });
+
+    const sql = calls.flat().join(" ");
+    expect(sql).not.toContain("ai_memory_items");
+    expect(sql).not.toContain("ai_memory_suggestions");
+  });
+
   it("rejects a same-named view in place of a required ordinary table", async () => {
     await expect(
       checkDatabase({

@@ -13,14 +13,7 @@ import {
 } from "./backup-utils.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const requiredTables = [
-  "users",
-  "auth_sessions",
-  "ai_conversations",
-  "ai_messages",
-  "ai_memory_items",
-  "ai_memory_suggestions",
-];
+const requiredTables = ["users", "auth_sessions", "ai_conversations", "ai_messages"];
 
 export async function validateBackupDirectory(directory) {
   const absolute = path.resolve(directory);

@@ -19,23 +19,14 @@ enum AIMessageStatus {
   FAILED
 }
 
-enum AIMemorySuggestionStatus {
-  PENDING
-  ACCEPTED
-  DISMISSED
-}
-
 model User {
-  id            String         @id @default(uuid()) @db.Uuid
-  email         String         @unique @db.VarChar(320)
-  passwordHash  String         @map("password_hash")
-  memoryEnabled Boolean        @default(true) @map("memory_enabled")
-  createdAt     DateTime       @default(now()) @db.Timestamptz(3) @map("created_at")
-  updatedAt     DateTime       @updatedAt @db.Timestamptz(3) @map("updated_at")
+  id            String           @id @default(uuid()) @db.Uuid
+  email         String           @unique @db.VarChar(320)
+  passwordHash  String           @map("password_hash")
+  createdAt     DateTime         @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt     DateTime         @updatedAt @db.Timestamptz(3) @map("updated_at")
   sessions      AuthSession[]
   conversations AIConversation[]
-  memories      AIMemoryItem[]
-  suggestions   AIMemorySuggestion[]
 
   @@map("users")
 }
@@ -54,18 +45,16 @@ model AuthSession {
 }
 
 model AIConversation {
-  id                      String               @id @default(uuid()) @db.Uuid
-  userId                  String               @db.Uuid @map("user_id")
-  title                   String               @default("新对话") @db.VarChar(160)
-  summary                 String?              @db.Text
-  summaryThroughMessageId String?              @db.Uuid @map("summary_through_message_id")
-  lastMessageAt           DateTime?            @db.Timestamptz(3) @map("last_message_at")
-  createdAt               DateTime             @default(now()) @db.Timestamptz(3) @map("created_at")
-  updatedAt               DateTime             @updatedAt @db.Timestamptz(3) @map("updated_at")
-  user                    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                      String      @id @default(uuid()) @db.Uuid
+  userId                  String      @db.Uuid @map("user_id")
+  title                   String      @default("新对话") @db.VarChar(160)
+  summary                 String?     @db.Text
+  summaryThroughMessageId String?     @db.Uuid @map("summary_through_message_id")
+  lastMessageAt           DateTime?   @db.Timestamptz(3) @map("last_message_at")
+  createdAt               DateTime    @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt               DateTime    @updatedAt @db.Timestamptz(3) @map("updated_at")
+  user                    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages                AIMessage[]
-  memoryItems             AIMemoryItem[]
-  memorySuggestions       AIMemorySuggestion[]
 
   @@index([userId, updatedAt])
   @@map("ai_conversations")
@@ -87,37 +76,4 @@ model AIMessage {
   @@unique([conversationId, clientMessageId])
   @@index([conversationId, createdAt])
   @@map("ai_messages")
-}
-
-model AIMemoryItem {
-  id                   String          @id @default(uuid()) @db.Uuid
-  userId               String          @db.Uuid @map("user_id")
-  content              String          @db.Text
-  enabled              Boolean         @default(true)
-  sourceConversationId String?         @db.Uuid @map("source_conversation_id")
-  createdAt            DateTime        @default(now()) @db.Timestamptz(3) @map("created_at")
-  updatedAt            DateTime        @updatedAt @db.Timestamptz(3) @map("updated_at")
-  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceConversation   AIConversation? @relation(fields: [sourceConversationId], references: [id], onDelete: SetNull)
-
-  @@index([userId, enabled, updatedAt])
-  @@index([sourceConversationId])
-  @@map("ai_memory_items")
-}
-
-model AIMemorySuggestion {
-  id                   String                    @id @default(uuid()) @db.Uuid
-  userId               String                    @db.Uuid @map("user_id")
-  sourceConversationId String?                   @db.Uuid @map("source_conversation_id")
-  content              String                    @db.Text
-  reason               String?                   @db.Text
-  status               AIMemorySuggestionStatus  @default(PENDING)
-  createdAt            DateTime                  @default(now()) @db.Timestamptz(3) @map("created_at")
-  updatedAt            DateTime                  @updatedAt @db.Timestamptz(3) @map("updated_at")
-  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceConversation   AIConversation?           @relation(fields: [sourceConversationId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status, createdAt])
-  @@index([sourceConversationId])
-  @@map("ai_memory_suggestions")
 }

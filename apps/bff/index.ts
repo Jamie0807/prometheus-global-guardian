@@ -23,7 +23,6 @@ import { createAuthRouter } from "./auth/auth-routes.js";
 import { createRequireUser } from "./auth/require-user.js";
 import { recoverInterruptedAssistantMessages } from "./ai/conversation-repository.js";
 import { createConversationRouter } from "./ai/conversation-routes.js";
-import { createMemoryRouter } from "./ai/memory-routes.js";
 import { registerAnalyticsRoute } from "./analytics/analytics-route.js";
 import {
   createForwardHeaders,
@@ -330,7 +329,6 @@ export function createApp(options: CreateAppOptions = {}): Application {
   app.use("/api", requireAuthenticatedUser);
 
   registerAnalyticsRoute(app, [], { env: serverEnv, fetchImpl: upstreamFetch });
-  app.use("/api/ai", createMemoryRouter({ env: serverEnv, fetchImpl: upstreamFetch }));
   app.use("/api/ai/conversations", createConversationRouter());
   registerAIChatRoute(app, [aiRateLimit], { env: serverEnv, fetchImpl: upstreamFetch });
 
