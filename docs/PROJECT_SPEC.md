@@ -13,6 +13,8 @@
 
 历史设计和计划用于说明决策背景，不覆盖当前代码事实，也不在维护本规格书时改写。
 
+本规格书只记录稳定的工程事实：运行单元、依赖方向、安全边界、数据契约和质量规则。启动步骤看 `README.md`，数据库操作看 `docs/OPERATIONS_PERSISTENCE.md`，测试证据看 `docs/TESTING_BASELINE.md`，未完成事项看 `docs/PROJECT_OPTIMIZATION_BACKLOG.md`；本文件不复制这些文档的操作清单或历史验证数量。
+
 ## 2. 项目定位、当前状态与非目标
 
 Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展示、分析和 AI 辅助事件研判的本地开发项目。仓库包含 React 客户端、Express BFF、FastAPI 分析服务、PostgreSQL 账号与 AI 持久化，以及灾害数据源和 AI Provider 集成。
@@ -27,6 +29,7 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 - 通过 BFF 的 `meta.sources[]` 为 DisasterAware、USGS、NASA EONET 和 GDACS 输出固定五分钟窗口的进程内来源健康快照；
 - 通过前端 Service 运行时解析、Python Pydantic 模型和共享 JSON 样本维护 Analytics 输入边界；
 - 通过 `packages/hazard-domain/` 与 `packages/contracts/hazard-event.json` 维护统一事件/图层注册表，通过 `@pgg/hazard-domain` 公共入口向 BFF、浏览器 Worker、地图、Analytics、质量检查、AI 和 Python 传递 canonical 灾害字段；
+- 通过 Workflow Provider 的 `hazard_context_available` 显式区分实时上下文缺失、实时快照为空和实时快照有数据；RAG 文档由外部 ai-workflow 知识库管理，不进入本项目 PostgreSQL；
 - 通过 lint、格式检查、TypeScript 类型检查、多层自动化测试和构建命令执行质量检查。
 
 当前仓库没有部署工作流，Docker Compose 只定义本地完整栈启动方式。以下能力不属于当前已实现范围：
@@ -39,16 +42,18 @@ Prometheus Global Guardian 是一个用于全球灾害监测、地理空间展�
 
 ## 3. 术语
 
-| 术语             | 含义                                                                                                                                                                 |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Browser / 浏览器 | Vite 构建的 React 客户端运行环境。`VITE_*` 值会进入浏览器构建产物，只能承载公开配置。                                                                                |
-| BFF              | Express 服务。负责静态客户端、用户会话、API 登录门禁、DisasterAware 受限代理、灾害聚合、Analytics 代理和 AI Provider 路由/持久化。                                   |
-| Analytics        | 独立 FastAPI 服务及其分析算法。浏览器经同源 `/api/analytics` 访问 BFF，再由 BFF 以服务间令牌代理。                                                                   |
-| Hazard           | 地图、分析、AI 上下文和报告流程共同消费的灾害领域记录。                                                                                                              |
-| Service 边界     | `apps/web/src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                                                                            |
-| Provider         | BFF 调用的 AI 上游；当前实现支持 ai-workflow 与 Volcengine Ark。                                                                                                     |
-| 共享契约工件     | `packages/contracts/analytics-hazard-data.json` 与 `packages/contracts/hazard-event.json`，供 TypeScript 与 Python 测试共同读取的 Analytics 输入和统一灾害事件样本。 |
-| 管理接口         | FastAPI 的 `/metrics` 与 `/cache/clear`；启用后要求静态管理令牌。                                                                                                    |
+| 术语                       | 含义                                                                                                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser / 浏览器           | Vite 构建的 React 客户端运行环境。`VITE_*` 值会进入浏览器构建产物，只能承载公开配置。                                                                                |
+| BFF                        | Express 服务。负责静态客户端、用户会话、API 登录门禁、DisasterAware 受限代理、灾害聚合、Analytics 代理和 AI Provider 路由/持久化。                                   |
+| Analytics                  | 独立 FastAPI 服务及其分析算法。浏览器经同源 `/api/analytics` 访问 BFF，再由 BFF 以服务间令牌代理。                                                                   |
+| Hazard                     | 地图、分析、AI 上下文和报告流程共同消费的灾害领域记录。                                                                                                              |
+| Service 边界               | `apps/web/src/services/` 中负责 HTTP 调用、外部数据适配、运行时解析和业务错误语义的边界。                                                                            |
+| Provider                   | BFF 调用的 AI 上游；当前实现支持 ai-workflow 与 Volcengine Ark。                                                                                                     |
+| RAG                        | 外部 ai-workflow 知识库检索能力；本项目只转发 Workflow 请求，不管理其文档索引。                                                                                      |
+| `hazard_context_available` | Workflow 输入中的实时上下文判别字段；`true` 表示请求包含实时快照形状，`false` 表示 BFF 未提供实时上下文。                                                            |
+| 共享契约工件               | `packages/contracts/analytics-hazard-data.json` 与 `packages/contracts/hazard-event.json`，供 TypeScript 与 Python 测试共同读取的 Analytics 输入和统一灾害事件样本。 |
+| 管理接口                   | FastAPI 的 `/metrics` 与 `/cache/clear`；启用后要求静态管理令牌。                                                                                                    |
 
 ## 4. 系统上下文与拓扑
 
@@ -298,6 +303,10 @@ BFF 的 DisasterAware、USGS、NASA EONET 和 GDACS adapter 均在服务端边�
 ### 8.3 AI 流式会话
 
 浏览器向 `POST /api/ai/conversations/:conversationId/messages` 发送单条新消息和灾害上下文；聊天消息自动保存。BFF 按当前 `userId` 只读取目标会话与其历史消息，执行同会话上下文预算和摘要压缩，然后选择 Provider；同一会话超过预算时，较早消息进入有界摘要，原始消息仍保留。新建会话不会读取其他会话的消息或摘要。助手流和最终结果均写入 PostgreSQL。路由模式根据知识库、灾害领域和实时上下文信号选择优先 Provider；强制模式固定使用 workflow 或 Ark。首选 Provider 在响应开始前失败时，BFF 才尝试另一个 Provider。
+
+Workflow Provider 的输入契约为 `user_input`、`hazard_context`、`hazard_context_available`、`location` 和 `language`。`hazard_context_available` 是实时数据可用性的显式判别字段：当请求包含 `total`、`byType` 或 `recent` 任一实时快照字段时为 `true`，即使快照明确表示总数为 0；实时上下文缺失时为 `false`，同时发送 `hazard_context: null` 和不可用状态标记。Workflow 不得依据 `null` 或空值回答“当前没有灾害”。实时上下文可用时，`byType` 的全量计数用于数量问题，`recent` 仅作为有限代表样本，不能用于总量统计。
+
+BFF 在送入 Workflow 前会清洗实时上下文：只保留受允许的标题、类型、严重程度、时间、震级、来源和图层字段，删除原始 URL、坐标及其他未允许字段；会话摘要不进入 `hazard_context`。只依赖知识库/RAG 文档的问题可以在没有实时上下文时回答，但来源和“未使用实时数据”的限制由 Workflow 负责明确呈现。RAG 文档本身由外部 Workflow 知识库管理，不属于本项目 PostgreSQL 持久化范围。
 
 前端只在 React state 中维护当前呈现状态；用户拥有的对话、消息和有界同会话摘要保存在 PostgreSQL，聊天记录自动保存，刷新后可重新加载，用户之间通过所有权查询隔离。同一 UI 会话只允许一个活动请求，关闭、清空、停止或卸载会取消流；Hook 的本地请求序号防止迟到 chunk 写入新请求，Service 为每次 SSE 逻辑请求生成随机请求 ID 并在自动重连中复用。手动重试使用同一客户端消息 ID，不重复追加用户消息。服务端模型上下文限制为 48 KiB，保留当前输入和近期完整轮次，并为被裁剪的较早轮次更新当前会话摘要；原始消息仍保存。单条用户输入上限为 8,000 字符。
 

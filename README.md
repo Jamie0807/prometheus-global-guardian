@@ -10,9 +10,21 @@ Prometheus Global Guardian is a local development project for global hazard moni
 
 The repository contains a React client, an Express BFF, a FastAPI analytics service, PostgreSQL-backed accounts and AI persistence, and integrations with external data and AI providers. It is not currently deployed. Docker Compose is supplied only to run the complete stack locally.
 
+### Documentation map
+
+| Need                                                       | Document                                                                                                   |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Install, run, configure, and use the local stack           | This README                                                                                                |
+| Stable architecture, boundaries, and contracts             | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md)                                                               |
+| Test commands, ownership, evidence, and environment limits | [docs/TESTING_BASELINE.md](docs/TESTING_BASELINE.md)                                                       |
+| PostgreSQL migration, backup, restore, and data protection | [docs/OPERATIONS_PERSISTENCE.md](docs/OPERATIONS_PERSISTENCE.md)                                           |
+| Open work, priorities, and residual risks                  | [docs/PROJECT_OPTIMIZATION_BACKLOG.md](docs/PROJECT_OPTIMIZATION_BACKLOG.md)                               |
+| External project research and architecture comparisons     | [docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md](docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md) |
+
 ### Table of Contents
 
 - [Platform Overview](#platform-overview)
+- [Quick Start](#quick-start)
 - [Core Capabilities](#core-capabilities)
 - [Architecture and Data Flow](#architecture-and-data-flow)
 - [Service Topology](#service-topology)
@@ -33,13 +45,27 @@ The repository contains a React client, an Express BFF, a FastAPI analytics serv
 
 ### Platform Overview
 
-The platform is organized around four operational domains:
+The platform is organized around five operational domains:
 
 - **Hazard ingestion**: combines DisasterAware with USGS, NASA EONET, and GDACS feeds and normalizes them into `Hazard` records.
 - **Geospatial operations**: renders active events with Mapbox GL markers, popups, heatmap mode, clickable clustering, optional 3D Tiles, and configurable base styles.
 - **Analytics and reporting**: presents summaries, charts, risk and quality results from the Python service, then exports the current filtered hazards as a readable HTML report.
 - **AI-assisted analysis**: sends live hazard context through a streaming BFF endpoint for situation summaries and response recommendations.
 - **Accounts and AI persistence**: registers local/self-hosted accounts, gates application APIs by server-side sessions, and stores accounts, conversations, messages, and bounded summaries scoped to the same conversation in PostgreSQL.
+
+### Quick Start
+
+The supported local path is the Docker Compose complete stack:
+
+```bash
+cp .env.example .env
+# Set server-side secrets and provider values in .env.
+docker compose up --build -d
+docker compose exec web pnpm run db:migrate:deploy
+open http://localhost:8080
+```
+
+For frontend/BFF or Analytics development outside Compose, use the commands in [Local Development](#local-development) and [Python Analytics Service](#python-analytics-service). The application is a local or private self-hosted project; this repository does not define a deployment workflow.
 
 ### Core Capabilities
 
@@ -71,6 +97,8 @@ The platform is organized around four operational domains:
 - Streaming chat interface with current hazards inserted as context; the assistant bubble appears only after the first response text arrives.
 - Quick prompts for global review, floods, seismic activity, wildfire threat, forecasting, and emergency response.
 - BFF smart routing: disaster-domain questions can use ai-workflow; general conversation can use Volcengine Ark.
+- Workflow requests carry an explicit `hazard_context_available` flag. When live context is unavailable, the BFF sends `hazard_context: null` and an explicit unavailable-data marker instead of an empty snapshot, so the workflow cannot infer that there are no current hazards.
+- When live context is available, aggregate `byType` counts are authoritative for totals; `recent` is only a bounded representative sample. RAG-only questions can use the Workflow knowledge base without requiring live hazard context.
 - Forced provider modes and a local demo fallback when no provider key is configured.
 - Closing the assistant cancels its active stream. App-level Escape closes only report and settings modals; the AI component handles Escape itself to close and cancel its active stream.
 
@@ -203,7 +231,7 @@ ANALYTICS_SERVICE_URL=http://localhost:8001
 ANALYTICS_SERVICE_TOKEN=replace_with_a_random_service_secret
 ```
 
-These values are read by Express at runtime and must never use a `VITE_` prefix. `AI_PROVIDER=router` enables smart routing; use `workflow` or `ark` to force one provider while troubleshooting. If the workflow runs on the macOS host while Express runs in Docker, set its URL to `http://host.docker.internal:3100/api/v1/apps/run`.
+These values are read by Express at runtime and must never use a `VITE_` prefix. `AI_PROVIDER=router` enables smart routing; use `workflow` or `ark` to force one provider while troubleshooting. The workflow URL accepts `VOLCENGINE_WORKFLOW_API_URL` or the compatibility alias `AI_WORKFLOW_API_URL`; the key accepts the corresponding `VOLCENGINE_WORKFLOW_API_KEY` or `AI_WORKFLOW_API_KEY` name. If the workflow runs on the macOS host while Express runs in Docker, set its URL to `http://host.docker.internal:3100/api/v1/apps/run`.
 
 PostgreSQL is required for account and AI persistence. Generate `AUTH_CSRF_SECRET` and `ANALYTICS_SERVICE_TOKEN` with `openssl rand -base64 48`; replace the local-only PostgreSQL password before exposing a self-hosted instance. Keep all three values server-side.
 
@@ -311,6 +339,8 @@ Read [services/analytics/README.md](services/analytics/README.md) for startup in
 ### AI Assistant Provider
 
 The browser sends new messages to `POST /api/ai/conversations/:id/messages`; chat messages are saved automatically to the signed-in user's conversation. Express applies a bounded context from that conversation and its summary, then streams and persists the result. When a conversation exceeds the context budget, earlier messages are compressed into a bounded same-conversation summary while the original messages remain stored. A new conversation does not load messages or summaries from any other conversation. `POST /api/ai/cancel` stops an active generation for the current user. Conversation history is restored after reload. With `AI_PROVIDER=router`, disaster-domain analysis can go to ai-workflow and general conversation can go to Volcengine Ark. The BFF supports Ark's OpenAI-compatible Chat Completions and Responses protocols. If no provider is configured, the existing local demo reply remains available; provider-backed assistant output is stored server-side.
+
+For the ai-workflow provider, the BFF sends `inputs.user_input`, `inputs.hazard_context`, `inputs.hazard_context_available`, `inputs.location`, and `inputs.language`. `hazard_context_available` is `true` only when the request contains a live snapshot shape (`total`, `byType`, or `recent`), including an explicit empty snapshot. When it is `false`, `hazard_context` is `null` and the user input includes a marker that prohibits deciding current hazard presence from an empty value. The Workflow prompt should preserve this distinction: live-data questions must return an explicit inability-to-judge response when the flag is false, while knowledge-base/RAG questions may answer from the retrieved document and identify that source.
 
 ### Local Production Build
 
@@ -444,9 +474,21 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 
 仓库包含 React 前端、Express BFF、FastAPI 分析服务、PostgreSQL 账号与 AI 数据持久化，以及外部数据源和 AI 服务集成。当前未部署；Docker Compose 仅用于在本地启动完整技术栈。
 
+### 文档分工
+
+| 需求                                  | 文档                                                                                                       |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 安装、启动、配置和使用本地技术栈      | 本 README                                                                                                  |
+| 稳定架构、边界和契约                  | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md)                                                               |
+| 测试命令、责任、证据和环境限制        | [docs/TESTING_BASELINE.md](docs/TESTING_BASELINE.md)                                                       |
+| PostgreSQL 迁移、备份、恢复和数据保护 | [docs/OPERATIONS_PERSISTENCE.md](docs/OPERATIONS_PERSISTENCE.md)                                           |
+| 未完成事项、优先级和遗留风险          | [docs/PROJECT_OPTIMIZATION_BACKLOG.md](docs/PROJECT_OPTIMIZATION_BACKLOG.md)                               |
+| 外部项目调研和架构对比                | [docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md](docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md) |
+
 ### 目录
 
 - [平台概览](#平台概览)
+- [快速开始](#快速开始)
 - [核心能力](#核心能力)
 - [架构与数据流](#架构与数据流)
 - [服务拓扑](#服务拓扑)
@@ -467,13 +509,27 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 
 ### 平台概览
 
-平台围绕四个业务域组织：
+平台围绕五个业务域组织：
 
 - **灾害接入**：整合 DisasterAware、USGS、NASA EONET 和 GDACS，并统一为 `Hazard` 记录。
 - **地理态势**：以 Mapbox GL 呈现活动事件、标记、弹窗、热力图、可点击展开的聚合、可选 3D Tiles 和可配置底图。
 - **分析与报告**：调用 Python 服务呈现统计、图表、风险和质量结果，并把当前筛选后的灾害数据导出为可读 HTML 报告。
 - **AI 辅助研判**：将实时灾害上下文送入流式 BFF 接口，生成态势摘要和响应建议。
 - **账号与 AI 持久化**：支持本地/自托管账号注册，全站 API 按服务端会话鉴权；账号、会话、对话、消息和有界同会话摘要保存在 PostgreSQL。
+
+### 快速开始
+
+推荐使用 Docker Compose 启动本地完整技术栈：
+
+```bash
+cp .env.example .env
+# 在 .env 中填写服务端密钥和 Provider 配置。
+docker compose up --build -d
+docker compose exec web pnpm run db:migrate:deploy
+open http://localhost:8080
+```
+
+如果需要在 Compose 外开发前端、BFF 或 Analytics，请参阅[本地开发](#本地开发)和 [Python 分析服务](#python-分析服务)。本项目面向本地或私有自托管，仓库没有部署工作流。
 
 ### 核心能力
 
@@ -505,6 +561,8 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 - 流式聊天界面会注入当前灾害上下文，首段回答到达前不显示空白助手气泡。
 - 提供全球态势、洪水风险、地震活动、野火威胁、预测和应急响应等快捷提示。
 - BFF 智能路由可把灾害领域问题送给 ai-workflow，把通用对话送给火山方舟。
+- 发送到 Workflow 的请求包含显式的 `hazard_context_available` 布尔标记。实时上下文不可用时，BFF 发送 `hazard_context: null` 和不可用标记，不用空对象冒充“当前没有灾害”。
+- 实时上下文可用时，`byType` 是总量统计的权威来源，`recent` 只表示有限的代表样本；只问知识库/RAG 文档的问题不要求实时灾害上下文。
 - 支持强制指定 Provider；未配置模型 Key 时使用本地演示回复。
 - 关闭助手会取消正在进行的流。App 级 Escape 只关闭报告和设置弹窗；AI 组件自身处理 Escape，关闭助手并取消正在进行的流。
 
@@ -645,7 +703,7 @@ ANALYTICS_SERVICE_URL=http://localhost:8001
 ANALYTICS_SERVICE_TOKEN=replace_with_a_random_service_secret
 ```
 
-这些变量由 Express 在运行时读取，不能使用 `VITE_` 前缀。`AI_PROVIDER=router` 启用智能路由；排查问题时可使用 `workflow` 或 `ark` 强制单一 Provider。若工作流运行在 macOS 主机、Express 运行在 Docker 中，应把工作流 URL 设为 `http://host.docker.internal:3100/api/v1/apps/run`。
+这些变量由 Express 在运行时读取，不能使用 `VITE_` 前缀。`AI_PROVIDER=router` 启用智能路由；排查问题时可使用 `workflow` 或 `ark` 强制单一 Provider。工作流 URL 支持 `VOLCENGINE_WORKFLOW_API_URL` 或兼容别名 `AI_WORKFLOW_API_URL`，Key 也支持对应的 `VOLCENGINE_WORKFLOW_API_KEY` 或 `AI_WORKFLOW_API_KEY`。若工作流运行在 macOS 主机、Express 运行在 Docker 中，应把工作流 URL 设为 `http://host.docker.internal:3100/api/v1/apps/run`。
 
 账号和 AI 持久化需要 PostgreSQL。使用 `openssl rand -base64 48` 生成 `AUTH_CSRF_SECRET` 与 `ANALYTICS_SERVICE_TOKEN`；对外开放自托管实例前替换仅供本地使用的数据库密码。以上值都只能保留在服务端。
 
@@ -764,6 +822,8 @@ FastAPI 是内部分析服务。`/`、`/health`、`/docs` 和 `/redoc` 可在服
 ### AI 助手服务
 
 浏览器向 `POST /api/ai/conversations/:id/messages` 提交新消息；聊天消息会自动保存到当前用户的会话，Express 仅读取该会话及其有界摘要，组装有长度上限的上下文后流式返回并持久化回复。同一会话超过上下文预算时，较早消息会压缩为摘要，原始消息仍保留；新建会话不会自动读取其他会话的消息或摘要。`POST /api/ai/cancel` 会停止当前用户正在进行的生成。刷新后可以恢复对话。使用 `AI_PROVIDER=router` 时，灾害分析可路由至 ai-workflow，通用对话可路由至火山方舟；如果 Ark 未配置，后台摘要任务会回退到已配置的工作流。BFF 支持 Ark 的 OpenAI 兼容 Chat Completions 与 Responses 协议。未配置 Provider 时仍可使用本地演示回复；真实 Provider 的助手回复保存在服务端。
+
+Workflow Provider 的请求输入包括 `user_input`、`hazard_context`、`hazard_context_available`、`location` 和 `language`。实时快照存在时，BFF 只转发经过清洗的总量、类型计数和有限近期样本，并在 `user_input` 中注明不能用 `recent` 代表总量；实时快照缺失时发送 `hazard_context: null`，并明确要求 Workflow 不得由空值推断“当前没有灾害”。RAG 文档检索由外部 ai-workflow 负责，本项目只负责安全转发请求和持久化会话，不把知识库文档写入本项目 PostgreSQL。
 
 ### 本地生产构建
 
