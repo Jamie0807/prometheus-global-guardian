@@ -648,6 +648,30 @@ body {
   background: linear-gradient(110deg, #0891b2, #1d75b8);
 }
 
+.status-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.status-loading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: #7dd3fc;
+  font-size: 0.75rem;
+}
+
+.status-loading-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid rgba(125, 211, 252, 0.25);
+  border-top-color: #67e8f9;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 .loading-text {
   color: #60a5fa;
   font-size: 0.75rem;
@@ -3947,6 +3971,10 @@ textarea.form-input {
   gap: 8px;
 }
 
+.ai-header-action {
+  font-size: 0.72rem;
+}
+
 .ai-new-conversation-btn,
 .ai-delete-conversation-btn {
   border: 1px solid rgba(125, 211, 252, 0.24);
@@ -3955,7 +3983,6 @@ textarea.form-input {
   color: #bae6fd;
   padding: 7px 10px;
   cursor: pointer;
-  font-size: 0.72rem;
   white-space: nowrap;
 }
 
@@ -4006,7 +4033,6 @@ textarea.form-input {
   border: 1px solid rgba(125, 211, 252, 0.25);
   background: rgba(125, 211, 252, 0.08);
   color: #7dd3fc;
-  font-size: 0.68rem;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -4028,7 +4054,6 @@ textarea.form-input {
   height: 32px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9rem;
   transition: all 0.2s;
   display: flex;
   align-items: center;

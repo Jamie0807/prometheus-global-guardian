@@ -265,7 +265,7 @@ const AIChatAssistant: React.FC = () => {
           <div className="ai-header-actions">
             {/* 上下文开关 */}
             <button
-              className={`ai-ctx-btn ${contextEnabled ? "active" : ""}`}
+              className={`ai-header-action ai-ctx-btn ${contextEnabled ? "active" : ""}`}
               onClick={() => setContextEnabled((v) => !v)}
               title={contextEnabled ? "已注入灾害实时上下文" : "点击注入实时上下文"}
             >
@@ -273,7 +273,7 @@ const AIChatAssistant: React.FC = () => {
             </button>
 
             <button
-              className="ai-new-conversation-btn"
+              className="ai-header-action ai-new-conversation-btn"
               onClick={() => void newConversation()}
               disabled={isLoadingConversations}
             >
@@ -281,7 +281,7 @@ const AIChatAssistant: React.FC = () => {
             </button>
 
             {isStreaming && (
-              <button className="ai-clear-btn" onClick={stop} type="button">
+              <button className="ai-header-action ai-clear-btn" onClick={stop} type="button">
                 停止
               </button>
             )}

@@ -6,7 +6,7 @@ import DISPLAYED_TYPES from "../config/displayedTypes";
 import { useMapState } from "../features/map/state/MapStateContext";
 
 const StatusPanel: React.FC = () => {
-  const { filter, hazards, refresh, setFilter } = useMapState();
+  const { filter, hazards, loading, refresh, setFilter } = useMapState();
 
   return (
     <details className="status-panel orbital-overlay" aria-label="实时监控面板" open>
@@ -30,8 +30,11 @@ const StatusPanel: React.FC = () => {
         <span className="status-panel-title" role="heading" aria-level={2}>
           实时监控
         </span>
-        <span className="status-summary-count" aria-label={`灾害总数 ${hazards.length} 条`}>
-          {hazards.length} 条
+        <span
+          className="status-summary-count"
+          aria-label={loading ? "正在加载灾害数据" : `灾害总数 ${hazards.length} 条`}
+        >
+          {loading ? "加载中…" : `${hazards.length} 条`}
         </span>
         <span className="overlay-chevron" aria-hidden="true" />
       </summary>
@@ -73,8 +76,20 @@ const StatusPanel: React.FC = () => {
           </span>
         </div>
 
-        <button className="btn btn-primary status-refresh-button" onClick={() => void refresh()}>
-          刷新数据
+        {loading && (
+          <div className="status-loading" role="status" aria-live="polite">
+            <span className="status-loading-spinner" aria-hidden="true" />
+            正在加载灾害数据…
+          </div>
+        )}
+
+        <button
+          className="btn btn-primary status-refresh-button"
+          onClick={() => void refresh()}
+          disabled={loading}
+          aria-busy={loading}
+        >
+          {loading ? "加载中…" : "刷新数据"}
         </button>
       </div>
     </details>

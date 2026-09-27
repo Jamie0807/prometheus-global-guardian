@@ -179,8 +179,17 @@ function pendingHazardFeed() {
 }
 
 function MapStateControls() {
-  const { filter, hazards, refresh, setFilter, showHeatmap, toggleHeatmap, viewMode, setViewMode } =
-    useMapState();
+  const {
+    filter,
+    hazards,
+    loading,
+    refresh,
+    setFilter,
+    showHeatmap,
+    toggleHeatmap,
+    viewMode,
+    setViewMode,
+  } = useMapState();
 
   return (
     <>
@@ -188,6 +197,7 @@ function MapStateControls() {
       <div data-testid="map-state-event-ids">
         {hazards.map((hazard) => hazard.eventId).join(",")}
       </div>
+      <div data-testid="map-state-loading">{String(loading)}</div>
       <div data-testid="map-state-view-mode">{viewMode}</div>
       <div data-testid="map-state-filter">{filter}</div>
       <div data-testid="map-state-heatmap">{String(showHeatmap)}</div>
@@ -326,6 +336,26 @@ describe("MapView", () => {
 
     await waitFor(() => expect(mapMocks.addSource).toHaveBeenCalled());
     expect(screen.getByTestId("map-state-event-ids")).toHaveTextContent("disasteraware:hazard-1");
+  });
+
+  it("exposes loading while initial and manual hazard requests are pending", async () => {
+    const initial = pendingHazardFeed();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => initial.promise);
+    renderMapView();
+
+    await waitFor(() => expect(mapMocks.fetchHazardFeed).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("map-state-loading")).toHaveTextContent("true");
+
+    initial.resolve({ hazards: [], meta: null });
+    await waitFor(() => expect(screen.getByTestId("map-state-loading")).toHaveTextContent("false"));
+
+    const manual = pendingHazardFeed();
+    mapMocks.fetchHazardFeed.mockImplementationOnce(() => manual.promise);
+    fireEvent.click(screen.getByRole("button", { name: "refresh-map-data" }));
+
+    await waitFor(() => expect(screen.getByTestId("map-state-loading")).toHaveTextContent("true"));
+    manual.resolve({ hazards: [], meta: null });
+    await waitFor(() => expect(screen.getByTestId("map-state-loading")).toHaveTextContent("false"));
   });
 
   it("keeps individual hazard markers hidden when data arrives at a clustered zoom", async () => {

@@ -9,6 +9,7 @@ import DISPLAYED_TYPES from "../../src/config/displayedTypes";
 const mapStateMocks = vi.hoisted(() => ({
   hazards: [{ id: "hazard-1" }],
   filter: "ALL",
+  loading: false,
   refresh: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   setFilter: vi.fn<(filter: string) => void>(),
 }));
@@ -22,6 +23,7 @@ describe("StatusPanel", () => {
     mapStateMocks.refresh.mockReset();
     mapStateMocks.refresh.mockResolvedValue(undefined);
     mapStateMocks.setFilter.mockReset();
+    mapStateMocks.loading = false;
   });
 
   it("immediately provides every supported localized hazard type", () => {
@@ -62,5 +64,15 @@ describe("StatusPanel", () => {
     await user.click(screen.getByRole("button", { name: "刷新数据" }));
 
     expect(mapStateMocks.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("shows loading feedback while hazard data is being fetched", () => {
+    mapStateMocks.loading = true;
+    render(<StatusPanel />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("正在加载灾害数据…");
+    expect(screen.getByLabelText("正在加载灾害数据")).toHaveTextContent("加载中…");
+    expect(screen.getByRole("button", { name: "加载中…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "加载中…" })).toHaveAttribute("aria-busy", "true");
   });
 });

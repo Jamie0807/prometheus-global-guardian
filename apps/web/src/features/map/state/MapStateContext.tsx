@@ -20,6 +20,7 @@ export type MapViewMode = "2d" | "3d";
 
 export type MapStateValue = {
   hazards: Hazard[];
+  loading: boolean;
   filter: string;
   mapStyle: string;
   viewMode: MapViewMode;
@@ -40,7 +41,7 @@ export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Ele
   const [viewMode, setViewMode] = useState<MapViewMode>("2d");
   const [showHeatmap, setShowHeatmap] = useState(false);
   const toggleHeatmap = useCallback(() => setShowHeatmap((value) => !value), []);
-  const { disasters, refresh, sourceMeta } = useHazardData(filter);
+  const { disasters, loading, refresh, sourceMeta } = useHazardData(filter);
   const previousHazardCountRef = useRef(0);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Ele
   const value = useMemo<MapStateValue>(
     () => ({
       hazards: disasters,
+      loading,
       filter,
       mapStyle,
       viewMode,
@@ -67,7 +69,17 @@ export function MapStateProvider({ children }: PropsWithChildren): React.JSX.Ele
       toggleHeatmap,
       refresh,
     }),
-    [disasters, filter, mapStyle, refresh, showHeatmap, sourceMeta, toggleHeatmap, viewMode],
+    [
+      disasters,
+      filter,
+      loading,
+      mapStyle,
+      refresh,
+      showHeatmap,
+      sourceMeta,
+      toggleHeatmap,
+      viewMode,
+    ],
   );
 
   return <MapStateContext.Provider value={value}>{children}</MapStateContext.Provider>;

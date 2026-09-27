@@ -47,6 +47,7 @@ export function useHazardData(filter: string) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [disasters, setDisasters] = useState<Hazard[]>([]);
   const [sourceMeta, setSourceMeta] = useState<HazardFeedResponse["meta"] | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const clearRefreshInterval = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -65,6 +66,7 @@ export function useHazardData(filter: string) {
     inFlightRef.current = null;
     requestIdRef.current += 1;
     inFlight.controller.abort();
+    if (mountedRef.current) setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export function useHazardData(filter: string) {
       cancelInFlight();
       const controller = new AbortController();
       const requestId = ++requestIdRef.current;
+      setLoading(true);
       const promise = (async () => {
         try {
           const response = await fetchHazardFeed(filter, controller.signal);
@@ -115,7 +118,10 @@ export function useHazardData(filter: string) {
       const inFlight: InFlightRequest = { controller, filter, promise, reason };
       inFlightRef.current = inFlight;
       void promise.finally(() => {
-        if (inFlightRef.current === inFlight) inFlightRef.current = null;
+        if (inFlightRef.current === inFlight) {
+          inFlightRef.current = null;
+          setLoading(false);
+        }
       });
       return promise;
     },
@@ -156,5 +162,5 @@ export function useHazardData(filter: string) {
     };
   }, [cancelInFlight, clearRefreshInterval, refresh]);
 
-  return { disasters, refresh, sourceMeta };
+  return { disasters, loading, refresh, sourceMeta };
 }

@@ -133,6 +133,21 @@ describe("AIChatAssistant", () => {
     expect(screen.queryByRole("region", { name: "长期记忆管理" })).not.toBeInTheDocument();
   });
 
+  it("uses the shared header action style for the stop control", async () => {
+    const user = userEvent.setup();
+    serviceMocks.streamChatMessage.mockReturnValue(new Promise<AIStreamOutcome>(() => undefined));
+
+    renderWithAppState();
+    await user.click(screen.getByRole("button", { name: "open-ai" }));
+    await user.type(screen.getByRole("textbox"), "分析洪水");
+    await user.click(screen.getByTitle("发送"));
+
+    const sharedHeaderActionClass = "ai-header-action";
+    expect(screen.getByRole("button", { name: /上下文已开/ })).toHaveClass(sharedHeaderActionClass);
+    expect(screen.getByRole("button", { name: /新对话/ })).toHaveClass(sharedHeaderActionClass);
+    expect(screen.getByRole("button", { name: "停止" })).toHaveClass(sharedHeaderActionClass);
+  });
+
   it("keeps ordered action numbering independent from unordered findings", async () => {
     const user = userEvent.setup();
     serviceMocks.streamChatMessage.mockImplementation(
