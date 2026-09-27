@@ -158,8 +158,31 @@ test("buildWorkflowPayload sends the latest user input and workflow context", ()
     byType: { EARTHQUAKE: 12, TSUNAMI: 10 },
     recent: [],
   });
+  assert.equal(payload.inputs.hazard_context_available, true);
   assert.equal(payload.inputs.location, "全球");
   assert.equal(payload.inputs.language, "zh");
+});
+
+test("buildWorkflowPayload distinguishes unavailable context from an empty live snapshot", () => {
+  const unavailablePayload = buildWorkflowPayload({
+    messages: [{ role: "user", content: "当前有多少条实时灾害" }],
+    disasterContext: { conversationSummary: "上一轮不应进入实时数据上下文" },
+  });
+  const emptySnapshotPayload = buildWorkflowPayload({
+    messages: [{ role: "user", content: "当前有多少条实时灾害" }],
+    disasterContext: { total: 0, byType: {}, recent: [] },
+  });
+
+  assert.equal(unavailablePayload.inputs.hazard_context_available, false);
+  assert.equal(emptySnapshotPayload.inputs.hazard_context_available, true);
+  assert.equal(unavailablePayload.inputs.hazard_context, null);
+  assert.match(unavailablePayload.inputs.user_input, /实时灾害上下文不可用/);
+  assert.deepEqual(emptySnapshotPayload.inputs.hazard_context, {
+    total: 0,
+    byType: {},
+    recent: [],
+  });
+  assert.equal("conversationSummary" in (unavailablePayload.inputs.hazard_context ?? {}), false);
 });
 
 test("buildWorkflowPayload tells the workflow to use aggregate counts instead of recent samples", () => {
@@ -200,6 +223,7 @@ test("buildAIProviderRequest chooses workflow protocol for workflow provider", (
   assert.equal(request.payload.stream, true);
   assert.equal(request.payload.inputs.location, "全球");
   assert.equal(request.payload.inputs.language, "zh");
+  assert.equal(request.payload.inputs.hazard_context_available, true);
   assert.deepEqual(request.payload.inputs.hazard_context, {
     total: 0,
     byType: {},
@@ -324,8 +348,8 @@ test("buildWorkflowPayload strips raw hazard fields before forwarding context", 
   });
 
   assert.doesNotMatch(JSON.stringify(payload), /secret\.example|coordinates|script/);
-  assert.equal(payload.inputs.hazard_context.recent?.[0]?.sourceId, "unknown");
-  assert.equal(payload.inputs.hazard_context.recent?.[0]?.layerId, "unknown");
+  assert.equal(payload.inputs.hazard_context?.recent?.[0]?.sourceId, "unknown");
+  assert.equal(payload.inputs.hazard_context?.recent?.[0]?.layerId, "unknown");
 });
 
 test("builds prompt and workflow context without sensitive text in allowlisted hazard fields", () => {

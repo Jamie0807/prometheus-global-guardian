@@ -73,7 +73,8 @@ interface ResponsesPayload {
 interface WorkflowPayload {
   inputs: {
     user_input: string;
-    hazard_context: DisasterContext;
+    hazard_context: DisasterContext | null;
+    hazard_context_available: boolean;
     location: string;
     language: string;
   };
@@ -312,7 +313,10 @@ function sanitizeHazardSummary(value: HazardSummary): HazardSummary {
   return summary;
 }
 
-function sanitizeDisasterContext(ctx?: DisasterContext | null): DisasterContext {
+function sanitizeDisasterContext(
+  ctx?: DisasterContext | null,
+  options: { includeConversationSummary?: boolean } = {},
+): DisasterContext {
   const total = Number(ctx?.total);
   const byType = Object.fromEntries(
     Object.entries(ctx?.byType ?? {})
@@ -334,8 +338,18 @@ function sanitizeDisasterContext(ctx?: DisasterContext | null): DisasterContext 
     total: Number.isSafeInteger(total) && total >= 0 ? total : 0,
     byType,
     recent,
-    ...(conversationSummary ? { conversationSummary } : {}),
+    ...(options.includeConversationSummary === false || !conversationSummary
+      ? {}
+      : { conversationSummary }),
   };
+}
+
+function hasLiveHazardContext(ctx?: DisasterContext | null): boolean {
+  if (!ctx || typeof ctx !== "object") return false;
+
+  return ["total", "byType", "recent"].some((key) =>
+    Object.prototype.hasOwnProperty.call(ctx, key),
+  );
 }
 
 function buildWorkflowStatisticsInstruction(ctx: DisasterContext): string {
@@ -491,18 +505,22 @@ export function buildWorkflowPayload({
   const safeMessages = normalizeMessages(messages);
   const latestInput =
     [...safeMessages].reverse().find((message) => message.role === "user") ?? safeMessages.at(-1);
-  const sanitizedContext =
-    disasterContext && typeof disasterContext === "object"
-      ? sanitizeDisasterContext(disasterContext)
-      : { total: 0, byType: {}, recent: [] };
+  const liveContextAvailable = hasLiveHazardContext(disasterContext);
+  const sanitizedContext = liveContextAvailable
+    ? sanitizeDisasterContext(disasterContext, { includeConversationSummary: false })
+    : null;
   const latestInputText = latestInput
     ? `${latestInput.role === "assistant" ? "助手" : "用户"}：${latestInput.content}`
     : "";
+  const unavailableContextInstruction = liveContextAvailable
+    ? ""
+    : "\n\n【平台实时数据状态】实时灾害上下文不可用，不得根据空值判断当前是否有灾害。";
 
   return {
     inputs: {
-      user_input: `${latestInputText}${buildWorkflowStatisticsInstruction(sanitizedContext)}`,
+      user_input: `${latestInputText}${sanitizedContext ? buildWorkflowStatisticsInstruction(sanitizedContext) : ""}${unavailableContextInstruction}`,
       hazard_context: sanitizedContext,
+      hazard_context_available: liveContextAvailable,
       location: typeof location === "string" ? location.trim() : "",
       language: typeof language === "string" && language.trim() ? language.trim() : "zh",
     },
