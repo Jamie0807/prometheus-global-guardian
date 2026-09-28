@@ -12,14 +12,15 @@ The repository contains a React client, an Express BFF, a FastAPI analytics serv
 
 ### Documentation map
 
-| Need                                                       | Document                                                                                                   |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Install, run, configure, and use the local stack           | This README                                                                                                |
-| Stable architecture, boundaries, and contracts             | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md)                                                               |
-| Test commands, ownership, evidence, and environment limits | [docs/TESTING_BASELINE.md](docs/TESTING_BASELINE.md)                                                       |
-| PostgreSQL migration, backup, restore, and data protection | [docs/OPERATIONS_PERSISTENCE.md](docs/OPERATIONS_PERSISTENCE.md)                                           |
-| Open work, priorities, and residual risks                  | [docs/PROJECT_OPTIMIZATION_BACKLOG.md](docs/PROJECT_OPTIMIZATION_BACKLOG.md)                               |
-| External project research and architecture comparisons     | [docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md](docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md) |
+| Need                                                           | Document                                                                                                   |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Install, run, configure, and use the local stack               | This README                                                                                                |
+| Stable architecture, boundaries, and contracts                 | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md)                                                               |
+| Test commands, ownership, evidence, and environment limits     | [docs/TESTING_BASELINE.md](docs/TESTING_BASELINE.md)                                                       |
+| PostgreSQL migration, backup, restore, and data protection     | [docs/OPERATIONS_PERSISTENCE.md](docs/OPERATIONS_PERSISTENCE.md)                                           |
+| Docker image builds, Compose startup, and container boundaries | [Docker/README.md](Docker/README.md)                                                                       |
+| Open work, priorities, and residual risks                      | [docs/PROJECT_OPTIMIZATION_BACKLOG.md](docs/PROJECT_OPTIMIZATION_BACKLOG.md)                               |
+| External project research and architecture comparisons         | [docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md](docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md) |
 
 ### Table of Contents
 
@@ -60,8 +61,8 @@ The supported local path is the Docker Compose complete stack:
 ```bash
 cp .env.example .env
 # Set server-side secrets and provider values in .env.
-docker compose up --build -d
-docker compose exec web pnpm run db:migrate:deploy
+docker compose --env-file .env -f Docker/compose/docker-compose.yml up --build -d
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec web pnpm run db:migrate:deploy
 open http://localhost:8080
 ```
 
@@ -315,17 +316,17 @@ Docker Compose is a **local complete-stack startup** path. It does not represent
 
 ```bash
 pnpm run check:docker
-docker compose up --build -d
-docker compose exec web pnpm run db:migrate:deploy
+docker compose --env-file .env -f Docker/compose/docker-compose.yml up --build -d
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec web pnpm run db:migrate:deploy
 ```
 
-`pnpm run check:docker` validates both Compose configurations without starting containers. Open `http://localhost:8080`. FastAPI stays private to the Compose network; PostgreSQL publishes `5432` for local tools such as DataGrip. The isolated test overlay uses `127.0.0.1:55439` and a separate volume. Check services with `docker compose ps` and `docker compose logs -f analytics db`. Stop with `docker compose down`.
+`pnpm run check:docker` validates both Compose configurations without starting containers. Open `http://localhost:8080`. FastAPI stays private to the Compose network; PostgreSQL publishes `5432` for local tools such as DataGrip. The isolated test overlay uses `127.0.0.1:55439` and a separate volume. Check services with `docker compose --env-file .env -f Docker/compose/docker-compose.yml ps` and `docker compose --env-file .env -f Docker/compose/docker-compose.yml logs -f analytics db`. Stop with `docker compose --env-file .env -f Docker/compose/docker-compose.yml down`.
 
 The web container exposes 8080 and Analytics does not publish a host port. Analytics requests go through the authenticated BFF and its private service token. Compose passes public `VITE_*` build values to the client build; database, session, analytics service, DisasterAware and AI values remain server-side. The sample database password is for local use only. Back up the PostgreSQL volume before upgrades or maintenance; the migration command is explicit and is not run automatically by startup. For a local SQL backup and restore:
 
 ```bash
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
 ```
 
 Protect backup files as user data and store them separately from the Compose volume.
@@ -456,15 +457,17 @@ prometheus-global-guardian/
 ├── vite.config.ts                # Web root and root dist/ output
 ├── vitest.config.ts              # Service test configuration
 ├── playwright.config.ts          # Browser test configuration
-├── Dockerfile                    # Local complete-stack image
-├── services/analytics/Dockerfile # Analytics service image
-├── docker-compose.yml           # Local complete-stack startup
-├── docker-compose.test.yml      # Isolated test database overlay
+├── Docker/                       # Container builds, Compose files, and Docker guide
+│   ├── build/web-bff.Dockerfile
+│   ├── build/analytics.Dockerfile
+│   ├── compose/docker-compose.yml
+│   ├── compose/docker-compose.test.yml
+│   └── README.md
 ├── .dockerignore                # Build context exclusions
 └── AGENTS.md                    # Development, worktree, TDD, and validation conventions
 ```
 
-The Web runtime lives in `apps/web/`, with implementation under `apps/web/src/`. The BFF runtime lives in `apps/bff/`, with `apps/bff/index.ts` as its entrypoint. The Analytics runtime lives in `services/analytics/`, with `main.py` retained as its direct and Uvicorn entrypoint. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express serves. The repository root retains the package scripts, Vite, Vitest, Playwright, and Dockerfile orchestration. Web and BFF production code import the hazard model through the public `@pgg/hazard-domain` entrypoint; the removed shared hazard compatibility layer is no longer part of the runtime boundary.
+The Web runtime lives in `apps/web/`, with implementation under `apps/web/src/`. The BFF runtime lives in `apps/bff/`, with `apps/bff/index.ts` as its entrypoint. The Analytics runtime lives in `services/analytics/`, with `main.py` retained as its direct and Uvicorn entrypoint. Vite builds from `apps/web/index.html` into the repository root `dist/`, which Express serves. The repository root retains the package scripts, Vite, Vitest, and Playwright orchestration; Docker build and Compose files are centralized under `Docker/`. Web and BFF production code import the hazard model through the public `@pgg/hazard-domain` entrypoint; the removed shared hazard compatibility layer is no longer part of the runtime boundary.
 
 ---
 
@@ -476,14 +479,15 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 
 ### 文档分工
 
-| 需求                                  | 文档                                                                                                       |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 安装、启动、配置和使用本地技术栈      | 本 README                                                                                                  |
-| 稳定架构、边界和契约                  | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md)                                                               |
-| 测试命令、责任、证据和环境限制        | [docs/TESTING_BASELINE.md](docs/TESTING_BASELINE.md)                                                       |
-| PostgreSQL 迁移、备份、恢复和数据保护 | [docs/OPERATIONS_PERSISTENCE.md](docs/OPERATIONS_PERSISTENCE.md)                                           |
-| 未完成事项、优先级和遗留风险          | [docs/PROJECT_OPTIMIZATION_BACKLOG.md](docs/PROJECT_OPTIMIZATION_BACKLOG.md)                               |
-| 外部项目调研和架构对比                | [docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md](docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md) |
+| 需求                                    | 文档                                                                                                       |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 安装、启动、配置和使用本地技术栈        | 本 README                                                                                                  |
+| 稳定架构、边界和契约                    | [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md)                                                               |
+| 测试命令、责任、证据和环境限制          | [docs/TESTING_BASELINE.md](docs/TESTING_BASELINE.md)                                                       |
+| PostgreSQL 迁移、备份、恢复和数据保护   | [docs/OPERATIONS_PERSISTENCE.md](docs/OPERATIONS_PERSISTENCE.md)                                           |
+| Docker 镜像构建、Compose 启动和容器边界 | [Docker/README.md](Docker/README.md)                                                                       |
+| 未完成事项、优先级和遗留风险            | [docs/PROJECT_OPTIMIZATION_BACKLOG.md](docs/PROJECT_OPTIMIZATION_BACKLOG.md)                               |
+| 外部项目调研和架构对比                  | [docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md](docs/OPEN_SOURCE_DISASTER_VISUALIZATION_RESEARCH.md) |
 
 ### 目录
 
@@ -524,8 +528,8 @@ Prometheus Global Guardian 是一个用于本地开发的全球灾害监测、�
 ```bash
 cp .env.example .env
 # 在 .env 中填写服务端密钥和 Provider 配置。
-docker compose up --build -d
-docker compose exec web pnpm run db:migrate:deploy
+docker compose --env-file .env -f Docker/compose/docker-compose.yml up --build -d
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec web pnpm run db:migrate:deploy
 open http://localhost:8080
 ```
 
@@ -787,28 +791,19 @@ Docker Compose 是**本地完整栈启动方式**，不代表部署配置。
 
 ```bash
 pnpm run check:docker
-docker compose up --build -d
-docker compose exec web pnpm run db:migrate:deploy
+docker compose --env-file .env -f Docker/compose/docker-compose.yml up --build -d
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec web pnpm run db:migrate:deploy
 ```
 
-`pnpm run check:docker` 会在不启动容器的情况下校验两套 Compose 配置。访问 `http://localhost:8080`。FastAPI 只在 Compose 私有网络中可用；PostgreSQL 默认发布 `5432`，可供 DataGrip 等本地工具连接。隔离测试覆盖使用 `127.0.0.1:55439` 和独立数据卷。用 `docker compose ps` 查看状态，用 `docker compose logs -f analytics db` 查看日志，用 `docker compose down` 停止本地栈。
+`pnpm run check:docker` 会在不启动容器的情况下校验两套 Compose 配置。访问 `http://localhost:8080`。FastAPI 只在 Compose 私有网络中可用；PostgreSQL 默认发布 `5432`，可供 DataGrip 等本地工具连接。隔离测试覆盖使用 `127.0.0.1:55439` 和独立数据卷。用 `docker compose --env-file .env -f Docker/compose/docker-compose.yml ps` 查看状态，用 `docker compose --env-file .env -f Docker/compose/docker-compose.yml logs -f analytics db` 查看日志，用 `docker compose --env-file .env -f Docker/compose/docker-compose.yml down` 停止本地栈。
 
 Web 容器暴露 8080，Analytics 不发布主机端口。分析请求经已鉴权的 BFF 和私有服务令牌转发。Compose 只将公开的 `VITE_*` 构建变量传入客户端构建；数据库、会话、分析服务、DisasterAware 和 AI 配置都保留在服务端。示例数据库密码仅供本地使用。升级或维护前先备份 PostgreSQL 数据卷；迁移命令需显式执行，不会随服务启动自动运行。
 
 本地 SQL 备份与恢复示例：
 
 ```bash
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
-```
-
-备份文件包含用户数据，应妥善保护，并与 Compose 数据卷分开保存。
-
-本地 SQL 备份与恢复示例：
-
-```bash
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > ./prometheus-backup.sql
+docker compose --env-file .env -f Docker/compose/docker-compose.yml exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"' < ./prometheus-backup.sql
 ```
 
 备份文件包含用户数据，应妥善保护，并与 Compose 数据卷分开保存。
@@ -935,12 +930,14 @@ prometheus-global-guardian/
 ├── vite.config.ts                # Web root 与根目录 dist/ 输出
 ├── vitest.config.ts              # Service 测试配置
 ├── playwright.config.ts          # 浏览器测试配置
-├── Dockerfile                    # 本地完整栈镜像
-├── services/analytics/Dockerfile # Analytics 服务镜像
-├── docker-compose.yml           # 本地完整栈启动
-├── docker-compose.test.yml      # 隔离测试数据库覆盖
+├── Docker/                       # 容器构建、Compose 编排和 Docker 说明
+│   ├── build/web-bff.Dockerfile
+│   ├── build/analytics.Dockerfile
+│   ├── compose/docker-compose.yml
+│   ├── compose/docker-compose.test.yml
+│   └── README.md
 ├── .dockerignore                # 构建上下文排除项
 └── AGENTS.md                    # 开发、worktree、TDD 和验证约定
 ```
 
-Web 运行单元位于 `apps/web/`，实现位于 `apps/web/src/`；BFF 运行单元位于 `apps/bff/`，入口为 `apps/bff/index.ts`；Analytics 运行单元位于 `services/analytics/`，入口为 `main.py`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest、Playwright 和 Dockerfile 编排入口。Web 与 BFF 生产代码通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；旧共享灾害兼容层已移除。
+Web 运行单元位于 `apps/web/`，实现位于 `apps/web/src/`；BFF 运行单元位于 `apps/bff/`，入口为 `apps/bff/index.ts`；Analytics 运行单元位于 `services/analytics/`，入口为 `main.py`。Vite 从 `apps/web/index.html` 构建，客户端产物仍输出到仓库根目录 `dist/` 并由 Express 提供。根目录继续保留 package 脚本、Vite、Vitest 和 Playwright 编排入口；Docker 构建和 Compose 文件统一位于 `Docker/`。Web 与 BFF 生产代码通过公共入口 `@pgg/hazard-domain` 使用灾害领域包；旧共享灾害兼容层已移除。

@@ -28,7 +28,7 @@
 ## 3. 首次启动与迁移
 
 ```bash
-docker compose up -d db
+docker compose --env-file .env -f Docker/compose/docker-compose.yml up -d db
 pnpm db:migrate:deploy
 pnpm db:check
 ```
@@ -74,4 +74,4 @@ Prisma migration 只前向执行，不自动生成或执行 down migration。迁
 
 ## 7. 隔离测试数据库
 
-持久化运维验证使用 `docker-compose.yml` 与 `docker-compose.test.yml` 叠加、独立 Compose 项目名、测试专用 `DATABASE_URL`、独立卷和 `127.0.0.1:55439` 端口。测试结束后才可对已确认的隔离项目执行 `down -v`；不得对正式 Compose 项目使用该命令。
+持久化运维验证使用 `Docker/compose/docker-compose.yml` 与 `Docker/compose/docker-compose.test.yml` 叠加、独立 Compose 项目名、测试专用 `DATABASE_URL`、独立卷和 `127.0.0.1:55439` 端口。测试结束后才可对已确认的隔离项目执行 `down -v`；不得对正式 Compose 项目使用该命令。

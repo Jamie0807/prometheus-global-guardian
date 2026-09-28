@@ -110,7 +110,7 @@ pnpm run test:python
 从仓库根目录启动完整栈：
 
 ```bash
-docker compose up --build
+docker compose --env-file .env -f Docker/compose/docker-compose.yml up --build
 ```
 
 Compose 不把分析服务映射到宿主机端口；Web BFF 通过 Compose 私有网络访问它。直接本地运行时，可在宿主机 `localhost:8001` 调试。
@@ -129,6 +129,7 @@ services/analytics/
 ├── analytics/              统计、预测、风险、ETL、质量、透视实现
 ├── security.py             管理令牌与 CORS 来源解析
 ├── tests/                  自动化 unittest
-├── requirements.txt
-└── Dockerfile
+└── requirements.txt
 ```
+
+Analytics 镜像定义统一位于仓库根目录的 `Docker/build/analytics.Dockerfile`，构建 context 仍是仓库根目录。

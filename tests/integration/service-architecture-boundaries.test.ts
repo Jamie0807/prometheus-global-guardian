@@ -64,7 +64,10 @@ describe("workspace architecture", () => {
   });
 
   it("includes workspace packages before Docker dependency installation", () => {
-    const dockerfile = readFileSync(path.join(repositoryRoot, "Dockerfile"), "utf8");
+    const dockerfile = readFileSync(
+      path.join(repositoryRoot, "Docker/build/web-bff.Dockerfile"),
+      "utf8",
+    );
     const stageSections = dockerfile.split("RUN npm install --global pnpm@10.15.1");
     expect(stageSections).toHaveLength(2);
     expect(stageSections[0]).toContain("COPY packages ./packages");
@@ -72,26 +75,59 @@ describe("workspace architecture", () => {
   });
 
   it("keeps container definitions at their runtime ownership boundaries", () => {
-    const compose = readFileSync(path.join(repositoryRoot, "docker-compose.yml"), "utf8");
-    const testCompose = readFileSync(path.join(repositoryRoot, "docker-compose.test.yml"), "utf8");
-    expect(existsSync(path.join(repositoryRoot, "Dockerfile"))).toBe(true);
+    const compose = readFileSync(
+      path.join(repositoryRoot, "Docker/compose/docker-compose.yml"),
+      "utf8",
+    );
+    const testCompose = readFileSync(
+      path.join(repositoryRoot, "Docker/compose/docker-compose.test.yml"),
+      "utf8",
+    );
+    expect(existsSync(path.join(repositoryRoot, "Docker/build/web-bff.Dockerfile"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "Docker/build/analytics.Dockerfile"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "Docker/compose/docker-compose.yml"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "Docker/compose/docker-compose.test.yml"))).toBe(
+      true,
+    );
+    expect(existsSync(path.join(repositoryRoot, "Dockerfile"))).toBe(false);
+    expect(existsSync(path.join(repositoryRoot, "docker-compose.yml"))).toBe(false);
+    expect(existsSync(path.join(repositoryRoot, "docker-compose.test.yml"))).toBe(false);
     expect(existsSync(path.join(repositoryRoot, ".dockerignore"))).toBe(true);
-    expect(existsSync(path.join(repositoryRoot, "services/analytics/Dockerfile"))).toBe(true);
+    expect(existsSync(path.join(repositoryRoot, "services/analytics/Dockerfile"))).toBe(false);
     expect(existsSync(path.join(repositoryRoot, "tooling/docker/check-compose.sh"))).toBe(true);
-    expect(compose).toContain("dockerfile: services/analytics/Dockerfile");
+    expect(compose).toContain("dockerfile: Docker/build/web-bff.Dockerfile");
+    expect(compose).toContain("dockerfile: Docker/build/analytics.Dockerfile");
+    expect(compose).toContain("name: prometheus-global-guardian");
     expect(compose).toContain("db:");
     expect(compose).toContain("analytics:");
     expect(testCompose).toContain("postgres-auth-test-data");
     expect(testCompose).toContain("127.0.0.1:55439:5432");
     expect(checkArchitecture(repositoryRoot)).not.toContain(
-      "container governance entry is missing: Dockerfile",
+      "container governance entry is missing: Docker/README.md",
     );
   });
 
   it("reports a missing container governance entry", () => {
     withFixture((root) => {
       expect(checkArchitecture(root)).toContain(
-        "container governance entry is missing: Dockerfile",
+        "container governance entry is missing: Docker/README.md",
+      );
+    });
+  });
+
+  it("reports legacy container paths that bypass centralized governance", () => {
+    withFixture((root) => {
+      writeFixture(root, "Dockerfile", "FROM scratch");
+      writeFixture(root, "docker-compose.yml", "services: {}\n");
+      writeFixture(root, "docker-compose.test.yml", "services: {}\n");
+      writeFixture(root, "services/analytics/Dockerfile", "FROM scratch");
+      expect(checkArchitecture(root)).toEqual(
+        expect.arrayContaining([
+          "legacy container governance path must be removed: Dockerfile",
+          "legacy container governance path must be removed: docker-compose.yml",
+          "legacy container governance path must be removed: docker-compose.test.yml",
+          "legacy container governance path must be removed: services/analytics/Dockerfile",
+        ]),
       );
     });
   });

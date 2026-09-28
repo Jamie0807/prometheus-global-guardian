@@ -443,7 +443,8 @@ describe("persistence health and restore rehearsal", () => {
       const oldProject = process.env.PERSISTENCE_COMPOSE_PROJECT;
       const oldFile = process.env.COMPOSE_FILE;
       process.env.PERSISTENCE_COMPOSE_PROJECT = "pgg-custom";
-      process.env.COMPOSE_FILE = "docker-compose.yml:docker-compose.test.yml";
+      process.env.COMPOSE_FILE =
+        "Docker/compose/docker-compose.yml:Docker/compose/docker-compose.test.yml";
       const calls: string[][] = [];
       try {
         await restoreVerify({
@@ -464,7 +465,13 @@ describe("persistence health and restore rehearsal", () => {
         else process.env.COMPOSE_FILE = oldFile;
       }
       for (const args of calls.filter((args) => args.includes("config") || args.includes("run"))) {
-        expect(args.slice(0, 3)).toEqual(["compose", "-p", "pgg-custom"]);
+        expect(args.slice(0, 5)).toEqual([
+          "compose",
+          "--env-file",
+          path.join(process.cwd(), ".env"),
+          "-p",
+          "pgg-custom",
+        ]);
         expect(args).not.toContain("-f");
         expect(args.some((arg) => arg.startsWith("DATABASE_URL="))).toBe(false);
       }
@@ -606,7 +613,7 @@ describe("persistence command boundaries", () => {
     const invocations: Array<{ command: string; args: string[] }> = [];
     await runCompose(["ps", "--status", "running"], {
       composeProject: "pgg-test",
-      composeFile: "docker-compose.test.yml",
+      composeFile: "Docker/compose/docker-compose.test.yml",
       runner: async (command: string, args: string[]) => {
         invocations.push({ command, args });
       },
@@ -616,8 +623,10 @@ describe("persistence command boundaries", () => {
         command: "docker",
         args: [
           "compose",
+          "--env-file",
+          path.join(process.cwd(), ".env"),
           "-f",
-          "docker-compose.test.yml",
+          "Docker/compose/docker-compose.test.yml",
           "-p",
           "pgg-test",
           "ps",
@@ -625,6 +634,33 @@ describe("persistence command boundaries", () => {
           "running",
         ],
       },
+    ]);
+  });
+
+  it("uses the centralized Compose file when no file override is configured", async () => {
+    const oldFile = process.env.COMPOSE_FILE;
+    delete process.env.COMPOSE_FILE;
+    const invocations: string[][] = [];
+    try {
+      await runCompose(["ps", "db"], {
+        runner: async (_command: string, args: string[]) => {
+          invocations.push(args);
+        },
+      });
+    } finally {
+      if (oldFile === undefined) delete process.env.COMPOSE_FILE;
+      else process.env.COMPOSE_FILE = oldFile;
+    }
+    expect(invocations).toEqual([
+      [
+        "compose",
+        "--env-file",
+        path.join(process.cwd(), ".env"),
+        "-f",
+        path.join(process.cwd(), "Docker/compose/docker-compose.yml"),
+        "ps",
+        "db",
+      ],
     ]);
   });
 
@@ -648,7 +684,8 @@ describe("persistence command boundaries", () => {
     const oldProject = process.env.PERSISTENCE_COMPOSE_PROJECT;
     const oldFile = process.env.COMPOSE_FILE;
     process.env.PERSISTENCE_COMPOSE_PROJECT = "pgg-custom";
-    process.env.COMPOSE_FILE = "docker-compose.yml:docker-compose.test.yml";
+    process.env.COMPOSE_FILE =
+      "Docker/compose/docker-compose.yml:Docker/compose/docker-compose.test.yml";
     const invocations: string[][] = [];
     try {
       await runCompose(["ps", "db"], {
@@ -662,6 +699,8 @@ describe("persistence command boundaries", () => {
       if (oldFile === undefined) delete process.env.COMPOSE_FILE;
       else process.env.COMPOSE_FILE = oldFile;
     }
-    expect(invocations).toEqual([["compose", "-p", "pgg-custom", "ps", "db"]]);
+    expect(invocations).toEqual([
+      ["compose", "--env-file", path.join(process.cwd(), ".env"), "-p", "pgg-custom", "ps", "db"],
+    ]);
   });
 });

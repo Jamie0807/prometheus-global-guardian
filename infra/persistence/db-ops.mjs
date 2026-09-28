@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,8 @@ import {
 } from "./backup-utils.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const defaultComposeEnvFile = path.join(projectRoot, ".env");
+const defaultComposeFile = path.join(projectRoot, "Docker/compose/docker-compose.yml");
 const requiredTables = ["users", "auth_sessions", "ai_conversations", "ai_messages"];
 
 export async function validateBackupDirectory(directory) {
@@ -62,9 +65,14 @@ export async function defaultRunner(command, args, { stdoutPath, env } = {}) {
 }
 
 function composeCommand(args, options = {}) {
-  const composeFile = options.composeFile;
+  const composeEnvFile =
+    options.composeEnvFile ??
+    (existsSync(defaultComposeEnvFile) ? defaultComposeEnvFile : undefined);
+  const composeFile =
+    options.composeFile ?? (process.env.COMPOSE_FILE ? undefined : defaultComposeFile);
   const composeProject = options.composeProject ?? process.env.PERSISTENCE_COMPOSE_PROJECT;
   const command = ["compose"];
+  if (composeEnvFile) command.push("--env-file", composeEnvFile);
   if (composeFile) command.push("-f", composeFile);
   if (composeProject) command.push("-p", composeProject);
   command.push(...args);

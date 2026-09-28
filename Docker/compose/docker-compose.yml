@@ -1,8 +1,10 @@
+name: prometheus-global-guardian
+
 services:
   web:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: Docker/build/web-bff.Dockerfile
       args:
         VITE_MAPBOX_TOKEN: ${VITE_MAPBOX_TOKEN:-}
         VITE_3D_TILES_URL: ${VITE_3D_TILES_URL:-}
@@ -59,8 +61,8 @@ services:
 
   analytics:
     build:
-      context: .
-      dockerfile: services/analytics/Dockerfile
+      context: ../..
+      dockerfile: Docker/build/analytics.Dockerfile
     environment:
       ANALYTICS_ADMIN_TOKEN: ${ANALYTICS_ADMIN_TOKEN:-}
       ANALYTICS_SERVICE_TOKEN: ${ANALYTICS_SERVICE_TOKEN:-}

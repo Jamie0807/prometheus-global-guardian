@@ -103,41 +103,41 @@ flowchart LR
 
 ## 6. 目录地图
 
-| 路径                                                     | 责任                                                                        |
-| -------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `apps/web/index.html`                                    | Vite 浏览器 HTML 入口。                                                     |
-| `apps/web/src/App.tsx`                                   | 客户端组合根、Provider 装配、视图选择和组件懒加载。                         |
-| `apps/web/src/features/`                                 | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。 |
-| `apps/web/src/components/`                               | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。         |
-| `apps/web/src/hooks/`                                    | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                        |
-| `apps/web/src/config/`、`apps/web/src/utils/`            | 浏览器公开配置、日志、通知和无业务归属的纯工具。                            |
-| `apps/web/src/state/`                                    | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                   |
-| `apps/web/src/state/AuthContext.tsx`                     | 恢复服务端用户会话、CSRF token 和认证操作。                                 |
-| `apps/web/src/services/`                                 | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。    |
-| `apps/web/src/types/`                                    | 客户端共享领域类型。                                                        |
-| `apps/web/src/workers/`                                  | 浏览器 Worker 数据处理。                                                    |
-| `apps/bff/index.ts`                                      | Express 应用装配、授权、灾害 API、静态资源和监听入口。                      |
-| `apps/bff/ai/`                                           | AI Provider 配置、路由判定、请求处理和流协议转换。                          |
-| `apps/bff/auth/`                                         | 密码哈希、服务端会话、CSRF 校验和用户认证路由。                             |
-| `apps/bff/db/`                                           | Prisma/PostgreSQL 客户端初始化。                                            |
-| `apps/bff/analytics/`                                    | 认证后的 Analytics allowlist BFF 代理。                                     |
-| `apps/bff/hazards/`                                      | 公共灾害源获取、适配、缓存和聚合。                                          |
-| `apps/bff/security/`                                     | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                      |
-| `packages/hazard-domain/`                                | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
-| `services/analytics/app/`                                | FastAPI 应用工厂、core、routes、schemas 和应用服务。                        |
-| `services/analytics/analytics/`                          | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                       |
-| `packages/contracts/`                                    | Analytics 与统一灾害事件的跨语言契约样本。                                  |
-| `packages/hazard-domain/`                                | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
-| `package.json`、`vite.config.ts`                         | 仓库脚本、Web 构建入口和根 `dist/` 产物配置。                               |
-| `prisma.config.ts`、`prisma/`                            | Prisma CLI 根配置、数据库 schema 与版本化 migration。                       |
-| `tsconfig*.json`、`eslint.config.js`                     | 跨 Web、BFF、契约和配置文件的 TypeScript/ESLint 编排边界。                  |
-| `vitest.config.ts`、`playwright.config.ts`、`Dockerfile` | 仓库级测试与容器编排入口。                                                  |
-| `docker-compose.yml`、`docker-compose.test.yml`          | 本地完整栈与隔离测试数据库的 Compose 编排入口。                             |
-| `tooling/docker/check-compose.sh`                        | 无需启动容器即可校验两套 Compose 配置的结构与覆盖关系。                     |
-| `tests/`                                                 | BFF、前端 Service、组件、契约和 E2E 自动化测试。                            |
-| `services/analytics/tests/`                              | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
-| `.github/workflows/`                                     | 当前 GitHub Actions 质量工作流。                                            |
-| `docs/`                                                  | 当前测试基线、优化清单、本规格书和历史过程记录。                            |
+| 路径                                          | 责任                                                                        |
+| --------------------------------------------- | --------------------------------------------------------------------------- |
+| `apps/web/index.html`                         | Vite 浏览器 HTML 入口。                                                     |
+| `apps/web/src/App.tsx`                        | 客户端组合根、Provider 装配、视图选择和组件懒加载。                         |
+| `apps/web/src/features/`                      | 当前包含 `map/` 与 `analytics/` 两个 feature 的 React UI、Hook 和局部逻辑。 |
+| `apps/web/src/components/`                    | 共享展示组件，以及当前尚未迁入 feature 的 AI 助手、设置与报告弹窗。         |
+| `apps/web/src/hooks/`                         | 供组件使用的跨组件 Hook；AI 会话 Hook 当前位于此处。                        |
+| `apps/web/src/config/`、`apps/web/src/utils/` | 浏览器公开配置、日志、通知和无业务归属的纯工具。                            |
+| `apps/web/src/state/`                         | 跨功能 UI 状态；`UIStateContext` 持有活动视图和弹窗状态。                   |
+| `apps/web/src/state/AuthContext.tsx`          | 恢复服务端用户会话、CSRF token 和认证操作。                                 |
+| `apps/web/src/services/`                      | 浏览器业务请求、HTTP 调度、外部数据适配、运行时响应解析和 Service 错误。    |
+| `apps/web/src/types/`                         | 客户端共享领域类型。                                                        |
+| `apps/web/src/workers/`                       | 浏览器 Worker 数据处理。                                                    |
+| `apps/bff/index.ts`                           | Express 应用装配、授权、灾害 API、静态资源和监听入口。                      |
+| `apps/bff/ai/`                                | AI Provider 配置、路由判定、请求处理和流协议转换。                          |
+| `apps/bff/auth/`                              | 密码哈希、服务端会话、CSRF 校验和用户认证路由。                             |
+| `apps/bff/db/`                                | Prisma/PostgreSQL 客户端初始化。                                            |
+| `apps/bff/analytics/`                         | 认证后的 Analytics allowlist BFF 代理。                                     |
+| `apps/bff/hazards/`                           | 公共灾害源获取、适配、缓存和聚合。                                          |
+| `apps/bff/security/`                          | BFF 请求体、query、路由、上游请求、AI 输入和限流边界。                      |
+| `packages/hazard-domain/`                     | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
+| `services/analytics/app/`                     | FastAPI 应用工厂、core、routes、schemas 和应用服务。                        |
+| `services/analytics/analytics/`               | ETL、统计、预测、风险、质量、统一模型和透视算法实现。                       |
+| `packages/contracts/`                         | Analytics 与统一灾害事件的跨语言契约样本。                                  |
+| `packages/hazard-domain/`                     | 浏览器与 Node 共用的 canonical 灾害事件、来源/图层注册表和事件 ID 规则。    |
+| `package.json`、`vite.config.ts`              | 仓库脚本、Web 构建入口和根 `dist/` 产物配置。                               |
+| `prisma.config.ts`、`prisma/`                 | Prisma CLI 根配置、数据库 schema 与版本化 migration。                       |
+| `tsconfig*.json`、`eslint.config.js`          | 跨 Web、BFF、契约和配置文件的 TypeScript/ESLint 编排边界。                  |
+| `vitest.config.ts`、`playwright.config.ts`    | 仓库级测试和浏览器编排入口。                                                |
+| `Docker/build/`、`Docker/compose/`            | 镜像构建、完整栈 Compose 和隔离测试数据库 Compose 入口。                    |
+| `tooling/docker/check-compose.sh`             | 无需启动容器即可校验两套 Compose 配置的结构与覆盖关系。                     |
+| `tests/`                                      | BFF、前端 Service、组件、契约和 E2E 自动化测试。                            |
+| `services/analytics/tests/`                   | Python 模型、路由、服务与算法自动化测试及手工脚本。                         |
+| `.github/workflows/`                          | 当前 GitHub Actions 质量工作流。                                            |
+| `docs/`                                       | 当前测试基线、优化清单、本规格书和历史过程记录。                            |
 
 根目录配置文件按“仓库编排入口”治理，不按业务功能拆散：`prisma.config.ts` 跟随 Prisma CLI 的默认发现规则，`playwright.config.ts` 负责跨 Web/BFF 的生产构建冒烟，`vite.config.ts`、`vitest*.config.ts` 和 `tsconfig*.json` 负责多运行单元的构建、测试和类型边界；`eslint.config.js`、`commitlint.config.cjs`、`cspell.json` 和 `.prettierrc.json` 是仓库级质量策略。依赖管理只保留 pnpm 的 `pnpm-workspace.yaml` 与 `pnpm-lock.yaml`，不保留平行 `package-lock.json`。
 
@@ -336,31 +336,31 @@ BFF 在送入 Workflow 前会清洗实时上下文：只保留受允许的标题
 
 ### 11.1 本地命令
 
-| 命令                                    | 当前作用                                                                                              |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                              | 通过项目 Node 版本包装脚本启动 Vite。Vite 配置将 `/api/ai` 和 `/api` 转发到 `http://localhost:8080`。 |
-| `pnpm run db:generate`                  | 从 Prisma schema 生成服务端 Prisma Client。                                                           |
-| `pnpm run db:migrate:deploy`            | 显式应用 PostgreSQL 版本化迁移；服务启动不会自动迁移。                                                |
-| `pnpm run build:server`                 | 生成 Prisma Client 并编译 Express BFF。                                                               |
-| `pnpm start`                            | 运行 `dist-server/apps/bff/index.js`；BFF 默认监听 8080，并托管 `dist` 与 SPA 回退。                  |
-| `./services/analytics/start-service.sh` | 启动本地 Python Analytics 服务。                                                                      |
-| `pnpm build`                            | 顺序执行 Vite 客户端构建和 BFF TypeScript 编译。                                                      |
-| `docker compose up --build`             | 构建并启动本地完整栈。                                                                                |
+| 命令                                                                             | 当前作用                                                                                              |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                                                       | 通过项目 Node 版本包装脚本启动 Vite。Vite 配置将 `/api/ai` 和 `/api` 转发到 `http://localhost:8080`。 |
+| `pnpm run db:generate`                                                           | 从 Prisma schema 生成服务端 Prisma Client。                                                           |
+| `pnpm run db:migrate:deploy`                                                     | 显式应用 PostgreSQL 版本化迁移；服务启动不会自动迁移。                                                |
+| `pnpm run build:server`                                                          | 生成 Prisma Client 并编译 Express BFF。                                                               |
+| `pnpm start`                                                                     | 运行 `dist-server/apps/bff/index.js`；BFF 默认监听 8080，并托管 `dist` 与 SPA 回退。                  |
+| `./services/analytics/start-service.sh`                                          | 启动本地 Python Analytics 服务。                                                                      |
+| `pnpm build`                                                                     | 顺序执行 Vite 客户端构建和 BFF TypeScript 编译。                                                      |
+| `docker compose --env-file .env -f Docker/compose/docker-compose.yml up --build` | 构建并启动本地完整栈。                                                                                |
 
 `vite.config.ts` 没有显式固定浏览器开发服务器端口，因此具体开发端口不作为本规格的配置契约。
 
 ### 11.2 Docker
 
-根 Dockerfile 使用 Node 20.19 的两阶段构建。构建阶段安装锁定依赖并生成 `dist` 与 `dist-server`；运行阶段只安装生产依赖并以 `node dist-server/apps/bff/index.js` 启动 8080。
+`Docker/build/web-bff.Dockerfile` 使用 Node 20.19 的两阶段构建。构建阶段安装锁定依赖并生成 `dist` 与 `dist-server`；运行阶段只安装生产依赖并以 `node dist-server/apps/bff/index.js` 启动 8080。
 
-Python Dockerfile 基于 Python 3.13 slim，安装 requirements 并以 Uvicorn 在容器内 `0.0.0.0:8001` 启动。容器文件的归属边界固定为：根 `Dockerfile` 负责 Web/BFF 完整栈镜像，`services/analytics/Dockerfile` 只负责 Analytics 镜像；根 `docker-compose.yml` 是本地完整栈入口，`docker-compose.test.yml` 只覆盖隔离测试数据库；`tooling/docker/check-compose.sh` 负责无运行时副作用的配置校验。它们保留在根目录或服务目录是为了保持标准 Compose 命令和运行单元归属，不再新增平行的 `docker/` 副本。
+`Docker/build/analytics.Dockerfile` 基于 Python 3.13 slim，安装 requirements 并以 Uvicorn 在容器内 `0.0.0.0:8001` 启动。容器文件的归属边界固定为：`Docker/build/web-bff.Dockerfile` 负责 Web/BFF 完整栈镜像，`Docker/build/analytics.Dockerfile` 负责 Analytics 镜像；`Docker/compose/docker-compose.yml` 是本地完整栈入口，`Docker/compose/docker-compose.test.yml` 只覆盖隔离测试数据库；`tooling/docker/check-compose.sh` 负责无运行时副作用的配置校验。两个 Dockerfile 都以仓库根目录为 build context，根 `.dockerignore` 统一管理构建排除项。
 
 Compose 中：
 
 - `web` 发布 `8080:8080`，并等待 PostgreSQL 和 Analytics healthcheck 成功；
 - `db` 使用具名卷保存用户和 AI 持久化数据，默认发布 `5432:5432` 供 DataGrip 等本地工具连接；测试覆盖会改用 `127.0.0.1:55439` 和独立卷；
 - `analytics` 不发布主机端口，只在私有 Compose 网络中接受 BFF 服务令牌；
-- 迁移使用 `docker compose exec web pnpm run db:migrate:deploy` 显式执行，不会自动在生产启动时执行；
+- 迁移使用 `docker compose --env-file .env -f Docker/compose/docker-compose.yml exec web pnpm run db:migrate:deploy` 显式执行，不会自动在生产启动时执行；
 - Compose 没有定义镜像发布或部署过程，示例口令仅供本地使用。
 
 ## 12. 质量基线与测试分层
@@ -373,7 +373,7 @@ Compose 中：
 | `pnpm run typecheck:server`        | Express BFF TypeScript 类型检查。                                                                  |
 | `pnpm run typecheck:contracts`     | TypeScript 契约正反例类型检查。                                                                    |
 | `pnpm run check:architecture`      | 检查共享包元数据、根目录编排文件、契约唯一目录和共享包与运行单元的导入方向。                       |
-| `pnpm run check:docker`            | 校验根 Compose 与测试覆盖 Compose 的配置结构，不启动服务或访问数据卷。                             |
+| `pnpm run check:docker`            | 校验 `Docker/compose/` 下完整栈与测试覆盖 Compose 的配置结构，不启动服务或访问数据卷。             |
 | `pnpm test` / `pnpm run test:unit` | 串行执行 BFF Node 测试和前端 Service Vitest。                                                      |
 | `pnpm run test:component`          | React Testing Library + jsdom 组件测试。                                                           |
 | `pnpm run test:e2e`                | Playwright 本地生产构建关键流程冒烟。                                                              |
@@ -381,7 +381,7 @@ Compose 中：
 | `pnpm run test:baseline`           | lint、格式、三项类型检查、架构检查、Docker 配置检查、unit、component、E2E 和构建的完整 Node 基线。 |
 | `pnpm run build`                   | 客户端生产构建与 BFF 编译。                                                                        |
 
-`test:baseline` 不包含 Python 测试。CI 的 `frontend-bff` job 安装锁定 pnpm 依赖后显式运行 `check:architecture`，安装 Chromium 后运行 `test:baseline`；独立 `python` job 使用 Python 3.13 安装 requirements 后运行 `test:python`。Quality Gate 在 pull request 和对 `main` 的 push 上触发，权限为只读仓库内容。当前工作流没有 Docker build、镜像发布或部署步骤，但 Node 基线会运行 `check:docker` 校验两套 Compose 配置。Web 位于 `apps/web/`，Vite 从 `apps/web/index.html` 构建，客户端产物仍位于根 `dist/` 并由 Express 提供。BFF 位于 `apps/bff/`，入口为 `apps/bff/index.ts`，编译入口为 `dist-server/apps/bff/index.js`。Analytics 位于 `services/analytics/`，入口为 `main.py`，由独立 FastAPI 进程提供服务。
+`test:baseline` 不包含 Python 测试。CI 的 `frontend-bff` job 安装锁定 pnpm 依赖后显式运行 `check:architecture`，安装 Chromium 后运行 `test:baseline`；独立 `python` job 使用 Python 3.13 安装 requirements 后运行 `test:python`。Quality Gate 在 pull request 和对 `main` 的 push 上触发，权限为只读仓库内容。当前工作流没有 Docker build、镜像发布或部署步骤，但 Node 基线会运行 `check:docker` 校验 `Docker/compose/` 下的两套 Compose 配置。Web 位于 `apps/web/`，Vite 从 `apps/web/index.html` 构建，客户端产物仍位于根 `dist/` 并由 Express 提供。BFF 位于 `apps/bff/`，入口为 `apps/bff/index.ts`，编译入口为 `dist-server/apps/bff/index.js`。Analytics 位于 `services/analytics/`，入口为 `main.py`，由独立 FastAPI 进程提供服务。
 
 测试责任按边界分配：
 
@@ -480,7 +480,7 @@ Compose 中：
 
 本规格的当前事实来自以下可复核位置：
 
-- 运行与构建：`package.json`、`.nvmrc`、`vite.config.ts`、`Dockerfile`、`docker-compose.yml`、`docker-compose.test.yml`、`tooling/docker/check-compose.sh`、`.github/workflows/quality.yml`；
+- 运行与构建：`package.json`、`.nvmrc`、`vite.config.ts`、`Docker/build/`、`Docker/compose/`、`tooling/docker/check-compose.sh`、`.github/workflows/quality.yml`；
 - React 与 Service：`apps/web/src/App.tsx`、`apps/web/src/state/`、`apps/web/src/features/`、`apps/web/src/services/`、`apps/web/src/hooks/useAIChatSession.ts`；
 - Express BFF：`apps/bff/index.ts`、`apps/bff/ai/`、`apps/bff/hazards/`、`apps/bff/security/`、`packages/logging/`；
 - Python：`services/analytics/app/`、`services/analytics/analytics/`、`services/analytics/security.py`、`services/analytics/log_config.py`；

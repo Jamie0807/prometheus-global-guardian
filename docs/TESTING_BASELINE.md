@@ -80,7 +80,7 @@ pnpm run build:server:test
 - Python 核心算法的生产样本校准；
 - 公网部署、跨实例 SSE 恢复、集中观测和部署回滚。
 
-持久化运维测试必须使用 `docker-compose.test.yml` 的独立 Compose 项目、测试专用 `DATABASE_URL`、独立卷和 `127.0.0.1:55439`，不能接触开发或生产数据库。
+持久化运维测试必须使用 `Docker/compose/docker-compose.yml` 与 `Docker/compose/docker-compose.test.yml` 的独立 Compose 项目、测试专用 `DATABASE_URL`、独立卷和 `127.0.0.1:55439`，不能接触开发或生产数据库。
 
 ## 5. 环境限制与失败解释
 
